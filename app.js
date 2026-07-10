@@ -1,12 +1,12 @@
 // Lógica do formulário: dropdowns em cascata, listas dinâmicas (efetivo/
-// equipamentos/carros/atividades), condições do tempo, e o fluxo de
+// equipamentos e veículos/atividades), condições do tempo, e o fluxo de
 // "Gerar e Enviar RDO" (numeração -> gera xlsx -> envia pro backend).
 
 // Versão exibida no canto superior direito do app - bumped manualmente a
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.1';
+const VERSAO_APP = 'BETA 0.1.2';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -147,8 +147,13 @@ const state = {
     mm: { manha: '', tarde: '', noite: '' }
   },
   observacoes: '',
-  efetivo: Array.from({ length: N_EFETIVO_TOTAL }, (_, i) => ({ descricao: EFETIVO_PADRAO[i] || '', quant: '' })),
-  equipamentos: Array.from({ length: N_EQUIPAMENTOS }, () => ({ descricao: '', quant: '' })),
+  // Efetivo/Equipamentos agora crescem um de cada vez (botão "+
+  // Adicionar", igual Atividades - pedido do Paulo, 10/07 tarde) em vez
+  // de mostrar as 12/24 linhas do modelo de uma vez só. Efetivo começa
+  // com as 6 funções padrão já "adicionadas" (Engenheiro...Motorista);
+  // Equipamentos começa vazio, sem nenhum item padrão.
+  efetivo: EFETIVO_PADRAO.map(descricao => ({ descricao, quant: '' })),
+  equipamentos: [],
   // atividades comecam com 1 linha em branco - crescem com o botao "+
   // Adicionar atividade" (ver renderizarListaAtividades), em vez de
   // mostrar as 23/10 linhas do modelo de uma vez (formulario ficava
@@ -187,7 +192,11 @@ const el = {
   previewNumero: document.getElementById('preview-numero'),
   observacoes: document.getElementById('campo-observacoes'),
   listaEfetivo: document.getElementById('lista-efetivo'),
+  orcamentoEfetivo: document.getElementById('orcamento-efetivo'),
+  btnAddEfetivo: document.getElementById('btn-add-efetivo'),
   listaEquipamentos: document.getElementById('lista-equipamentos'),
+  orcamentoEquipamentos: document.getElementById('orcamento-equipamentos'),
+  btnAddEquipamentos: document.getElementById('btn-add-equipamentos'),
   listaAtivContratada: document.getElementById('lista-atividades-contratada'),
   listaAtivContratante: document.getElementById('lista-atividades-contratante'),
   orcamentoContratada: document.getElementById('orcamento-contratada'),
@@ -214,25 +223,42 @@ const el = {
 };
 
 // ---------------------------------------------------------------------------
-// Listas dinâmicas (Efetivo / Equipamentos / Carros)
+// Listas dinâmicas (Efetivo / Equipamentos e Veículos) - crescem uma linha
+// de cada vez com o botão "+ Adicionar" (igual Atividades - pedido do
+// Paulo, 10/07 tarde), em vez de mostrar as 12/24 linhas físicas do xlsx
+// de uma vez só. A capacidade (N_EFETIVO_TOTAL/N_EQUIPAMENTOS) é o limite
+// de quantos ITENS cabem (cada um ocupa exatamente 1 linha física no
+// modelo, ao contrário de Atividades onde um item pode consumir mais de
+// uma) - "orçamento" aqui é só a contagem de itens mesmo.
 // ---------------------------------------------------------------------------
 
-function renderizarListaQuant(container, itens, datalistId) {
+function atualizarOrcamentoQuant_(itens, capacidade, elOrcamento, btnAdd) {
+  const usados = itens.length;
+  elOrcamento.textContent = `${usados} / ${capacidade}`;
+  elOrcamento.parentElement.classList.toggle('cheio', usados >= capacidade);
+  btnAdd.disabled = usados >= capacidade;
+}
+
+function renderizarListaQuantCrescente(cfg) {
+  const { itens, container, elOrcamento, btnAdd, capacidade, datalistId } = cfg;
   container.innerHTML = '';
   const listAttr = datalistId ? `list="${datalistId}"` : '';
+
   itens.forEach((item, i) => {
     const linha = document.createElement('div');
     linha.className = 'linha-quant';
     linha.innerHTML = `
       <div class="campo-descricao">
         <label>Descrição</label>
-        <input type="text" data-idx="${i}" class="input-descricao" ${listAttr} autocomplete="off" value="${item.descricao || ''}">
+        <input type="text" class="input-descricao" ${listAttr} autocomplete="off" value="${item.descricao || ''}">
       </div>
       <div class="campo-quant">
         <label>Quant</label>
-        <input type="number" inputmode="numeric" min="0" data-idx="${i}" class="input-quant" value="${item.quant || ''}">
-      </div>`;
+        <input type="number" inputmode="numeric" min="0" class="input-quant" value="${item.quant || ''}">
+      </div>
+      <button type="button" class="btn-remover-quant" title="Remover">&times;</button>`;
     container.appendChild(linha);
+
     const inputDescricao = linha.querySelector('.input-descricao');
     inputDescricao.addEventListener('input', e => {
       if (e.target.value === 'Digitar') {
@@ -242,11 +268,20 @@ function renderizarListaQuant(container, itens, datalistId) {
       item.descricao = e.target.value;
     });
     // ver configurarListaSempreCompleta_ - sem isso, linhas já preenchidas
-    // (ex: "Engenheiro" nas linhas fixas do M.O.D.) não mostram a lista
-    // completa de sugestões ao tocar, só as que "batem" com o texto atual.
+    // (ex: "Engenheiro" nas 6 funções padrão do M.O.D.) não mostram a
+    // lista completa de sugestões ao tocar, só as que "batem" com o texto
+    // atual.
     configurarListaSempreCompleta_(inputDescricao);
+
     linha.querySelector('.input-quant').addEventListener('input', e => { item.quant = e.target.value; });
+
+    linha.querySelector('.btn-remover-quant').addEventListener('click', () => {
+      itens.splice(i, 1);
+      renderizarListaQuantCrescente(cfg);
+    });
   });
+
+  atualizarOrcamentoQuant_(itens, capacidade, elOrcamento, btnAdd);
 }
 
 // Atividades: lista que cresce com "+ Adicionar atividade" em vez de
@@ -354,8 +389,33 @@ el.btnAddContratante.addEventListener('click', () => {
 });
 
 preencherDatalist(el.dlMod, FUNCOES_MOD);
-renderizarListaQuant(el.listaEfetivo, state.efetivo, 'dl-mod');
-renderizarListaQuant(el.listaEquipamentos, state.equipamentos, 'dl-equipamentos');
+
+const cfgEfetivo = {
+  itens: state.efetivo,
+  container: el.listaEfetivo,
+  elOrcamento: el.orcamentoEfetivo,
+  btnAdd: el.btnAddEfetivo,
+  capacidade: N_EFETIVO_TOTAL,
+  datalistId: 'dl-mod'
+};
+const cfgEquipamentos = {
+  itens: state.equipamentos,
+  container: el.listaEquipamentos,
+  elOrcamento: el.orcamentoEquipamentos,
+  btnAdd: el.btnAddEquipamentos,
+  capacidade: N_EQUIPAMENTOS,
+  datalistId: 'dl-equipamentos'
+};
+el.btnAddEfetivo.addEventListener('click', () => {
+  state.efetivo.push({ descricao: '', quant: '' });
+  renderizarListaQuantCrescente(cfgEfetivo);
+});
+el.btnAddEquipamentos.addEventListener('click', () => {
+  state.equipamentos.push({ descricao: '', quant: '' });
+  renderizarListaQuantCrescente(cfgEquipamentos);
+});
+renderizarListaQuantCrescente(cfgEfetivo);
+renderizarListaQuantCrescente(cfgEquipamentos);
 renderizarListaAtividades(cfgAtivContratada);
 renderizarListaAtividades(cfgAtivContratante);
 

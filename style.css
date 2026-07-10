@@ -144,6 +144,16 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-quant .campo-descricao { flex: 3; }
 .linha-quant .campo-quant { flex: 1; }
 .linha-quant label { margin: 0 0 4px; }
+.linha-quant .btn-remover-quant {
+  background: none;
+  border: none;
+  color: var(--vermelho);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px 8px;
+  flex-shrink: 0;
+}
 
 .linha-atividade {
   border: 1px solid var(--borda);
@@ -197,6 +207,16 @@ textarea { resize: vertical; overflow: hidden; }
    buffer do canvas, não o background CSS por trás dele). */
 #canvas-assinatura-contratada {
   background-image: url('assets/logo_marca_dagua.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 110px;
+}
+
+/* Marca d'água do Contratante (imagem genérica de "cliente/fiscal de
+   obra" escolhida pelo Paulo, 10/07) no canvas da Contratante - mesma
+   lógica da marca d'água da FN acima. */
+#canvas-assinatura {
+  background-image: url('assets/logo_marca_dagua_contratante.png');
   background-repeat: no-repeat;
   background-position: center;
   background-size: 110px;
