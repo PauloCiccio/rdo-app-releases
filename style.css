@@ -191,6 +191,17 @@ textarea { resize: vertical; overflow: hidden; }
   margin-top: 4px;
 }
 
+/* Marca d'água da FN só no canvas da Contratada (é a assinatura da
+   própria empresa) - fica só no CSS de fundo do elemento, nunca entra no
+   PNG exportado (canvas.toDataURL() só captura o que foi desenhado no
+   buffer do canvas, não o background CSS por trás dele). */
+#canvas-assinatura-contratada {
+  background-image: url('assets/logo_marca_dagua.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 110px;
+}
+
 #cartao-preview .botao-secundario,
 #cartao-preview .botao-principal {
   margin-bottom: 8px;
