@@ -93,6 +93,7 @@
   <section class="cartao">
     <h2>Efetivo (MOD)</h2>
     <div id="lista-efetivo" class="lista-quant"></div>
+    <datalist id="dl-mod"></datalist>
   </section>
 
   <section class="cartao">
@@ -127,7 +128,10 @@
     <input type="text" id="campo-nome-assinante-contratada" placeholder="Nome completo">
     <label>Assine abaixo com o dedo</label>
     <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
-    <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
+    <div class="linha-botoes-assinatura">
+      <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
+      <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar">🔓 Travar assinatura</button>
+    </div>
   </section>
 
   <section class="cartao">
@@ -136,7 +140,10 @@
     <input type="text" id="campo-nome-assinante" placeholder="Nome completo">
     <label>Assine abaixo com o dedo</label>
     <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
-    <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
+    <div class="linha-botoes-assinatura">
+      <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
+      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar">🔓 Travar assinatura</button>
+    </div>
     <label class="linha-checkbox">
       <input type="checkbox" id="campo-concordo">
       Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO

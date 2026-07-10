@@ -224,6 +224,17 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .orcamento-info.cheio { color: var(--vermelho); font-weight: bold; }
 
+.linha-botoes-assinatura {
+  display: flex;
+  gap: 8px;
+}
+.linha-botoes-assinatura .botao-secundario { margin-top: 0; }
+.btn-travar.travado {
+  background: var(--vermelho);
+  color: #fff;
+  border-color: var(--vermelho);
+}
+
 .botao-secundario {
   width: 100%;
   padding: 10px;

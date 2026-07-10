@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.3';
+const VERSAO_APP = 'BETA 0.2.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -111,9 +111,22 @@ if (btnVerificarAtualizacao) {
   });
 }
 
+// Modelo novo (10/07) abriu 12 linhas físicas pra Efetivo/Equipamentos/
+// Veículos (era 6) - os 6 primeiros nomes vêm pré-preenchidos (igual antes),
+// as 6 linhas extras começam em branco. Equipamentos/Veículos idem, 12 cada.
 const EFETIVO_PADRAO = ['Engenheiro', 'Encarregado', 'Operador', 'Ajudante', 'Servente', 'Motorista'];
-const N_EQUIPAMENTOS = 6; // linha 7 virou "Total Equipamentos" no xlsx gerado
-const N_CARROS = 6; // linha 7 virou "Total Carros" no xlsx gerado
+// Sugestões de função pro campo Descrição do Efetivo (datalist, aceita
+// texto livre também) - pedido do Paulo pra cobrir mais funções de campo
+// além das 6 padrão.
+const FUNCOES_MOD = [
+  ...EFETIVO_PADRAO,
+  'Sondador', 'Soldador', 'Carpinteiro', 'Pedreiro', 'Armador', 'Eletricista',
+  'Mecânico', 'Apontador', 'Almoxarife', 'Técnico de Segurança', 'Topógrafo',
+  'Auxiliar de Topografia', 'Vigia'
+];
+const N_EFETIVO_TOTAL = 12;
+const N_EQUIPAMENTOS = 12;
+const N_CARROS = 12;
 
 const state = {
   contratante: '',
@@ -128,7 +141,7 @@ const state = {
     mm: { manha: '', tarde: '', noite: '' }
   },
   observacoes: '',
-  efetivo: EFETIVO_PADRAO.map(descricao => ({ descricao, quant: '' })),
+  efetivo: Array.from({ length: N_EFETIVO_TOTAL }, (_, i) => ({ descricao: EFETIVO_PADRAO[i] || '', quant: '' })),
   equipamentos: Array.from({ length: N_EQUIPAMENTOS }, () => ({ descricao: '', quant: '' })),
   carros: Array.from({ length: N_CARROS }, () => ({ descricao: '', quant: '' })),
   // atividades comecam com 1 linha em branco - crescem com o botao "+
@@ -163,6 +176,7 @@ const el = {
   dlServico: document.getElementById('dl-servico'),
   dlEquipamentos: document.getElementById('dl-equipamentos'),
   dlVeiculos: document.getElementById('dl-veiculos'),
+  dlMod: document.getElementById('dl-mod'),
   objeto: document.getElementById('campo-objeto'),
   trecho: document.getElementById('campo-trecho'),
   data: document.getElementById('campo-data'),
@@ -180,9 +194,11 @@ const el = {
   nomeAssinanteContratada: document.getElementById('campo-nome-assinante-contratada'),
   canvasAssinaturaContratada: document.getElementById('canvas-assinatura-contratada'),
   btnLimparAssinaturaContratada: document.getElementById('btn-limpar-assinatura-contratada'),
+  btnTravarAssinaturaContratada: document.getElementById('btn-travar-assinatura-contratada'),
   nomeAssinante: document.getElementById('campo-nome-assinante'),
   canvasAssinatura: document.getElementById('canvas-assinatura'),
   btnLimparAssinatura: document.getElementById('btn-limpar-assinatura'),
+  btnTravarAssinatura: document.getElementById('btn-travar-assinatura'),
   concordo: document.getElementById('campo-concordo'),
   btnGerar: document.getElementById('btn-gerar'),
   status: document.getElementById('status-envio'),
@@ -214,7 +230,11 @@ function renderizarListaQuant(container, itens, datalistId) {
         <input type="number" inputmode="numeric" min="0" data-idx="${i}" class="input-quant" value="${item.quant || ''}">
       </div>`;
     container.appendChild(linha);
-    linha.querySelector('.input-descricao').addEventListener('input', e => { item.descricao = e.target.value; });
+    const inputDescricao = linha.querySelector('.input-descricao');
+    inputDescricao.addEventListener('input', e => {
+      if (e.target.value === 'Digitar') e.target.value = ''; // ver preencherDatalist
+      item.descricao = e.target.value;
+    });
     linha.querySelector('.input-quant').addEventListener('input', e => { item.quant = e.target.value; });
   });
 }
@@ -323,7 +343,8 @@ el.btnAddContratante.addEventListener('click', () => {
   renderizarListaAtividades(cfgAtivContratante);
 });
 
-renderizarListaQuant(el.listaEfetivo, state.efetivo);
+preencherDatalist(el.dlMod, FUNCOES_MOD);
+renderizarListaQuant(el.listaEfetivo, state.efetivo, 'dl-mod');
 renderizarListaQuant(el.listaEquipamentos, state.equipamentos, 'dl-equipamentos');
 renderizarListaQuant(el.listaCarros, state.carros, 'dl-veiculos');
 renderizarListaAtividades(cfgAtivContratada);
@@ -361,9 +382,23 @@ el.trecho.addEventListener('input', () => { state.local = el.trecho.value; });
 // constava na lista ainda.
 // ---------------------------------------------------------------------------
 
+// Primeiro item de toda lista suspensa é "Digitar" (pedido do Paulo) - ao
+// tocar/selecionar essa opção, o campo limpa sozinho (ver
+// configurarDigitarSentinela_) em vez de preencher com o texto literal
+// "Digitar", deixando o teclado aberto pra digitação livre sem a lista
+// atrapalhando a visão.
 function preencherDatalist(datalist, opcoes) {
-  datalist.innerHTML = opcoes.map(o => `<option value="${o}">`).join('');
+  const todas = ['Digitar', ...opcoes];
+  datalist.innerHTML = todas.map(o => `<option value="${o}">`).join('');
 }
+
+function configurarDigitarSentinela_(input) {
+  input.addEventListener('input', () => {
+    if (input.value === 'Digitar') input.value = '';
+  });
+}
+
+[el.contratante, el.obra, el.servico].forEach(configurarDigitarSentinela_);
 
 async function carregarObras() {
   try {
@@ -465,7 +500,11 @@ function configurarCanvasAssinatura_(canvas) {
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#1a1a1a';
   let assinando = false;
-  const estado = { temAssinatura: false };
+  // travada começa DESTRAVADA (false) - assina normal por padrão, igual já
+  // funcionava antes; travar é uma ação explícita do usuário depois de
+  // assinar, pra rolar a tela sem risco de arrastar o dedo em cima do
+  // desenho sem querer.
+  const estado = { temAssinatura: false, travada: false };
 
   function posNoCanvas(e) {
     const rect = canvas.getBoundingClientRect();
@@ -475,6 +514,7 @@ function configurarCanvasAssinatura_(canvas) {
   }
 
   canvas.addEventListener('pointerdown', e => {
+    if (estado.travada) return;
     assinando = true;
     estado.temAssinatura = true;
     const p = posNoCanvas(e);
@@ -483,7 +523,7 @@ function configurarCanvasAssinatura_(canvas) {
     canvas.setPointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', e => {
-    if (!assinando) return;
+    if (!assinando || estado.travada) return;
     const p = posNoCanvas(e);
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
@@ -498,18 +538,37 @@ function configurarCanvasAssinatura_(canvas) {
     limpar() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       estado.temAssinatura = false;
+    },
+    // Travado: solta o touch-action (deixa rolar a tela passando o dedo por
+    // cima do canvas, já que desenhar está desligado mesmo). Destravado:
+    // volta a capturar o toque pra desenhar sem disparar rolagem da página
+    // junto (touch-action:none, já era o padrão original do canvas).
+    alternarTravamento() {
+      estado.travada = !estado.travada;
+      canvas.style.touchAction = estado.travada ? 'pan-y' : 'none';
+      return estado.travada;
     }
   };
+}
+
+function configurarBotaoTravar_(botao, assinatura) {
+  botao.addEventListener('click', () => {
+    const travada = assinatura.alternarTravamento();
+    botao.textContent = travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
+    botao.classList.toggle('travado', travada);
+  });
 }
 
 const assinaturaContratada = configurarCanvasAssinatura_(el.canvasAssinaturaContratada);
 el.btnLimparAssinaturaContratada.addEventListener('click', () => assinaturaContratada.limpar());
 el.nomeAssinanteContratada.addEventListener('input', () => { state.assinaturaContratadaNome = el.nomeAssinanteContratada.value; });
+configurarBotaoTravar_(el.btnTravarAssinaturaContratada, assinaturaContratada);
 
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
 el.nomeAssinante.addEventListener('input', () => { state.assinaturaNome = el.nomeAssinante.value; });
 el.concordo.addEventListener('change', () => { state.assinaturaConcordo = el.concordo.checked; });
+configurarBotaoTravar_(el.btnTravarAssinatura, assinaturaContratante);
 
 // ---------------------------------------------------------------------------
 // Gerar e enviar
