@@ -26,12 +26,17 @@ const RdoExcel = (function () {
   // logo abaixo (A15:G15, células em branco no modelo, uma por dia).
   const DIAS_SEMANA = { 1: 'A15', 2: 'B15', 3: 'C15', 4: 'D15', 5: 'E15', 6: 'F15', 0: 'G15' };
 
-  // Efetivo (MOD) / Equipamentos / Veículos agora dividem as MESMAS 12
-  // linhas físicas (19-30), lado a lado (B:G / H:O / P:V) - Veículos virou
-  // uma "2ª coluna" dentro do bloco Equipamentos, sem cabeçalho nem total
-  // próprios (decisão do Paulo, 10/07). Como as 3 seções compartilham
-  // linha, a ALTURA de cada linha tem que ser o MAIOR nº de linhas exigido
-  // entre as 3 colunas daquela linha (ver preencherEfetivoEquipVeiculos_).
+  // Efetivo (MOD) / Equipamentos / Veículos dividem as MESMAS 12 linhas
+  // físicas (19-30), lado a lado (B:G / H:O / P:V). Como as seções
+  // compartilham linha, a ALTURA de cada linha tem que ser o MAIOR nº de
+  // linhas exigido entre as colunas daquela linha (ver
+  // preencherEfetivoEquipVeiculos_). Equipamentos e Veículos viraram uma
+  // lista ÚNICA no formulário (10/07, pedido do Paulo - "misturado, tudo
+  // junto") - os 24 slots físicos (12+12) continuam existindo no xlsx, só
+  // que agora são preenchidos SEQUENCIALMENTE a partir de uma lista só: os
+  // 12 primeiros itens vão pro bloco Equipamentos (H:O), os 12 seguintes
+  // pro bloco Veículos (P:V) - sem cabeçalho/total próprio pro bloco
+  // Veículos (decisão do Paulo).
   const LINHAS_QUANT = [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
   const LINHA_TOTAIS = 31;
   const LINHA_ATIV_CONTRATADA_INICIO = 33; // até 55 no modelo (23 linhas)
@@ -111,16 +116,52 @@ const RdoExcel = (function () {
     [12, 13, 14, 15].forEach(r => { sh.getRow(r).height = alturaPorLinha; });
   }
 
-  // Efetivo (MOD) / Equipamentos / Veículos: 12 linhas físicas
-  // COMPARTILHADAS (19-30) entre as 3 colunas lado a lado. Cada célula de
-  // descrição tem wrapText ligado e a ALTURA da linha é o maior nº de
-  // linhas exigido entre as 3 colunas daquela linha (não dá pra ter altura
-  // diferente por coluna, é a mesma linha física da planilha).
-  function preencherEfetivoEquipVeiculos_(sh, efetivo, equipamentos, veiculos) {
+  // Abreviações usadas SÓ na hora de escrever no xlsx/PDF (a lista/datalist
+  // do formulário continua mostrando o nome completo digitado pelo
+  // usuário - pedido do Paulo, 10/07: "na lista fica o nome completo mas
+  // quando for escrever no PDF fique abreviado"). Ex: "Caminhão betoneira
+  // nº 08 PLACA - QES 9284" -> "CAM. BETONEIRA Nº 08 (QES 9284)";
+  // "Perfuratriz hélice contínua EC 800/23" -> "PERF. HÉLICE CONTÍNUA EC
+  // 800/23". Só a PRIMEIRA palavra é abreviada (o resto do texto segue
+  // igual, só maiúsculo) - abreviar palavras do meio arriscaria cortar
+  // nomes próprios/modelos que precisam ficar legíveis.
+  const ABREVIACOES_EQUIPAMENTO = {
+    'caminhão': 'Cam.', 'caminhao': 'Cam.', 'caminhonete': 'Cam.',
+    'perfuratriz': 'Perf.', 'escavadeira': 'Escav.', 'retroescavadeira': 'Retroesc.',
+    'manipulador': 'Manip.', 'motoniveladora': 'Motonivel.', 'guindaste': 'Guind.',
+    'martelo': 'Mart.', 'veículo': 'Veíc.', 'veiculo': 'Veíc.'
+  };
+  function abreviarDescricaoEquipamento_(texto) {
+    let t = (texto || '').trim();
+    if (!t) return t;
+    t = t.replace(/\s*PLACA\s*-\s*(.+)$/i, ' ($1)');
+    const palavras = t.split(' ');
+    const primeira = palavras[0].toLowerCase().replace(/[.,]/g, '');
+    if (ABREVIACOES_EQUIPAMENTO[primeira]) {
+      palavras[0] = ABREVIACOES_EQUIPAMENTO[primeira];
+      t = palavras.join(' ');
+    }
+    return t.toUpperCase();
+  }
+
+  // Efetivo (MOD) / Equipamentos e Veículos: 12 linhas físicas
+  // COMPARTILHADAS (19-30) entre as colunas lado a lado. Equipamentos e
+  // Veículos viraram uma lista ÚNICA no formulário (10/07) - os primeiros
+  // 12 itens da lista combinada vão pro bloco H:O (Equipamentos), os 12
+  // seguintes pro bloco P:V (Veículos), preenchendo sequencialmente. Cada
+  // célula de descrição tem wrapText ligado e a ALTURA da linha é o maior
+  // nº de linhas exigido entre as colunas daquela linha (não dá pra ter
+  // altura diferente por coluna, é a mesma linha física da planilha). A
+  // descrição escrita na célula é a versão ABREVIADA (a estimativa de
+  // quebra de linha também usa o texto abreviado, já que é isso que
+  // realmente é renderizado/quebrado na célula).
+  function preencherEfetivoEquipVeiculos_(sh, efetivo, equipamentosVeiculos) {
     LINHAS_QUANT.forEach((r, i) => {
       const itemMod = efetivo[i] || { descricao: '', quant: '' };
-      const itemEquip = equipamentos[i] || { descricao: '', quant: '' };
-      const itemVeic = veiculos[i] || { descricao: '', quant: '' };
+      const itemEquip = equipamentosVeiculos[i] || { descricao: '', quant: '' };
+      const itemVeic = equipamentosVeiculos[i + 12] || { descricao: '', quant: '' };
+      const descEquipAbrev = abreviarDescricaoEquipamento_(itemEquip.descricao);
+      const descVeicAbrev = abreviarDescricaoEquipamento_(itemVeic.descricao);
 
       const cellMod = sh.getCell(`B${r}`);
       cellMod.value = itemMod.descricao || '';
@@ -128,33 +169,33 @@ const RdoExcel = (function () {
       sh.getCell(`F${r}`).value = itemMod.quant !== '' && itemMod.quant != null ? Number(itemMod.quant) : null;
 
       const cellEquip = sh.getCell(`H${r}`);
-      cellEquip.value = itemEquip.descricao || '';
+      cellEquip.value = descEquipAbrev;
       cellEquip.alignment = Object.assign({}, cellEquip.alignment, { wrapText: true });
       sh.getCell(`N${r}`).value = itemEquip.quant !== '' && itemEquip.quant != null ? Number(itemEquip.quant) : null;
 
       const cellVeic = sh.getCell(`P${r}`);
-      cellVeic.value = itemVeic.descricao || '';
+      cellVeic.value = descVeicAbrev;
       cellVeic.alignment = Object.assign({}, cellVeic.alignment, { wrapText: true });
       sh.getCell(`V${r}`).value = itemVeic.quant !== '' && itemVeic.quant != null ? Number(itemVeic.quant) : null;
 
       const nLinhas = Math.max(
         estimarLinhasTexto_(itemMod.descricao, CHARS_POR_LINHA_MOD),
-        estimarLinhasTexto_(itemEquip.descricao, CHARS_POR_LINHA_EQUIPAMENTO),
-        estimarLinhasTexto_(itemVeic.descricao, CHARS_POR_LINHA_VEICULO)
+        estimarLinhasTexto_(descEquipAbrev, CHARS_POR_LINHA_EQUIPAMENTO),
+        estimarLinhasTexto_(descVeicAbrev, CHARS_POR_LINHA_VEICULO)
       );
       sh.getRow(r).height = ALTURA_POR_LINHA_PT * nLinhas;
     });
   }
 
-  // Só a soma de MOD e de Equipamentos - Veículos não tem total próprio
-  // nesse modelo (decisão do Paulo, 10/07: virou uma "2ª coluna" dentro do
-  // bloco Equipamentos). Escrito como texto simples concatenado (não
-  // fórmula) porque a célula do total agora é uma mescla ÚNICA cobrindo
-  // rótulo+valor juntos (A31:G31 / H31:V31), sem uma célula separada
-  // alinhada embaixo da coluna "Quant" como no modelo antigo.
-  function preencherTotais_(sh, efetivo, equipamentos) {
+  // Só a soma de MOD e de Equipamentos+Veículos juntos (bloco Veículos não
+  // tem total próprio nesse modelo - decisão do Paulo, 10/07). Escrito
+  // como texto simples concatenado (não fórmula) porque a célula do total
+  // agora é uma mescla ÚNICA cobrindo rótulo+valor juntos (A31:G31 /
+  // H31:V31), sem uma célula separada alinhada embaixo da coluna "Quant"
+  // como no modelo antigo.
+  function preencherTotais_(sh, efetivo, equipamentosVeiculos) {
     const somaMod = efetivo.reduce((s, i) => s + (Number(i.quant) || 0), 0);
-    const somaEquip = equipamentos.reduce((s, i) => s + (Number(i.quant) || 0), 0);
+    const somaEquip = equipamentosVeiculos.reduce((s, i) => s + (Number(i.quant) || 0), 0);
     sh.getCell('A' + LINHA_TOTAIS).value = `TOTAL  M.O.D = ${somaMod}`;
     sh.getCell('H' + LINHA_TOTAIS).value = `TOTAL  EQUIPAMENTOS = ${somaEquip}`;
   }
@@ -325,7 +366,7 @@ const RdoExcel = (function () {
 
     alargarColunasHorario_(sh);
     corrigirCabecalhoHorario_(sh);
-    preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos, state.carros);
+    preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos);
     preencherTotais_(sh, state.efetivo, state.equipamentos);
 
     const resContratada = preencherAtividades_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, state.atividadesContratada);

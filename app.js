@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.2.0';
+const VERSAO_APP = 'BETA 0.1.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -125,8 +125,14 @@ const FUNCOES_MOD = [
   'Auxiliar de Topografia', 'Vigia'
 ];
 const N_EFETIVO_TOTAL = 12;
-const N_EQUIPAMENTOS = 12;
-const N_CARROS = 12;
+// Equipamentos e Veículos viraram UMA lista só no formulário (antes eram 2
+// seções separadas) - o xlsx ainda tem 2 blocos de colunas fisicamente
+// separados (12 linhas cada, ver excel-fill.js), mas quem preenche não
+// precisa mais decidir em qual seção um item entra - só digita tudo numa
+// lista misturada, e a distribuição pros 2 blocos acontece sozinha na
+// hora de gerar (primeiros 12 itens no bloco Equipamentos, os próximos 12
+// no bloco Veículos).
+const N_EQUIPAMENTOS = 24;
 
 const state = {
   contratante: '',
@@ -143,7 +149,6 @@ const state = {
   observacoes: '',
   efetivo: Array.from({ length: N_EFETIVO_TOTAL }, (_, i) => ({ descricao: EFETIVO_PADRAO[i] || '', quant: '' })),
   equipamentos: Array.from({ length: N_EQUIPAMENTOS }, () => ({ descricao: '', quant: '' })),
-  carros: Array.from({ length: N_CARROS }, () => ({ descricao: '', quant: '' })),
   // atividades comecam com 1 linha em branco - crescem com o botao "+
   // Adicionar atividade" (ver renderizarListaAtividades), em vez de
   // mostrar as 23/10 linhas do modelo de uma vez (formulario ficava
@@ -175,7 +180,6 @@ const el = {
   dlObra: document.getElementById('dl-obra'),
   dlServico: document.getElementById('dl-servico'),
   dlEquipamentos: document.getElementById('dl-equipamentos'),
-  dlVeiculos: document.getElementById('dl-veiculos'),
   dlMod: document.getElementById('dl-mod'),
   objeto: document.getElementById('campo-objeto'),
   trecho: document.getElementById('campo-trecho'),
@@ -184,7 +188,6 @@ const el = {
   observacoes: document.getElementById('campo-observacoes'),
   listaEfetivo: document.getElementById('lista-efetivo'),
   listaEquipamentos: document.getElementById('lista-equipamentos'),
-  listaCarros: document.getElementById('lista-carros'),
   listaAtivContratada: document.getElementById('lista-atividades-contratada'),
   listaAtivContratante: document.getElementById('lista-atividades-contratante'),
   orcamentoContratada: document.getElementById('orcamento-contratada'),
@@ -346,7 +349,6 @@ el.btnAddContratante.addEventListener('click', () => {
 preencherDatalist(el.dlMod, FUNCOES_MOD);
 renderizarListaQuant(el.listaEfetivo, state.efetivo, 'dl-mod');
 renderizarListaQuant(el.listaEquipamentos, state.equipamentos, 'dl-equipamentos');
-renderizarListaQuant(el.listaCarros, state.carros, 'dl-veiculos');
 renderizarListaAtividades(cfgAtivContratada);
 renderizarListaAtividades(cfgAtivContratante);
 
@@ -371,8 +373,41 @@ document.querySelectorAll('.mm-chuva').forEach(input => {
 
 el.observacoes.addEventListener('input', () => { state.observacoes = el.observacoes.value; autoGrow(el.observacoes); });
 el.data.addEventListener('input', () => { state.data = el.data.value; });
-el.objeto.addEventListener('input', () => { state.objetoContrato = el.objeto.value; });
-el.trecho.addEventListener('input', () => { state.local = el.trecho.value; });
+el.objeto.addEventListener('input', () => { state.objetoContrato = el.objeto.value; salvarUltimaIdentificacao_(); });
+el.trecho.addEventListener('input', () => { state.local = el.trecho.value; salvarUltimaIdentificacao_(); });
+
+// ---------------------------------------------------------------------------
+// Última Contratante/Obra/Serviço fica salva no aparelho (localStorage) e
+// pré-preenchida na próxima abertura do app - pedido do Paulo (10/07):
+// quem preenche RDO geralmente está numa obra só por um tempo, então só
+// precisa trocar a Data a cada dia. Só a IDENTIFICAÇÃO é lembrada (não o
+// resto do formulário - Data, Efetivo, Atividades etc. sempre começam em
+// branco, um RDO novo por dia).
+// ---------------------------------------------------------------------------
+const CHAVE_ULTIMA_IDENTIFICACAO = 'rdo_ultima_identificacao';
+
+function salvarUltimaIdentificacao_() {
+  try {
+    localStorage.setItem(CHAVE_ULTIMA_IDENTIFICACAO, JSON.stringify({
+      contratante: state.contratante,
+      obra: state.obra,
+      servico: state.servico,
+      objetoContrato: state.objetoContrato,
+      local: state.local
+    }));
+  } catch (err) {
+    console.warn('Falha ao salvar última identificação:', err);
+  }
+}
+
+function carregarUltimaIdentificacao_() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_ULTIMA_IDENTIFICACAO);
+    return bruto ? JSON.parse(bruto) : null;
+  } catch (err) {
+    return null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Contratante -> Obra -> Serviço, como campos de texto com sugestões
@@ -415,23 +450,54 @@ async function carregarObras() {
   preencherDatalist(el.dlContratante, clientes);
 }
 
+// Pré-preenche Contratante/Obra/Serviço/Objeto/Local com o que ficou salvo
+// da última vez (localStorage) - precisa rodar DEPOIS de carregarObras()
+// pra reaproveitar a mesma lógica de cascata (Contratante->Obra->Serviço)
+// já usada nos listeners de input, senão a datalist de Obra ficaria vazia
+// pro Contratante pré-preenchido.
+async function preencherUltimaIdentificacao_() {
+  const ultima = carregarUltimaIdentificacao_();
+  if (!ultima || !ultima.contratante) return;
+
+  el.contratante.value = ultima.contratante;
+  state.contratante = ultima.contratante;
+  const obras = [...new Set(obrasDisponiveis.filter(o => o.cliente === state.contratante).map(o => o.obra))].sort();
+  preencherDatalist(el.dlObra, obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
+
+  if (!ultima.obra) return;
+  el.obra.value = ultima.obra;
+  state.obra = ultima.obra;
+  atualizarServicosESugestoes();
+
+  if (ultima.servico) { el.servico.value = ultima.servico; state.servico = ultima.servico; }
+  if (ultima.objetoContrato) { el.objeto.value = ultima.objetoContrato; state.objetoContrato = ultima.objetoContrato; }
+  if (ultima.local) { el.trecho.value = ultima.local; state.local = ultima.local; }
+
+  await atualizarPreviewNumero();
+}
+
 // Sugestões de Equipamentos/Veículos vindas da frota real da FN (planilha
 // "Maquinas" - aba Equipamentos/Veiculos no backend) - mesma lógica de
 // texto livre + sugestão dos outros campos (datalist, não <select> rígido,
 // pra não travar o usuário se faltar algum item novo na lista).
+// Equipamentos e Veículos viraram uma lista só no formulário (10/07) -
+// sugestões das duas fontes (abas "Equipamentos" e "Veiculos" no backend)
+// combinadas numa ÚNICA datalist, cada busca com seu próprio fallback
+// independente (se uma falhar, ainda mostra a outra).
 async function carregarEquipamentosVeiculos() {
+  let equipamentos = [];
+  let veiculos = [];
   try {
-    const equipamentos = await RdoApi.getEquipamentos();
-    preencherDatalist(el.dlEquipamentos, equipamentos);
+    equipamentos = await RdoApi.getEquipamentos();
   } catch (err) {
     console.warn('Falha ao carregar lista de equipamentos:', err);
   }
   try {
-    const veiculos = await RdoApi.getVeiculos();
-    preencherDatalist(el.dlVeiculos, veiculos);
+    veiculos = await RdoApi.getVeiculos();
   } catch (err) {
     console.warn('Falha ao carregar lista de veículos:', err);
   }
+  preencherDatalist(el.dlEquipamentos, [...equipamentos, ...veiculos]);
 }
 
 el.contratante.addEventListener('input', () => {
@@ -440,11 +506,13 @@ el.contratante.addEventListener('input', () => {
   el.previewNumero.textContent = '-';
   const obras = [...new Set(obrasDisponiveis.filter(o => o.cliente === state.contratante).map(o => o.obra))].sort();
   preencherDatalist(el.dlObra, obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
+  salvarUltimaIdentificacao_();
 });
 
 el.obra.addEventListener('input', () => {
   state.obra = el.obra.value;
   atualizarServicosESugestoes();
+  salvarUltimaIdentificacao_();
 });
 
 el.obra.addEventListener('change', async () => {
@@ -458,6 +526,7 @@ el.servico.addEventListener('input', () => {
   const linha = obrasDisponiveis.find(o =>
     o.cliente === state.contratante && o.obra === state.obra && o.servico === state.servico);
   if (linha) aplicarServico(linha);
+  salvarUltimaIdentificacao_();
 });
 
 function atualizarServicosESugestoes() {
@@ -477,6 +546,7 @@ function aplicarServico(linha) {
   state.local = linha.local;
   el.objeto.value = linha.servico;
   el.trecho.value = linha.local;
+  salvarUltimaIdentificacao_();
 }
 
 async function atualizarPreviewNumero() {
@@ -500,11 +570,12 @@ function configurarCanvasAssinatura_(canvas) {
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#1a1a1a';
   let assinando = false;
-  // travada começa DESTRAVADA (false) - assina normal por padrão, igual já
-  // funcionava antes; travar é uma ação explícita do usuário depois de
-  // assinar, pra rolar a tela sem risco de arrastar o dedo em cima do
-  // desenho sem querer.
-  const estado = { temAssinatura: false, travada: false };
+  // travada começa TRAVADA (true) - pedido do Paulo (10/07): quem for
+  // assinar precisa destravar antes, pra evitar risco sem querer ao rolar
+  // a tela logo que abre a seção. touchAction já nasce em 'pan-y' (rolagem
+  // liberada) pra combinar com o estado inicial travado.
+  const estado = { temAssinatura: false, travada: true };
+  canvas.style.touchAction = 'pan-y';
 
   function posNoCanvas(e) {
     const rect = canvas.getBoundingClientRect();
@@ -552,6 +623,12 @@ function configurarCanvasAssinatura_(canvas) {
 }
 
 function configurarBotaoTravar_(botao, assinatura) {
+  // Rótulo/classe do botão têm que refletir o estado JÁ NO CARREGAMENTO
+  // (canvas nasce travado agora) - o HTML traz um texto/classe "padrão
+  // antigo" fixo que não bate mais, então sincroniza aqui em vez de só no
+  // click.
+  botao.textContent = assinatura.estado.travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
+  botao.classList.toggle('travado', assinatura.estado.travada);
   botao.addEventListener('click', () => {
     const travada = assinatura.alternarTravamento();
     botao.textContent = travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
@@ -801,5 +878,5 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
   }
 });
 
-carregarObras();
+carregarObras().then(preencherUltimaIdentificacao_);
 carregarEquipamentosVeiculos();
