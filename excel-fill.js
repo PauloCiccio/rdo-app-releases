@@ -2,45 +2,56 @@
 // formulário, usando ExcelJS (preserva mesclas/estilos/fórmulas do modelo -
 // só edita valores de célula).
 //
-// Mapeamento de células - modelo trocado em 10/07/2026 (ver célula T2, "Modelo
-// v. beta X.X.X" - bumpar esse texto A MÃO no template toda vez que o layout
-// mudar de novo, é só um marcador de revisão, o app NUNCA escreve nela).
-// A maioria dos campos agora segue o padrão "rótulo: valor" na MESMA célula
-// mesclada (igual Contratante/Obra já funcionava antes), inclusive RDO nº,
-// Rev., Página, Data, Objeto do Contrato e Local - só concatenar o texto.
+// Mapeamento de células - modelo trocado 2x em 10/07/2026 (manhã e tarde,
+// ver célula T2 "Modelo v. beta X.X" - bumpar esse texto A MÃO no template
+// toda vez que o layout mudar de novo, é só um marcador de revisão, o app
+// NUNCA escreve nela). RDO nº/Rev./Página e Data seguem "rótulo: valor" na
+// MESMA célula mesclada, numa linha só. Contratante/Obra/Objeto do
+// Contrato/Local usam rótulo+valor em DUAS linhas na mesma célula (quebra
+// manual "\n" - pedido do Paulo pra o valor ficar "abaixo do nome" do
+// rótulo).
 
 const RdoExcel = (function () {
+  // Modelo trocado de novo em 10/07/2026 à tarde (Paulo ajustou o arquivo
+  // pra deixar as colunas A:G com largura uniforme - isso empurrou TODAS
+  // as linhas do layout pra cima, então praticamente todo o mapeamento
+  // abaixo mudou de novo em relação à versão da manhã). Rótulo fica na
+  // MESMA célula mesclada que antes só pro Data ("Data: " + valor,
+  // inline) - Contratante/Obra/Objeto/Local agora usam rótulo+valor em
+  // DUAS linhas dentro da mesma célula (o modelo já veio com wrapText
+  // ligado e a linha alta o bastante pra 2 linhas de texto - ver
+  // gerarWorkbook).
   const CELULAS = {
-    numero: 'L3',     // "RDO - Nº.: " + numero
-    rev: 'R3',        // "Rev.: " + rev
-    pagina: 'U3',      // "Página.: " + pagina
-    contratante: 'A7', // "CONTRATANTE:" + valor
-    obra: 'L7',        // "OBRA: " + valor
-    objeto: 'A9',      // "OBJETO DO CONTRATO:" + valor
-    local: 'L9',       // "LOCAL" + valor
-    data: 'A11'        // "Data:        " + valor (mesma célula, mescla A11:G12)
+    numero: 'L3',      // mescla L3:Q5 (3 linhas) - valign CENTER pra alinhar visualmente com a linha 4
+    rev: 'R3',         // mescla R3:T5, mesma lógica
+    pagina: 'U3',      // mescla U3:V5, mesma lógica
+    contratante: 'A6', // "CONTRATANTE:\n" + valor
+    obra: 'L6',        // "OBRA: \n" + valor
+    objeto: 'A7',      // "OBJETO DO CONTRATO:\n" + valor
+    local: 'L7',       // "LOCAL: \n" + valor
+    data: 'A8'         // "Data:        " + valor (inline, mescla A8:G9)
   };
 
-  // Linha 14 (A14:G14) só tem as abreviações fixas dos dias (2ª,3ª,...) -
-  // NÃO mexer nela. A marcação "X" do dia correspondente vai na linha 15
-  // logo abaixo (A15:G15, células em branco no modelo, uma por dia).
-  const DIAS_SEMANA = { 1: 'A15', 2: 'B15', 3: 'C15', 4: 'D15', 5: 'E15', 6: 'F15', 0: 'G15' };
+  // Linha 10 (A10:G10) só tem o rótulo "Dia da Semana" - NÃO mexer nela. A
+  // marcação "X" do dia correspondente vai na linha 11 logo abaixo
+  // (A11:G11, uma célula por dia: 2ª,3ª,4ª,5ª,6ª,Sab,Dom).
+  const DIAS_SEMANA = { 1: 'A11', 2: 'B11', 3: 'C11', 4: 'D11', 5: 'E11', 6: 'F11', 0: 'G11' };
 
   // Efetivo (MOD) / Equipamentos / Veículos dividem as MESMAS 12 linhas
-  // físicas (19-30), lado a lado (B:G / H:O / P:V). Como as seções
+  // físicas (16-27), lado a lado (B:G / H:O / P:V). Como as seções
   // compartilham linha, a ALTURA de cada linha tem que ser o MAIOR nº de
   // linhas exigido entre as colunas daquela linha (ver
-  // preencherEfetivoEquipVeiculos_). Equipamentos e Veículos viraram uma
-  // lista ÚNICA no formulário (10/07, pedido do Paulo - "misturado, tudo
+  // preencherEfetivoEquipVeiculos_). Equipamentos e Veículos são uma lista
+  // ÚNICA no formulário (10/07, pedido do Paulo - "misturado, tudo
   // junto") - os 24 slots físicos (12+12) continuam existindo no xlsx, só
-  // que agora são preenchidos SEQUENCIALMENTE a partir de uma lista só: os
-  // 12 primeiros itens vão pro bloco Equipamentos (H:O), os 12 seguintes
-  // pro bloco Veículos (P:V) - sem cabeçalho/total próprio pro bloco
-  // Veículos (decisão do Paulo).
-  const LINHAS_QUANT = [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
-  const LINHA_TOTAIS = 31;
-  const LINHA_ATIV_CONTRATADA_INICIO = 33; // até 55 no modelo (23 linhas)
-  const LINHA_ATIV_CONTRATANTE_INICIO = 56; // até 65 no modelo (10 linhas)
+  // que são preenchidos SEQUENCIALMENTE a partir de uma lista só: os 12
+  // primeiros itens vão pro bloco Equipamentos (H:O), os 12 seguintes pro
+  // bloco Veículos (P:V) - sem cabeçalho/total próprio pro bloco Veículos
+  // (decisão do Paulo).
+  const LINHAS_QUANT = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
+  const LINHA_TOTAIS = 28;
+  const LINHA_ATIV_CONTRATADA_INICIO = 30; // até 52 no modelo (23 linhas)
+  const LINHA_ATIV_CONTRATANTE_INICIO = 53; // até 62 no modelo (10 linhas)
   const CAPACIDADE_CONTRATADA = 23; // em "linhas" de ALTURA_POR_LINHA_PT
   const CAPACIDADE_CONTRATANTE = 10;
 
@@ -89,31 +100,31 @@ const RdoExcel = (function () {
     cell.font = Object.assign({}, cell.font, { bold: true });
   }
 
-  // Condições do Tempo: linha 13 = "Bom" (marcas em I13:K13), linha 14 =
-  // "Chuva" (marcas em I14:K14), linha 15 = "mm" (valores em I15:K15) -
-  // colunas I/J/K = Manhã/Tarde/Noite (cabeçalho na linha 12).
+  // Condições do Tempo: linha 10 = "Bom" (marcas em I10:K10), linha 11 =
+  // "Chuva" (marcas em I11:K11), linha 12 = "mm" (valores em I12:K12) -
+  // colunas I/J/K = Manhã/Tarde/Noite (cabeçalho na linha 9).
   function preencherTempo_(sh, tempo) {
-    if (tempo.bom.manha) marcarX_(sh, 'I13');
-    if (tempo.bom.tarde) marcarX_(sh, 'J13');
-    if (tempo.bom.noite) marcarX_(sh, 'K13');
-    if (tempo.chuva.manha) marcarX_(sh, 'I14');
-    if (tempo.chuva.tarde) marcarX_(sh, 'J14');
-    if (tempo.chuva.noite) marcarX_(sh, 'K14');
-    if (tempo.mm.manha !== '') sh.getCell('I15').value = Number(tempo.mm.manha);
-    if (tempo.mm.tarde !== '') sh.getCell('J15').value = Number(tempo.mm.tarde);
-    if (tempo.mm.noite !== '') sh.getCell('K15').value = Number(tempo.mm.noite);
+    if (tempo.bom.manha) marcarX_(sh, 'I10');
+    if (tempo.bom.tarde) marcarX_(sh, 'J10');
+    if (tempo.bom.noite) marcarX_(sh, 'K10');
+    if (tempo.chuva.manha) marcarX_(sh, 'I11');
+    if (tempo.chuva.tarde) marcarX_(sh, 'J11');
+    if (tempo.chuva.noite) marcarX_(sh, 'K11');
+    if (tempo.mm.manha !== '') sh.getCell('I12').value = Number(tempo.mm.manha);
+    if (tempo.mm.tarde !== '') sh.getCell('J12').value = Number(tempo.mm.tarde);
+    if (tempo.mm.noite !== '') sh.getCell('K12').value = Number(tempo.mm.noite);
   }
 
-  // Observações: rótulo M11:V11, conteúdo M12:V15 (mescla única de 4
-  // linhas, wrapText ligado).
+  // Observações: rótulo L8:V8, conteúdo L9:V12 (mescla única de 4 linhas,
+  // wrapText ligado).
   function preencherObservacoes_(sh, texto) {
-    const cell = sh.getCell('M12');
+    const cell = sh.getCell('L9');
     cell.value = (texto || '').trim();
     cell.alignment = Object.assign({}, cell.alignment, { wrapText: true, vertical: 'top' });
 
     const nLinhas = Math.max(4, Math.ceil((texto || '').length / CHARS_POR_LINHA_OBSERVACOES));
     const alturaPorLinha = (ALTURA_POR_LINHA_PT * nLinhas) / 4;
-    [12, 13, 14, 15].forEach(r => { sh.getRow(r).height = alturaPorLinha; });
+    [9, 10, 11, 12].forEach(r => { sh.getRow(r).height = alturaPorLinha; });
   }
 
   // Abreviações usadas SÓ na hora de escrever no xlsx/PDF (a lista/datalist
@@ -200,19 +211,16 @@ const RdoExcel = (function () {
     sh.getCell('H' + LINHA_TOTAIS).value = `TOTAL  EQUIPAMENTOS = ${somaEquip}`;
   }
 
-  // Colunas de horário (Início/Fim) das atividades eram estreitas demais no
-  // modelo original e quebravam o texto "07:00" visualmente - alargadas.
-  // (mesmas colunas C/D também formam a grade de Dia da Semana lá em cima -
-  // tradeoff já aceito desde o modelo antigo.)
-  function alargarColunasHorario_(sh) {
-    sh.getColumn('C').width = 9;
-    sh.getColumn('D').width = 9;
-  }
-
-  // Cabeçalho "Início" (C32) no modelo está sem acento ("Inicio") - "Fim"
-  // (D32) ao lado já está correto.
+  // Cabeçalho "Início" (C29) no modelo está sem acento ("Inicio") - "Fim"
+  // (D29) ao lado já está correto. NÃO alargar as colunas C/D pra caber
+  // "07:00" (existia um alargarColunasHorario_ que fazia isso antes) -
+  // Paulo pediu explicitamente (10/07 tarde) que A:G fiquem com a MESMA
+  // largura, e C/D também formam a grade de Dia da Semana lá em cima, então
+  // alargar aqui quebraria a uniformidade pedida. Se o texto de horário
+  // ficar apertado, é um ajuste de fonte/formato do modelo, não de largura
+  // de coluna.
   function corrigirCabecalhoHorario_(sh) {
-    const cell = sh.getCell('C32');
+    const cell = sh.getCell('C29');
     cell.value = 'Início';
     cell.alignment = Object.assign({}, cell.alignment, { horizontal: 'center' });
   }
@@ -283,45 +291,48 @@ const RdoExcel = (function () {
     return { itensColocados, itensDescartados: naoVazios.length - itensColocados, slotsUsados, capacidadeSlots };
   }
 
-  // Área "Responsável da Contratada" (A66:J69, mescla única de 4 linhas) -
+  // Área "Responsável da Contratada" (A63:J66, mescla única de 4 linhas) -
   // espelha inserirAssinatura_ (Contratante), só que o rótulo já é fixo (o
-  // texto real do modelo é lido direto da célula, não hardcoded aqui) e a
-  // imagem fica centralizada na fronteira das colunas E/F em vez de Q/R.
+  // texto real do modelo é lido direto da célula, não hardcoded aqui). O
+  // rótulo vem TOP-aligned no modelo original (CENTER) - forçado aqui pra
+  // 'top' porque a imagem da assinatura ocupa o resto do bloco (3 das 4
+  // linhas) logo abaixo; com CENTER a imagem ficava sobreposta em cima do
+  // texto (confirmado visualmente - "Re[assinatura]ccio" cortando o nome
+  // ao meio). Calibrado por teste visual (PNG) depois do remapeamento de
+  // 10/07 tarde - ver memória feedback_exceljs_template_fill.
   function inserirAssinaturaContratada_(workbook, sh, nome, base64Png) {
     const nomeLimpo = (nome || '').trim();
     if (!nomeLimpo && !base64Png) return;
 
-    const cell = sh.getCell('A66');
+    const cell = sh.getCell('A63');
     const rotuloBase = String(cell.value || '').trim() || 'Responsável da Contratada';
     cell.value = nomeLimpo ? `${rotuloBase}: ${nomeLimpo}` : rotuloBase;
+    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'top' });
 
     if (base64Png) {
       const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
-      // tl.col igual ao calibrado antes (colunas A:V não mudaram de
-      // largura nessa revisão do modelo, só a ÁREA da assinatura desceu 2
-      // linhas) - tl.row ajustado pra a nova posição (era linha 64, agora
-      // 66, mesmo deslocamento fracionário .15 dentro da linha).
       sh.addImage(imageId, {
-        tl: { col: 3.189, row: 65.15 },
-        ext: { width: 170, height: 48 }
+        tl: { col: 3.4, row: 63.05 },
+        ext: { width: 140, height: 34 }
       });
     }
   }
 
-  // Área "Responsável da Contratante" (K66:V69, mescla única de 4 linhas).
+  // Área "Responsável da Contratante" (K63:V66, mescla única de 4 linhas).
   function inserirAssinatura_(workbook, sh, nome, base64Png) {
     const nomeLimpo = (nome || '').trim();
     if (!nomeLimpo && !base64Png) return;
 
-    const cell = sh.getCell('K66');
+    const cell = sh.getCell('K63');
     const rotuloBase = String(cell.value || '').trim() || 'Responsável da Contratante';
     cell.value = nomeLimpo ? `${rotuloBase}: ${nomeLimpo}` : rotuloBase;
+    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'top' });
 
     if (base64Png) {
       const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
       sh.addImage(imageId, {
-        tl: { col: 15.475, row: 65.15 },
-        ext: { width: 170, height: 48 }
+        tl: { col: 15.7, row: 63.05 },
+        ext: { width: 140, height: 34 }
       });
     }
   }
@@ -351,20 +362,34 @@ const RdoExcel = (function () {
     const workbook = await carregarTemplate_();
     const sh = workbook.getWorksheet('RDO');
 
-    sh.getCell(CELULAS.numero).value = 'RDO - Nº.: ' + numero;
-    sh.getCell(CELULAS.rev).value = 'Rev.: 0';
-    sh.getCell(CELULAS.pagina).value = 'Página.: 1/1'; // RDO sempre cabe em 1 página (área de impressão fixa)
-    sh.getCell(CELULAS.contratante).value = 'CONTRATANTE: ' + state.contratante;
-    sh.getCell(CELULAS.obra).value = 'OBRA: ' + state.obra;
-    sh.getCell(CELULAS.objeto).value = 'OBJETO DO CONTRATO: ' + state.objetoContrato;
-    sh.getCell(CELULAS.local).value = 'LOCAL: ' + state.local;
+    // RDO nº/Rev./Página ficam numa mescla de 3 linhas (X3:Y5) - vertical
+    // CENTER pra o texto (uma linha só) cair visualmente alinhado com a
+    // linha 4 do meio, em vez de colado no topo (pedido do Paulo, 10/07
+    // tarde).
+    const celCentralizada = (endereco, texto) => {
+      const cell = sh.getCell(endereco);
+      cell.value = texto;
+      cell.alignment = Object.assign({}, cell.alignment, { vertical: 'middle' });
+    };
+    celCentralizada(CELULAS.numero, 'RDO - Nº.: ' + numero);
+    celCentralizada(CELULAS.rev, 'Rev.: 0');
+    celCentralizada(CELULAS.pagina, 'Página.: 1/1'); // RDO sempre cabe em 1 página (área de impressão fixa)
+
+    // Contratante/Obra/Objeto do Contrato/Local: rótulo na 1ª linha, valor
+    // na 2ª (mesma célula, quebra de linha manual) - pedido do Paulo
+    // (10/07 tarde) "preenchido abaixo do nome" do rótulo. As 4 células já
+    // vêm do modelo com wrapText ligado e altura dobrada (linhas 6/7 =
+    // 33.75pt, o dobro do normal) pra caber as 2 linhas.
+    sh.getCell(CELULAS.contratante).value = 'CONTRATANTE:\n' + state.contratante;
+    sh.getCell(CELULAS.obra).value = 'OBRA:\n' + state.obra;
+    sh.getCell(CELULAS.objeto).value = 'OBJETO DO CONTRATO:\n' + state.objetoContrato;
+    sh.getCell(CELULAS.local).value = 'LOCAL:\n' + state.local;
     sh.getCell(CELULAS.data).value = 'Data: ' + formatarDataBR_(state.data);
     marcarDiaSemana_(sh, state.data);
 
     preencherTempo_(sh, state.tempo);
     preencherObservacoes_(sh, state.observacoes);
 
-    alargarColunasHorario_(sh);
     corrigirCabecalhoHorario_(sh);
     preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos);
     preencherTotais_(sh, state.efetivo, state.equipamentos);

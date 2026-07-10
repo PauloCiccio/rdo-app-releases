@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.0';
+const VERSAO_APP = 'BETA 0.1.1';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -235,9 +235,16 @@ function renderizarListaQuant(container, itens, datalistId) {
     container.appendChild(linha);
     const inputDescricao = linha.querySelector('.input-descricao');
     inputDescricao.addEventListener('input', e => {
-      if (e.target.value === 'Digitar') e.target.value = ''; // ver preencherDatalist
+      if (e.target.value === 'Digitar') {
+        e.target.value = ''; // ver preencherDatalist
+        suprimirListaAteDesfocar_(e.target);
+      }
       item.descricao = e.target.value;
     });
+    // ver configurarListaSempreCompleta_ - sem isso, linhas já preenchidas
+    // (ex: "Engenheiro" nas linhas fixas do M.O.D.) não mostram a lista
+    // completa de sugestões ao tocar, só as que "batem" com o texto atual.
+    configurarListaSempreCompleta_(inputDescricao);
     linha.querySelector('.input-quant').addEventListener('input', e => { item.quant = e.target.value; });
   });
 }
@@ -427,13 +434,64 @@ function preencherDatalist(datalist, opcoes) {
   datalist.innerHTML = todas.map(o => `<option value="${o}">`).join('');
 }
 
+// Ao selecionar "Digitar" da lista suspensa, o campo limpa sozinho (linha
+// abaixo) - mas só isso não bastava (pedido do Paulo, 10/07 tarde): o
+// datalist nativo do Android/Chrome não fecha o popup que já estava aberto
+// só porque o JS zerou o value, e a lista (agora "filtrando" por um valor
+// vazio, ou seja, mostrando TUDO de novo) reaparece bem na hora que o
+// usuário ia digitar livre - o contrário do que o botão "Digitar" deveria
+// fazer. A correção é remover o atributo `list` por completo enquanto o
+// campo estiver com foco (impede qualquer popup de aparecer, nem
+// filtrado) e devolver o atributo no blur, pra sugestão voltar a funcionar
+// da próxima vez que o campo for tocado.
+function suprimirListaAteDesfocar_(input) {
+  const listId = input.getAttribute('list');
+  if (!listId) return;
+  input.removeAttribute('list');
+  input.addEventListener('blur', () => input.setAttribute('list', listId), { once: true });
+}
+
 function configurarDigitarSentinela_(input) {
   input.addEventListener('input', () => {
-    if (input.value === 'Digitar') input.value = '';
+    if (input.value === 'Digitar') {
+      input.value = '';
+      suprimirListaAteDesfocar_(input);
+    }
   });
 }
 
-[el.contratante, el.obra, el.servico].forEach(configurarDigitarSentinela_);
+// A lista suspensa só sugere opções que "batem" com o texto JÁ digitado no
+// campo (filtro nativo do datalist) - então um campo que chega PRÉ-
+// PREENCHIDO (ex: linhas fixas do M.O.D. tipo "Engenheiro", ou
+// Contratante/Obra/Serviço lembrados da última vez - ver
+// preencherUltimaIdentificacao_) não mostra a lista completa ao tocar,
+// só opções que contenham aquele texto (quase sempre nenhuma). Pedido do
+// Paulo (10/07 tarde): "a lista suspensa precisa estar em todas as linhas
+// do M.O.D, não só nas vazias". Fix: ao focar um campo com valor
+// preenchido, esvazia ele temporariamente (sem disparar o listener de
+// 'input', então o dado guardado no state não muda) pra o datalist voltar
+// a mostrar TUDO; se o usuário sair do campo sem escolher/digitar nada
+// novo, devolve o valor original no blur.
+function configurarListaSempreCompleta_(input) {
+  let valorAntesDoFoco = null;
+  input.addEventListener('focus', () => {
+    if (input.value && input.value !== 'Digitar') {
+      valorAntesDoFoco = input.value;
+      input.value = '';
+    }
+  });
+  input.addEventListener('blur', () => {
+    if (valorAntesDoFoco !== null && input.value === '') {
+      input.value = valorAntesDoFoco;
+    }
+    valorAntesDoFoco = null;
+  });
+}
+
+[el.contratante, el.obra, el.servico].forEach(input => {
+  configurarDigitarSentinela_(input);
+  configurarListaSempreCompleta_(input);
+});
 
 async function carregarObras() {
   try {
