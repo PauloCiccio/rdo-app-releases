@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.3';
+const VERSAO_APP = 'BETA 0.1.4';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,11 @@ const state = {
   assinaturaContratadaImagemBase64: null, // preenchido só na hora de gerar, a partir do canvas
   assinaturaNome: '',
   assinaturaImagemBase64: null, // preenchido só na hora de gerar, a partir do canvas
-  assinaturaConcordo: false
+  assinaturaConcordo: false,
+  // e-mail do responsável da Contratante, pra receber cópia (CC) do RDO -
+  // pedido do Paulo, 10/07. Igual nome/assinatura, é "por RDO" (limpa
+  // depois de enviar), não fica salvo entre RDOs.
+  emailContratante: ''
 };
 
 let obrasDisponiveis = [];
@@ -208,6 +212,7 @@ const el = {
   btnLimparAssinaturaContratada: document.getElementById('btn-limpar-assinatura-contratada'),
   btnTravarAssinaturaContratada: document.getElementById('btn-travar-assinatura-contratada'),
   nomeAssinante: document.getElementById('campo-nome-assinante'),
+  emailContratante: document.getElementById('campo-email-contratante'),
   canvasAssinatura: document.getElementById('canvas-assinatura'),
   btnLimparAssinatura: document.getElementById('btn-limpar-assinatura'),
   btnTravarAssinatura: document.getElementById('btn-travar-assinatura'),
@@ -762,6 +767,7 @@ configurarBotaoTravar_(el.btnTravarAssinaturaContratada, assinaturaContratada);
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
 el.nomeAssinante.addEventListener('input', () => { state.assinaturaNome = el.nomeAssinante.value; });
+el.emailContratante.addEventListener('input', () => { state.emailContratante = el.emailContratante.value.trim(); });
 el.concordo.addEventListener('change', () => { state.assinaturaConcordo = el.concordo.checked; });
 configurarBotaoTravar_(el.btnTravarAssinatura, assinaturaContratante);
 
@@ -781,6 +787,9 @@ function validar() {
   const tentandoAssinar = state.assinaturaNome.trim() || assinaturaContratante.estado.temAssinatura;
   if (tentandoAssinar && !state.assinaturaConcordo) {
     return 'Marque a caixa de concordância do Contratante (ou limpe o nome/assinatura se ele não vai assinar agora).';
+  }
+  if (state.emailContratante && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.emailContratante)) {
+    return 'E-mail do responsável da Contratante parece inválido.';
   }
   return null;
 }
@@ -960,7 +969,8 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       obra: state.obra,
       data: state.data,
       xlsxBase64: previewXlsxBase64,
-      fileName: previewFileName.replace(/\.pdf$/i, '.xlsx')
+      fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
+      emailContratante: state.emailContratante
     });
 
     el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado com sucesso!`;
@@ -977,10 +987,12 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       }
     };
 
-    // assinaturas, nomes e concordância são por RDO - limpa pra não ir junto no próximo
+    // assinaturas, nomes, e-mail e concordância são por RDO - limpa pra não ir junto no próximo
     assinaturaContratante.limpar();
     el.nomeAssinante.value = '';
     state.assinaturaNome = '';
+    el.emailContratante.value = '';
+    state.emailContratante = '';
     el.concordo.checked = false;
     state.assinaturaConcordo = false;
     assinaturaContratada.limpar();
