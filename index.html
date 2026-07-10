@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>RDO - FN Engenharia</title>
+<link rel="stylesheet" href="style.css">
+<script src="vendor/exceljs.min.js"></script>
+</head>
+<body>
+
+<header class="topo">
+  <img src="assets/logo_fn_bola.png" alt="FN Engenharia" class="logo">
+  <div>
+    <h1>Relatório Diário de Obra</h1>
+    <p class="subtitulo">FN Engenharia</p>
+  </div>
+  <div class="versao-bloco">
+    <span id="versao-app" class="versao-app"></span>
+    <button type="button" id="btn-verificar-atualizacao" class="link-atualizacao">Verificar atualizações</button>
+    <span id="status-atualizacao" class="status-atualizacao"></span>
+  </div>
+</header>
+
+<main id="form-rdo">
+
+  <section class="cartao">
+    <h2>Identificação</h2>
+
+    <label for="campo-contratante">Contratante</label>
+    <input type="text" id="campo-contratante" list="dl-contratante" placeholder="Selecione da lista ou digite" required autocomplete="off">
+    <datalist id="dl-contratante"></datalist>
+
+    <label for="campo-obra">Obra</label>
+    <input type="text" id="campo-obra" list="dl-obra" placeholder="Selecione da lista ou digite" required autocomplete="off">
+    <datalist id="dl-obra"></datalist>
+
+    <label for="campo-servico">Serviço</label>
+    <input type="text" id="campo-servico" list="dl-servico" placeholder="Selecione da lista ou digite (opcional)" autocomplete="off">
+    <datalist id="dl-servico"></datalist>
+
+    <label for="campo-objeto">Objeto do Contrato</label>
+    <input type="text" id="campo-objeto" placeholder="Preenchido automático, pode editar">
+
+    <label for="campo-trecho">Trecho / Local</label>
+    <input type="text" id="campo-trecho" placeholder="Preenchido automático, pode editar">
+
+    <div class="linha-2col">
+      <div>
+        <label for="campo-data">Data</label>
+        <input type="date" id="campo-data" required>
+      </div>
+      <div>
+        <label>RDO nº <span id="preview-numero" class="badge">-</span></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="cartao">
+    <h2>Condições do Tempo</h2>
+    <table class="tabela-tempo">
+      <thead>
+        <tr><th></th><th>Manhã</th><th>Tarde</th><th>Noite</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>Bom</th>
+          <td><button type="button" class="balao" data-tempo="bom" data-periodo="manha">X</button></td>
+          <td><button type="button" class="balao" data-tempo="bom" data-periodo="tarde">X</button></td>
+          <td><button type="button" class="balao" data-tempo="bom" data-periodo="noite">X</button></td>
+        </tr>
+        <tr>
+          <th>Chuva</th>
+          <td><button type="button" class="balao" data-tempo="chuva" data-periodo="manha">X</button></td>
+          <td><button type="button" class="balao" data-tempo="chuva" data-periodo="tarde">X</button></td>
+          <td><button type="button" class="balao" data-tempo="chuva" data-periodo="noite">X</button></td>
+        </tr>
+        <tr>
+          <th>mm</th>
+          <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="manha"></td>
+          <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="tarde"></td>
+          <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="noite"></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cartao">
+    <h2>Observações</h2>
+    <textarea id="campo-observacoes" rows="2" maxlength="500" placeholder="Observações do dia"></textarea>
+  </section>
+
+  <section class="cartao">
+    <h2>Efetivo (MOD)</h2>
+    <div id="lista-efetivo" class="lista-quant"></div>
+  </section>
+
+  <section class="cartao">
+    <h2>Equipamentos</h2>
+    <div id="lista-equipamentos" class="lista-quant"></div>
+    <datalist id="dl-equipamentos"></datalist>
+  </section>
+
+  <section class="cartao">
+    <h2>Veículos</h2>
+    <div id="lista-carros" class="lista-quant"></div>
+    <datalist id="dl-veiculos"></datalist>
+  </section>
+
+  <section class="cartao">
+    <h2>Atividades - Contratada</h2>
+    <p class="orcamento-info">Espaço usado: <span id="orcamento-contratada">0 / 23</span> linhas</p>
+    <div id="lista-atividades-contratada" class="lista-atividades"></div>
+    <button type="button" id="btn-add-contratada" class="botao-secundario">+ Adicionar atividade</button>
+  </section>
+
+  <section class="cartao">
+    <h2>Atividades - Contratante</h2>
+    <p class="orcamento-info">Espaço usado: <span id="orcamento-contratante">0 / 10</span> linhas</p>
+    <div id="lista-atividades-contratante" class="lista-atividades"></div>
+    <button type="button" id="btn-add-contratante" class="botao-secundario">+ Adicionar atividade</button>
+  </section>
+
+  <section class="cartao">
+    <h2>Assinatura da Contratada (opcional)</h2>
+    <label for="campo-nome-assinante-contratada">Nome de quem está assinando</label>
+    <input type="text" id="campo-nome-assinante-contratada" placeholder="Nome completo">
+    <label>Assine abaixo com o dedo</label>
+    <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
+    <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
+  </section>
+
+  <section class="cartao">
+    <h2>Assinatura do Contratante (opcional)</h2>
+    <label for="campo-nome-assinante">Nome de quem está assinando</label>
+    <input type="text" id="campo-nome-assinante" placeholder="Nome completo">
+    <label>Assine abaixo com o dedo</label>
+    <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
+    <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
+    <label class="linha-checkbox">
+      <input type="checkbox" id="campo-concordo">
+      Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
+    </label>
+  </section>
+
+  <section class="cartao">
+    <button type="button" id="btn-gerar" class="botao-principal">Pré-visualizar RDO</button>
+    <div id="status-envio" class="status" aria-live="polite"></div>
+  </section>
+
+  <section class="cartao" id="cartao-preview" style="display:none;">
+    <h2>Pré-visualização</h2>
+    <p>O RDO foi gerado. Toque em <strong>"Visualizar PDF"</strong> pra abrir e conferir o documento num leitor de PDF antes de confirmar o envio.</p>
+    <button type="button" id="btn-baixar-pdf" class="botao-principal">Visualizar PDF</button>
+    <button type="button" id="btn-compartilhar" class="botao-secundario" style="display:none;">Compartilhar PDF</button>
+    <button type="button" id="btn-confirmar-envio" class="botao-principal">Confirmar e Enviar por E-mail</button>
+    <button type="button" id="btn-cancelar-preview" class="botao-secundario">Cancelar / Editar</button>
+    <div id="status-confirmacao" class="status" aria-live="polite"></div>
+  </section>
+
+</main>
+
+<script src="api.js"></script>
+<script src="excel-fill.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
