@@ -232,8 +232,15 @@
 
   <section class="cartao" id="cartao-preview" style="display:none;">
     <h2>Pré-visualização</h2>
-    <p>O RDO foi gerado. Toque em <strong>"Baixar PDF de prévia"</strong> pra baixar e conferir o documento (vem com marca d'água "PRÉ-VISUALIZAÇÃO", só o envio final sai sem ela) antes de confirmar o envio.</p>
-    <button type="button" id="btn-baixar-pdf" class="botao-principal">Baixar PDF de prévia</button>
+    <p>O RDO foi gerado. Toque em <strong>"Exibir Prévia"</strong> pra conferir o documento (vem com marca d'água "PRÉ-VISUALIZAÇÃO", só o envio final sai sem ela) antes de confirmar o envio.</p>
+    <button type="button" id="btn-baixar-pdf" class="botao-principal">Exibir Prévia</button>
+    <div id="wrap-visualizador-app" class="wrap-visualizador-pdf" style="display:none;">
+      <div class="botoes-zoom-pdf">
+        <button type="button" id="btn-zoom-menos-app" class="botao-mini">－</button>
+        <button type="button" id="btn-zoom-mais-app" class="botao-mini">＋</button>
+      </div>
+      <iframe id="visualizador-app" class="iframe-visualizador-pdf"></iframe>
+    </div>
     <button type="button" id="btn-compartilhar" class="botao-secundario" style="display:none;">Compartilhar PDF</button>
     <button type="button" id="btn-confirmar-envio" class="botao-principal">Confirmar e Enviar por E-mail</button>
     <button type="button" id="btn-cancelar-preview" class="botao-secundario">Cancelar / Editar</button>

@@ -404,10 +404,13 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .bloco-corrigir-email input { flex: 1; margin: 0; }
 
-/* Preview do PDF parcial (aprovacao.html) com zoom SÓ dentro da caixa -
-   pinch-zoom da página inteira fica desligado (maximum-scale=1 no
-   viewport), então o zoom aqui é feito ampliando a largura do iframe
-   dentro de um wrapper com scroll, via botões +/- (ver aprovacao.js). */
+/* Preview de PDF (partial do cliente, prévia do app, prévia final do
+   cliente) com zoom SÓ dentro da caixa - pinch-zoom da página inteira
+   fica desligado (maximum-scale=1 no viewport), então o zoom aqui é
+   feito ampliando a largura do iframe dentro de um wrapper com scroll,
+   via botões +/- (ver configurarZoomIframe_ em app.js/aprovacao.js).
+   Classes reutilizáveis - pode ter mais de um visualizador na mesma
+   página (ex: aprovacao.html tem um pro PDF parcial e outro pro final). */
 .wrap-visualizador-pdf {
   overflow: auto;
   max-height: 75vh;
@@ -426,7 +429,7 @@ textarea { resize: vertical; overflow: hidden; }
   background: rgba(255,255,255,.9);
   border-bottom: 1px solid var(--borda);
 }
-#visualizador-pdf {
+.iframe-visualizador-pdf {
   display: block;
   width: 100%;
   height: 75vh;

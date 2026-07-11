@@ -81,7 +81,7 @@
         <button type="button" id="btn-zoom-menos" class="botao-mini">－</button>
         <button type="button" id="btn-zoom-mais" class="botao-mini">＋</button>
       </div>
-      <iframe id="visualizador-pdf"></iframe>
+      <iframe id="visualizador-pdf" class="iframe-visualizador-pdf"></iframe>
     </div>
   </section>
 
@@ -114,8 +114,15 @@
 
   <section class="cartao" id="cartao-preview-final" style="display:none;">
     <h2>Pré-visualização</h2>
-    <p>Confira o RDO com suas atividades e assinatura antes de concluir. O PDF baixado vem com marca d'água "PRÉ-VISUALIZAÇÃO" - só o envio final sai sem ela.</p>
-    <button type="button" id="btn-ver-pdf-final" class="botao-principal">Baixar PDF de prévia</button>
+    <p>Confira o RDO com suas atividades e assinatura antes de concluir. A prévia exibida vem com marca d'água "PRÉ-VISUALIZAÇÃO" - só o envio final sai sem ela.</p>
+    <button type="button" id="btn-ver-pdf-final" class="botao-principal">Exibir Prévia RDO Final</button>
+    <div id="wrap-visualizador-final" class="wrap-visualizador-pdf" style="display:none;">
+      <div class="botoes-zoom-pdf">
+        <button type="button" id="btn-zoom-menos-final" class="botao-mini">－</button>
+        <button type="button" id="btn-zoom-mais-final" class="botao-mini">＋</button>
+      </div>
+      <iframe id="visualizador-final" class="iframe-visualizador-pdf"></iframe>
+    </div>
     <button type="button" id="btn-concluir" class="botao-principal">Concluir e Enviar RDO Final</button>
     <button type="button" id="btn-editar" class="botao-secundario">Cancelar / Editar</button>
     <div id="status-confirmacao" class="status" aria-live="polite"></div>

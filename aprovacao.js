@@ -73,6 +73,10 @@ const el = {
 
   cartaoPreviewFinal: document.getElementById('cartao-preview-final'),
   btnVerPdfFinal: document.getElementById('btn-ver-pdf-final'),
+  wrapVisualizadorFinal: document.getElementById('wrap-visualizador-final'),
+  visualizadorFinal: document.getElementById('visualizador-final'),
+  btnZoomMaisFinal: document.getElementById('btn-zoom-mais-final'),
+  btnZoomMenosFinal: document.getElementById('btn-zoom-menos-final'),
   btnConcluir: document.getElementById('btn-concluir'),
   btnEditar: document.getElementById('btn-editar'),
   statusConfirmacao: document.getElementById('status-confirmacao'),
@@ -320,16 +324,22 @@ fetch('https://api.ipify.org?format=json')
 // reflui/amplia o conteúdo pra largura nova de verdade (não é só um
 // "esticar" visual), e o wrapper com overflow:auto deixa rolar pra ver o
 // resto. maximum-scale=1 no viewport principal continua desligando o
-// pinch-zoom da página toda.
-let zoomPdfAtual_ = 100;
-el.btnZoomMais.addEventListener('click', () => {
-  zoomPdfAtual_ = Math.min(zoomPdfAtual_ + 25, 250);
-  el.visualizadorPdf.style.width = zoomPdfAtual_ + '%';
-});
-el.btnZoomMenos.addEventListener('click', () => {
-  zoomPdfAtual_ = Math.max(zoomPdfAtual_ - 25, 100);
-  el.visualizadorPdf.style.width = zoomPdfAtual_ + '%';
-});
+// pinch-zoom da página toda. Função reutilizável - a página tem DOIS
+// visualizadores (PDF parcial em #cartao-info, PDF final em
+// #cartao-preview-final, ambos com zoom).
+function configurarZoomIframe_(iframe, btnMais, btnMenos) {
+  let zoomAtual = 100;
+  btnMais.addEventListener('click', () => {
+    zoomAtual = Math.min(zoomAtual + 25, 250);
+    iframe.style.width = zoomAtual + '%';
+  });
+  btnMenos.addEventListener('click', () => {
+    zoomAtual = Math.max(zoomAtual - 25, 100);
+    iframe.style.width = zoomAtual + '%';
+  });
+}
+configurarZoomIframe_(el.visualizadorPdf, el.btnZoomMais, el.btnZoomMenos);
+configurarZoomIframe_(el.visualizadorFinal, el.btnZoomMaisFinal, el.btnZoomMenosFinal);
 
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token');
@@ -585,29 +595,12 @@ function liberarFormularioPrincipal_() {
   renderizarListaAtividades(cfgAtivContratante);
 }
 
-function base64ParaBytes_(base64) {
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
 // Igual o app principal: Pré-visualizar -> conferir o PDF -> só então
 // mandar pra assinatura eletrônica de verdade.
 let previewXlsxBase64 = null;
 let previewPdfBase64 = null;
 let previewFileName = null;
 let stateFinalAtual = null; // guardado pra poder regerar a prévia com marca d'água (ver btnVerPdfFinal)
-
-function baixarPdf_(base64, fileName) {
-  const blob = new Blob([base64ParaBytes_(base64)], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 el.btnPrevisualizar.addEventListener('click', async () => {
   if (!assinaturaContratante.estado.temAssinatura) {
@@ -663,18 +656,25 @@ el.btnPrevisualizar.addEventListener('click', async () => {
 // gera uma cópia SEPARADA (apenasPreview:true) só pra esse download; o
 // xlsx/pdf que realmente vai ser enviado (previewXlsxBase64/
 // previewPdfBase64) não muda.
+// "Exibir Prévia RDO Final" (11/07 noite, voltou atrás do download -
+// Paulo preferiu ver na hora, com zoom, igual já mostra o PDF parcial pro
+// cliente em #cartao-info) - gera uma cópia SEPARADA com marca d'água
+// (apenasPreview:true) e mostra embutida via iframe (Drive), não baixa
+// mais nada.
 el.btnVerPdfFinal.addEventListener('click', async () => {
   el.btnVerPdfFinal.disabled = true;
   try {
-    el.statusConfirmacao.textContent = 'Gerando PDF de prévia (com marca d\'água)...';
+    el.statusConfirmacao.textContent = 'Gerando prévia (com marca d\'água)...';
     el.statusConfirmacao.className = 'status';
     const { base64: xlsxPreviaBase64, fileName: fileNamePrevia } = await RdoExcel.gerarWorkbook(stateFinalAtual, numero, { apenasPreview: true });
-    const respPdf = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
-    baixarPdf_(respPdf.pdfBase64, fileNamePrevia.replace(/\.xlsx$/i, '_PREVIA.pdf'));
+    const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
+    if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+    el.visualizadorFinal.src = respLink.pdfUrl;
+    el.wrapVisualizadorFinal.style.display = 'block';
     el.statusConfirmacao.textContent = '';
   } catch (err) {
     console.error(err);
-    el.statusConfirmacao.textContent = 'Erro ao baixar o PDF de prévia: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.textContent = 'Erro ao gerar a prévia: ' + (err && err.message ? err.message : err);
     el.statusConfirmacao.className = 'status erro';
     RdoApi.logErro('visualizar_pdf_aprovacao', err && err.message ? err.message : String(err), { token });
   } finally {

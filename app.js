@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.6.1';
+const VERSAO_APP = 'BETA 0.7.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -236,6 +236,10 @@ const el = {
   status: document.getElementById('status-envio'),
   cartaoPreview: document.getElementById('cartao-preview'),
   btnBaixarPdf: document.getElementById('btn-baixar-pdf'),
+  wrapVisualizadorApp: document.getElementById('wrap-visualizador-app'),
+  visualizadorApp: document.getElementById('visualizador-app'),
+  btnZoomMaisApp: document.getElementById('btn-zoom-mais-app'),
+  btnZoomMenosApp: document.getElementById('btn-zoom-menos-app'),
   btnCompartilhar: document.getElementById('btn-compartilhar'),
   btnConfirmarEnvio: document.getElementById('btn-confirmar-envio'),
   btnCancelarPreview: document.getElementById('btn-cancelar-preview'),
@@ -1551,9 +1555,28 @@ let previewNumeroAtual = null; // guardado pra poder regerar a prévia com marca
 
 function fecharPreview_() {
   el.cartaoPreview.style.display = 'none';
+  el.wrapVisualizadorApp.style.display = 'none';
+  el.visualizadorApp.src = '';
   el.statusConfirmacao.textContent = '';
   el.statusConfirmacao.className = 'status';
 }
+
+// Zoom do preview do PDF SÓ dentro da caixa (mesma técnica de
+// aprovacao.js/configurarZoomIframe_ - ver comentário lá pro histórico:
+// pinch-zoom nativo não dá pra restringir a um elemento, então aumenta a
+// LARGURA do iframe além de 100%, o Drive reflui o conteúdo de verdade).
+function configurarZoomIframe_(iframe, btnMais, btnMenos) {
+  let zoomAtual = 100;
+  btnMais.addEventListener('click', () => {
+    zoomAtual = Math.min(zoomAtual + 25, 250);
+    iframe.style.width = zoomAtual + '%';
+  });
+  btnMenos.addEventListener('click', () => {
+    zoomAtual = Math.max(zoomAtual - 25, 100);
+    iframe.style.width = zoomAtual + '%';
+  });
+}
+configurarZoomIframe_(el.visualizadorApp, el.btnZoomMaisApp, el.btnZoomMenosApp);
 
 // Depois de mandar o RDO (direto ou pra aprovação da Contratante), o
 // formulário volta pro estado "normal" de um RDO novo - pedido do Paulo
@@ -1597,6 +1620,12 @@ async function resetarParaProximoRdo_() {
   el.aprovacaoContratante.checked = false;
   state.aprovacaoContratante = false;
   el.avisoAprovacaoContratante.style.display = 'none';
+
+  // Prévia exibida (se houver) era do RDO anterior - esconde pra não
+  // mostrar um documento errado se o usuário abrir "Exibir Prévia" nesse
+  // meio tempo sem gerar um RDO novo primeiro.
+  el.wrapVisualizadorApp.style.display = 'none';
+  el.visualizadorApp.src = '';
 
   // Contratante/Obra continuam preenchidos (mesma obra) - reserva o
   // PRÓXIMO número já de cara, senão a prévia ficava travada em "-" até
@@ -1665,18 +1694,24 @@ el.btnGerar.addEventListener('click', async () => {
 // verdade). Gera uma cópia SEPARADA (com `apenasPreview: true`) só pra
 // esse download - o xlsx/pdf usado de verdade no envio (previewXlsxBase64/
 // previewPdfBase64, sem marca d'água) não muda.
+// "Exibir Prévia" (11/07 noite, voltou atrás do download - Paulo
+// preferiu ver na hora, com zoom, igual já mostra pro cliente) - gera
+// uma cópia SEPARADA com marca d'água (apenasPreview:true) e mostra
+// embutida via iframe (Drive), não baixa mais nada.
 el.btnBaixarPdf.addEventListener('click', async () => {
   el.btnBaixarPdf.disabled = true;
   try {
-    el.statusConfirmacao.textContent = 'Gerando PDF de prévia (com marca d\'água)...';
+    el.statusConfirmacao.textContent = 'Gerando prévia (com marca d\'água)...';
     el.statusConfirmacao.className = 'status';
     const { base64: xlsxPreviewBase64, fileName: fileNamePreview } = await RdoExcel.gerarWorkbook(state, previewNumeroAtual, { apenasPreview: true });
-    const respPdf = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
-    await compartilharPdf_(respPdf.pdfBase64, fileNamePreview.replace(/\.xlsx$/i, '_PREVIA.pdf'));
+    const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
+    if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+    el.visualizadorApp.src = respLink.pdfUrl;
+    el.wrapVisualizadorApp.style.display = 'block';
     el.statusConfirmacao.textContent = '';
   } catch (err) {
     console.error(err);
-    el.statusConfirmacao.textContent = 'Erro ao baixar o PDF de prévia: ' + err.message;
+    el.statusConfirmacao.textContent = 'Erro ao gerar a prévia: ' + err.message;
     el.statusConfirmacao.className = 'status erro';
     RdoApi.logErro('visualizar_pdf', err && err.message ? err.message : String(err));
   } finally {

@@ -234,6 +234,13 @@ const RdoApi = (function () {
     return postJson_({ action: 'previsualizarRDO', xlsxBase64, fileName });
   }
 
+  // Salva o PDF de prévia no Drive e devolve um link embutível (iframe) -
+  // usado pelo botão "Exibir Prévia" (mostra na hora, com zoom, em vez de
+  // baixar - ver app.js/aprovacao.js).
+  function gerarLinkPreview({ xlsxBase64, fileName }) {
+    return postJson_({ action: 'gerarLinkPreview', xlsxBase64, fileName });
+  }
+
   // Aprovação do Contratante por e-mail (11/07) - ver www/aprovacao.html.
   function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel }) {
     return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel });
@@ -325,7 +332,7 @@ const RdoApi = (function () {
   }
 
   return {
-    getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO,
+    getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO, gerarLinkPreview,
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
     buscarCliente, buscarNomeCliente, cadastrarCliente, login, salvarAssinaturaUsuario,
     meusRdos, buscarPdfPorId, reenviarLinkAprovacao, corrigirEmailAprovacao
