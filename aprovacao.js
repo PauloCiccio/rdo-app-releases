@@ -408,20 +408,35 @@ async function iniciar() {
 // entrada, ver Code.gs) pra poupar a pessoa de redigitar o próprio nome
 // toda vez que volta. A conferência de verdade (CPF+Nome) continua
 // acontecendo no clique de "Continuar" abaixo, sem pular esse passo.
+//
+// SEMPRE sobrescreve o campo Nome quando encontra (sem checar se já tem
+// texto) - a primeira versão só preenchia se o campo estivesse vazio, o
+// que bloqueava silenciosamente o auto-preenchimento sempre que a pessoa
+// preenchia os campos fora de ordem (ou o navegador reaproveitava algo
+// digitado antes). Dispara tanto no 'input' (digitando) quanto no 'blur'
+// (saindo do campo) como reforço - cobre o caso de colar o CPF de uma vez
+// (autofill do teclado/gerenciador de senhas), que às vezes não dispara
+// 'input' do mesmo jeito que digitar tecla por tecla.
 let ultimoCpfBuscado_ = null;
-el.cpf.addEventListener('input', async () => {
-  el.cpf.value = aplicarMascaraCpf_(el.cpf.value);
+async function autoPreencherNomePorCpf_() {
   const digitos = el.cpf.value.replace(/\D/g, '');
   if (digitos.length !== 11 || !validarCpf_(el.cpf.value) || digitos === ultimoCpfBuscado_) return;
   ultimoCpfBuscado_ = digitos;
   try {
     const resp = await RdoApi.buscarNomeCliente(el.cpf.value);
-    if (resp.ok && resp.encontrado && !el.nomeIdentificacao.value.trim()) {
+    if (resp.ok && resp.encontrado) {
       el.nomeIdentificacao.value = resp.nome;
     }
   } catch (err) {
     console.warn('Falha ao auto-preencher nome pelo CPF (ignorado):', err);
   }
+}
+el.cpf.addEventListener('input', () => {
+  el.cpf.value = aplicarMascaraCpf_(el.cpf.value);
+  autoPreencherNomePorCpf_();
+});
+el.cpf.addEventListener('blur', () => {
+  autoPreencherNomePorCpf_();
 });
 
 // Identificação (CPF+Nome, pedido do Paulo 11/07) - se o CPF já estiver
