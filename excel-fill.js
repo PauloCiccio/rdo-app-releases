@@ -332,7 +332,10 @@ const RdoExcel = (function () {
     if (base64Png) {
       const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
       sh.addImage(imageId, {
-        tl: { col: 3.4, row: 62.1 },
+        // linha 63.1 (0-based) = Excel linha 64 - pedido do Paulo, 11/07:
+        // a assinatura precisa ficar entre as linhas 64/65 (estava
+        // começando um pouco alto demais, colada na linha 63).
+        tl: { col: 3.4, row: 63.1 },
         ext: { width: 140, height: 34 }
       });
     }
@@ -352,7 +355,7 @@ const RdoExcel = (function () {
     if (base64Png) {
       const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
       sh.addImage(imageId, {
-        tl: { col: 15.7, row: 62.1 },
+        tl: { col: 15.7, row: 63.1 },
         ext: { width: 140, height: 34 }
       });
     }
