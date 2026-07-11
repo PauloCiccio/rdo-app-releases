@@ -39,7 +39,6 @@ const el = {
   infoData: document.getElementById('info-data'),
   infoIdentificado: document.getElementById('info-identificado'),
   visualizadorPdf: document.getElementById('visualizador-pdf'),
-  linkPdfNovaAba: document.getElementById('link-pdf-nova-aba'),
 
   form: document.getElementById('cartao-form'),
   listaAtivContratante: document.getElementById('lista-atividades-contratante'),
@@ -115,6 +114,22 @@ function validarCpf_(cpf) {
   return true;
 }
 
+// Seletores de Hora/Minuto (cópia de app.js, ver comentário lá pro
+// histórico completo) - substituem o <input type="time"> nativo porque o
+// relógio nativo do Android fica cortado com o celular na vertical.
+const HORAS_SELECT_ = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTOS_SELECT_ = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+function montarOpcoesHorario_(opcoes, valorAtual) {
+  return '<option value="">--</option>' + opcoes.map(o =>
+    `<option value="${o}"${o === valorAtual ? ' selected' : ''}>${o}</option>`
+  ).join('');
+}
+
+function combinarHorario_(hora, minuto) {
+  return (hora && minuto) ? `${hora}:${minuto}` : '';
+}
+
 // Mesma lógica de renderizarListaAtividades do app.js, incluindo o bloqueio
 // de digitação/Enter além da capacidade da página (ver app.js pro
 // histórico: sem isso, um item existente ainda podia estourar o limite
@@ -124,6 +139,8 @@ function renderizarListaAtividades(cfg) {
   container.innerHTML = '';
 
   itens.forEach((item, i) => {
+    const [horaInicioAtual, minInicioAtual] = (item.inicio || '').split(':');
+    const [horaFimAtual, minFimAtual] = (item.fim || '').split(':');
     const linha = document.createElement('div');
     linha.className = 'linha-atividade';
     linha.innerHTML = `
@@ -135,11 +152,19 @@ function renderizarListaAtividades(cfg) {
       <div class="linha-horarios">
         <div class="campo-horario">
           <label>Início</label>
-          <input type="time" class="input-inicio" value="${item.inicio || ''}">
+          <div class="seletor-hora">
+            <select class="select-hora-inicio">${montarOpcoesHorario_(HORAS_SELECT_, horaInicioAtual)}</select>
+            <span class="separador-hora">:</span>
+            <select class="select-min-inicio">${montarOpcoesHorario_(MINUTOS_SELECT_, minInicioAtual)}</select>
+          </div>
         </div>
         <div class="campo-horario">
           <label>Fim</label>
-          <input type="time" class="input-fim" value="${item.fim || ''}">
+          <div class="seletor-hora">
+            <select class="select-hora-fim">${montarOpcoesHorario_(HORAS_SELECT_, horaFimAtual)}</select>
+            <span class="separador-hora">:</span>
+            <select class="select-min-fim">${montarOpcoesHorario_(MINUTOS_SELECT_, minFimAtual)}</select>
+          </div>
         </div>
       </div>
       <label>Discriminação da Atividade</label>
@@ -155,8 +180,14 @@ function renderizarListaAtividades(cfg) {
       atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd);
     }
 
-    linha.querySelector('.input-inicio').addEventListener('input', e => { item.inicio = e.target.value; });
-    linha.querySelector('.input-fim').addEventListener('input', e => { item.fim = e.target.value; });
+    const selectHoraInicio = linha.querySelector('.select-hora-inicio');
+    const selectMinInicio = linha.querySelector('.select-min-inicio');
+    const selectHoraFim = linha.querySelector('.select-hora-fim');
+    const selectMinFim = linha.querySelector('.select-min-fim');
+    selectHoraInicio.addEventListener('change', () => { item.inicio = combinarHorario_(selectHoraInicio.value, selectMinInicio.value); });
+    selectMinInicio.addEventListener('change', () => { item.inicio = combinarHorario_(selectHoraInicio.value, selectMinInicio.value); });
+    selectHoraFim.addEventListener('change', () => { item.fim = combinarHorario_(selectHoraFim.value, selectMinFim.value); });
+    selectMinFim.addEventListener('change', () => { item.fim = combinarHorario_(selectHoraFim.value, selectMinFim.value); });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
     let valorAnterior = item.discriminacao || '';
     areaDiscriminacao.addEventListener('input', e => {
@@ -332,8 +363,6 @@ async function iniciar() {
   if (resp.pdfUrl) {
     el.visualizadorPdf.src = resp.pdfUrl;
     el.visualizadorPdf.style.display = 'block';
-    el.linkPdfNovaAba.href = resp.pdfUrl;
-    el.linkPdfNovaAba.style.display = 'block';
   }
 
   el.carregando.style.display = 'none';

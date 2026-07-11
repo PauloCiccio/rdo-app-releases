@@ -207,6 +207,22 @@ textarea { resize: vertical; overflow: hidden; }
   margin-bottom: 8px;
 }
 .linha-atividade .campo-horario { min-width: 0; }
+.seletor-hora {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.seletor-hora select {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 2px;
+  text-align: center;
+}
+.seletor-hora .separador-hora {
+  font-weight: bold;
+  color: var(--cinza);
+}
 .linha-atividade label { margin: 0 0 4px; }
 .linha-atividade textarea { min-height: 40px; }
 
@@ -242,8 +258,8 @@ textarea { resize: vertical; overflow: hidden; }
   background-size: 110px;
 }
 
-#cartao-preview .botao-secundario,
-#cartao-preview .botao-principal {
+.botao-secundario,
+.botao-principal {
   margin-bottom: 8px;
 }
 
