@@ -19,6 +19,8 @@ const el = {
   infoObra: document.getElementById('info-obra'),
   infoCliente: document.getElementById('info-cliente'),
   infoData: document.getElementById('info-data'),
+  visualizadorPdf: document.getElementById('visualizador-pdf'),
+  linkPdfNovaAba: document.getElementById('link-pdf-nova-aba'),
   form: document.getElementById('cartao-form'),
   listaAtivContratante: document.getElementById('lista-atividades-contratante'),
   btnAddContratante: document.getElementById('btn-add-contratante'),
@@ -261,6 +263,13 @@ async function iniciar() {
   el.infoObra.textContent = resp.obra;
   el.infoCliente.textContent = resp.cliente;
   el.infoData.textContent = resp.data;
+
+  if (resp.pdfUrl) {
+    el.visualizadorPdf.src = resp.pdfUrl;
+    el.visualizadorPdf.style.display = 'block';
+    el.linkPdfNovaAba.href = resp.pdfUrl;
+    el.linkPdfNovaAba.style.display = 'block';
+  }
 
   el.carregando.style.display = 'none';
   el.info.style.display = 'block';

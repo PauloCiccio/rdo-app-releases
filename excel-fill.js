@@ -324,12 +324,15 @@ const RdoExcel = (function () {
     const cell = sh.getCell('A63');
     const rotuloBase = String(cell.value || '').trim() || 'Responsável da Contratada';
     cell.value = nomeLimpo ? `${rotuloBase}: ${nomeLimpo}` : rotuloBase;
-    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'top' });
+    // Rótulo agora fica embaixo do bloco (linha 66), não em cima (linha 63)
+    // - pedido do Paulo, 11/07. Imagem sobe pra ocupar o espaço ACIMA do
+    // rótulo (linhas 63-65) em vez de abaixo dele.
+    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'bottom' });
 
     if (base64Png) {
       const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
       sh.addImage(imageId, {
-        tl: { col: 3.4, row: 63.05 },
+        tl: { col: 3.4, row: 62.1 },
         ext: { width: 140, height: 34 }
       });
     }
@@ -343,12 +346,13 @@ const RdoExcel = (function () {
     const cell = sh.getCell('K63');
     const rotuloBase = String(cell.value || '').trim() || 'Responsável da Contratante';
     cell.value = nomeLimpo ? `${rotuloBase}: ${nomeLimpo}` : rotuloBase;
-    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'top' });
+    // Mesmo ajuste do bloco da Contratada acima (rótulo embaixo, linha 66).
+    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'bottom' });
 
     if (base64Png) {
       const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
       sh.addImage(imageId, {
-        tl: { col: 15.7, row: 63.05 },
+        tl: { col: 15.7, row: 62.1 },
         ext: { width: 140, height: 34 }
       });
     }
