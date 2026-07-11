@@ -226,8 +226,8 @@ const RdoApi = (function () {
     return postJson_({ action: 'reservarNumero', cliente, obra });
   }
 
-  function enviarRDO({ cliente, obra, data, xlsxBase64, fileName, emailContratante }) {
-    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, fileName, emailContratante });
+  function enviarRDO({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante }) {
+    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante });
   }
 
   function previsualizarRDO({ xlsxBase64, fileName }) {

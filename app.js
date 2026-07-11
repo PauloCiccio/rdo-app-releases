@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.5';
+const VERSAO_APP = 'BETA 0.1.6';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -831,11 +831,38 @@ function validar() {
   return null;
 }
 
-function base64ParaBlob_(base64, mime) {
+function base64ParaBytes_(base64) {
   const bin = atob(base64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
+  return bytes;
+}
+
+function base64ParaBlob_(base64, mime) {
+  return new Blob([base64ParaBytes_(base64)], { type: mime });
+}
+
+// RDO com mais de 1 folha (ver particionarAtividades_/gerarDocumento em
+// excel-fill.js) gera um PDF de UMA página por vez - o conversor do
+// backend (Apps Script) só sabe transformar UMA aba do Excel em PDF por
+// chamada. Junta tudo num PDF final contínuo aqui no cliente com pdf-lib
+// (vendorizado em vendor/pdf-lib.min.js) - mais simples e confiável do
+// que ensinar o Apps Script a lidar com planilhas de várias abas.
+async function juntarPdfsBase64_(pdfsBase64) {
+  if (pdfsBase64.length === 1) return pdfsBase64[0];
+
+  const { PDFDocument } = PDFLib;
+  const final = await PDFDocument.create();
+  for (const base64 of pdfsBase64) {
+    const doc = await PDFDocument.load(base64ParaBytes_(base64));
+    const paginas = await final.copyPages(doc, doc.getPageIndices());
+    paginas.forEach(pagina => final.addPage(pagina));
+  }
+
+  const bytesFinais = await final.save();
+  let binario = '';
+  for (let i = 0; i < bytesFinais.length; i++) binario += String.fromCharCode(bytesFinais[i]);
+  return btoa(binario);
 }
 
 // rodandoNoApp_() já foi definida lá no topo do arquivo (usada também na
@@ -952,16 +979,24 @@ el.btnGerar.addEventListener('click', async () => {
     const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
 
     mostrarStatus('Gerando planilha...');
-    const { base64, fileName, avisos } = await RdoExcel.gerarWorkbook(state, numero);
+    const { base64, fileName, paginasParaPdf, totalPaginas, avisos } = await RdoExcel.gerarDocumento(state, numero);
 
-    mostrarStatus('Gerando PDF pra prévia...');
-    const resp = await RdoApi.previsualizarRDO({ xlsxBase64: base64, fileName });
+    mostrarStatus(totalPaginas > 1
+      ? `Gerando PDF pra prévia (${totalPaginas} folhas)...`
+      : 'Gerando PDF pra prévia...');
+    const pdfsBase64 = [];
+    for (const pagina of paginasParaPdf) {
+      const respPagina = await RdoApi.previsualizarRDO({ xlsxBase64: pagina.base64, fileName });
+      pdfsBase64.push(respPagina.pdfBase64);
+    }
 
-    previewPdfBase64 = resp.pdfBase64;
+    previewPdfBase64 = await juntarPdfsBase64_(pdfsBase64);
     previewFileName = fileName.replace(/\.xlsx$/i, '.pdf');
     previewXlsxBase64 = base64;
 
-    let mensagem = 'RDO gerado. Toque em "Baixar PDF pra conferir" antes de enviar.';
+    let mensagem = totalPaginas > 1
+      ? `RDO gerado em ${totalPaginas} folhas (atividades continuaram nas folhas seguintes). Toque em "Baixar PDF pra conferir" antes de enviar.`
+      : 'RDO gerado. Toque em "Baixar PDF pra conferir" antes de enviar.';
     if (avisos && avisos.length) mensagem += '\nAtenção: ' + avisos.join(' ');
     mostrarStatus('');
     el.statusConfirmacao.textContent = mensagem;
@@ -1006,6 +1041,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       obra: state.obra,
       data: state.data,
       xlsxBase64: previewXlsxBase64,
+      pdfBase64: previewPdfBase64,
       fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
       emailContratante: state.emailContratante
     });
