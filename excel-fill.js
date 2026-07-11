@@ -20,7 +20,7 @@ const RdoExcel = (function () {
   // inline) - Contratante/Obra/Objeto/Local agora usam rótulo+valor em
   // DUAS linhas dentro da mesma célula (o modelo já veio com wrapText
   // ligado e a linha alta o bastante pra 2 linhas de texto - ver
-  // preencherPagina_).
+  // gerarWorkbook).
   const CELULAS = {
     numero: 'L3',      // mescla L3:Q5 (3 linhas) - valign CENTER pra alinhar visualmente com a linha 4
     rev: 'R3',         // mescla R3:T5, mesma lógica
@@ -252,75 +252,60 @@ const RdoExcel = (function () {
     return estimarLinhasTexto_(texto, CHARS_POR_LINHA_ATIVIDADE);
   }
 
-  // Paginação automática (11/07, pedido do Paulo): quando as atividades
-  // (Contratada OU Contratante) não cabem mais numa página, em vez de
-  // descartar o excesso (comportamento antigo de preencherAtividades_),
-  // o excesso vira uma FOLHA NOVA que repete o documento inteiro e
-  // continua a numeração de onde parou. particionarAtividades_ faz só o
-  // CÁLCULO (que item vai em qual folha, sem tocar em nenhuma célula) -
-  // reaproveitado tanto pra Contratada quanto Contratante, e também pra
-  // descobrir de antemão quantas folhas o RDO inteiro vai precisar (ver
-  // gerarDocumento). Um item cujo texto sozinho já estoura a capacidade
-  // inteira de uma página nunca seria colocado em NENHUMA folha (loop
-  // infinito) - MAX_PAGINAS é a válvula de segurança pra esse caso E pra
-  // qualquer entrada patológica (texto absurdamente longo colado).
-  const MAX_PAGINAS = 6;
+  // Paginação automática (11/07) foi TENTADA e depois ABANDONADA no mesmo
+  // dia - a folha extra saía errada em uso real (ver memória do projeto
+  // pro histórico completo) e o Paulo preferiu voltar pro modelo mais
+  // simples de sempre-1-página, com a UI (app.js) impedindo de digitar
+  // além da capacidade em vez de descartar depois. Mantido aqui só o
+  // comportamento antigo/estável: preenche o que couber, descarta
+  // (com aviso) o que não coube - a UI já bloqueia esse caso antes de
+  // chegar aqui (botão "+ Adicionar" desabilitado e digitação bloqueada
+  // no limite), então na prática `itensDescartados` não deveria mais
+  // acontecer, é só uma rede de segurança.
+  function preencherAtividades_(sh, linhaInicio, capacidadeSlots, itens) {
+    const naoVazios = itens.filter(item => (item.discriminacao || '').trim() || item.inicio || item.fim);
 
-  function particionarAtividades_(itensNaoVazios, capacidadeSlots) {
-    const paginas = [];
-    let idx = 0;
-    while (idx < itensNaoVazios.length && paginas.length < MAX_PAGINAS) {
-      let slots = 0;
-      const itensDaPagina = [];
-      while (idx < itensNaoVazios.length) {
-        const nLinhas = estimarLinhasAtividade((itensNaoVazios[idx].discriminacao || '').trim());
-        if (slots + nLinhas > capacidadeSlots) break;
-        slots += nLinhas;
-        itensDaPagina.push(itensNaoVazios[idx]);
-        idx += 1;
-      }
-      if (itensDaPagina.length === 0) break; // item maior que a página inteira - nunca vai caber
-      paginas.push({ itens: itensDaPagina, slotsUsados: slots });
-    }
-    return { paginas, itensDescartados: itensNaoVazios.length - idx };
-  }
-
-  // Escreve NUMA folha só a fatia (chunk) de atividades que coube nela,
-  // numerando a partir de numeroInicial (1 na folha 1, continuando de onde
-  // a folha anterior parou nas seguintes). As linhas que sobrarem SEM
-  // atividade continuam numeradas (não ficam com a numeração da folha 1
-  // "1,2,3...") - pedido do Paulo: "mesmo que fique em branco" a numeração
-  // segue a sequência real daquela folha, igual um talão de papel picotado.
-  function escreverAtividadesNaPagina_(sh, linhaInicio, capacidadeSlots, chunk, numeroInicial) {
-    const itens = chunk ? chunk.itens : [];
+    let slotsUsados = 0;
     let linhaAtual = linhaInicio;
+    let itensColocados = 0;
 
-    itens.forEach((item, i) => {
+    for (const item of naoVazios) {
       const texto = (item.discriminacao || '').trim();
       const nLinhas = estimarLinhasAtividade(texto);
-      sh.getCell(`B${linhaAtual}`).value = numeroInicial + i;
+      if (slotsUsados + nLinhas > capacidadeSlots) {
+        // não coube mais - para aqui (mantém a ordem cronológica das
+        // atividades em vez de pular pra um item menor mais adiante).
+        break;
+      }
+
       if (item.inicio) sh.getCell(`C${linhaAtual}`).value = item.inicio;
       if (item.fim) sh.getCell(`D${linhaAtual}`).value = item.fim;
       sh.getCell(`E${linhaAtual}`).value = texto;
       sh.getRow(linhaAtual).height = ALTURA_POR_LINHA_PT * nLinhas;
-      linhaAtual += 1;
-    });
 
-    for (let r = linhaAtual; r <= linhaInicio + capacidadeSlots - 1; r++) {
-      sh.getCell(`B${r}`).value = numeroInicial + (r - linhaInicio);
+      slotsUsados += nLinhas;
+      linhaAtual += 1;
+      itensColocados += 1;
     }
 
     // IMPORTANTE: só as linhas "roubadas" pelo excesso de altura de itens
-    // com texto longo são ocultadas - NÃO todo o espaço não usado (ver
-    // memória feedback_exceljs_template_fill ponto 5). Apagar a linha de
-    // verdade (spliceRows) mexeria nas mesclas verticais dos rótulos
+    // com texto longo são ocultadas - NÃO todo o espaço não usado. O
+    // formulário em papel original tem linhas numeradas fixas e o padrão é
+    // preencher o que for usado e deixar o resto em branco visível (como
+    // qualquer checklist impresso). A única coisa que precisa de ajuste é
+    // quando um item consome MAIS de 1 linha de altura (texto longo com
+    // quebra): cada linha extra que ele consome "rouba" o espaço de uma
+    // linha física do FINAL do bloco, senão o conteúdo ultrapassaria a
+    // área de impressão de 1 página. Apagar a linha de verdade
+    // (spliceRows) mexeria nas mesclas verticais dos rótulos
     // "CONTRATADA"/"CONTRATANTE" e em toda referência de célula fixa do
     // resto do documento - por isso OCULTAR (row.hidden) em vez de apagar.
-    const slotsUsados = chunk ? chunk.slotsUsados : 0;
-    const linhasRoubadas = slotsUsados - itens.length;
+    const linhasRoubadas = slotsUsados - itensColocados;
     for (let r = linhaInicio + capacidadeSlots - linhasRoubadas; r <= linhaInicio + capacidadeSlots - 1; r++) {
       sh.getRow(r).hidden = true;
     }
+
+    return { itensColocados, itensDescartados: naoVazios.length - itensColocados, slotsUsados, capacidadeSlots };
   }
 
   // Área "Responsável da Contratada" (A63:J66, mescla única de 4 linhas) -
@@ -369,20 +354,17 @@ const RdoExcel = (function () {
     }
   }
 
-  async function carregarTemplateBuffer_() {
+  async function carregarTemplate_() {
     const resp = await fetch('assets/modelo_rdo.xlsx');
-    return resp.arrayBuffer();
-  }
-
-  async function carregarTemplate_(buffer) {
+    const buffer = await resp.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer);
     return workbook;
   }
 
-  function bufferParaBase64_(buffer, mimeType) {
+  function bufferParaBase64_(buffer) {
     return new Promise((resolve, reject) => {
-      const blob = new Blob([buffer], { type: mimeType });
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64 = reader.result.split(',')[1];
@@ -393,41 +375,14 @@ const RdoExcel = (function () {
     });
   }
 
-  const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  async function gerarWorkbook(state, numero) {
+    const workbook = await carregarTemplate_();
+    const sh = workbook.getWorksheet('RDO');
 
-  // Clona a folha ORIGEM pra uma folha nova, DENTRO DO MESMO workbook
-  // (nunca entre workbooks diferentes - o imageId de uma imagem só faz
-  // sentido dentro do workbook que a registrou via addImage, então clonar
-  // entre workbooks deixaria a imagem quebrada/apontando pra nada). Usado
-  // só pra montar o arquivo xlsx COMBINADO de várias folhas (o anexo final)
-  // - cada folha do PDF é gerada por um caminho totalmente separado (ver
-  // gerarDocumento), então esta função não precisa ser perfeita pixel a
-  // pixel, só precisa preservar valores/estilos/mesclas/imagens (o que
-  // basta pra um arquivo Excel de arquivo/consulta).
-  //
-  // ARMADILHA do ExcelJS 4.4.0: o getter de `worksheet.model` devolve as
-  // mesclas em `model.merges` (array de strings tipo "A1:B2"), mas o
-  // SETTER de `model` só lê `model.mergeCells` (nome DIFERENTE) - por isso
-  // atribuir `novaFolha.model = origem.model` perde TODAS as mesclas em
-  // silêncio (sem erro nenhum). Confirmado testando manualmente antes de
-  // usar isso em produção - por isso as mesclas são reaplicadas na mão
-  // logo abaixo, usando a lista que o getter realmente devolve.
-  function clonarPaginaTemplate_(workbook, origem, novoNome) {
-    const nova = workbook.addWorksheet(novoNome + ' (temp)');
-    const modelo = JSON.parse(JSON.stringify(origem.model));
-    const merges = modelo.merges || [];
-    modelo.name = novoNome; // evita colisão de nome ao atribuir o model (ver set model em worksheet.js)
-    nova.model = modelo;
-    merges.forEach(range => nova.mergeCellsWithoutStyle(range));
-    return nova;
-  }
-
-  // Preenche UMA folha inteira (seja a folha 1 do arquivo combinado, seja
-  // uma folha individual carregada só pra gerar o PDF daquela página) -
-  // toda a lógica de "o que vai em cada folha" fica concentrada aqui, uma
-  // função só usada nos dois contextos, pra nunca divergir entre o
-  // arquivo Excel final e os PDFs de cada página.
-  function preencherPagina_(workbook, sh, state, numero, opcoes) {
+    // RDO nº/Rev./Página ficam numa mescla de 3 linhas (X3:Y5) - vertical
+    // CENTER pra o texto (uma linha só) cair visualmente alinhado com a
+    // linha 4 do meio, em vez de colado no topo (pedido do Paulo, 10/07
+    // tarde).
     const celCentralizada = (endereco, texto) => {
       const cell = sh.getCell(endereco);
       cell.value = texto;
@@ -435,11 +390,13 @@ const RdoExcel = (function () {
     };
     celCentralizada(CELULAS.numero, 'RDO - Nº.: ' + numero);
     celCentralizada(CELULAS.rev, 'Rev.: 0');
-    celCentralizada(CELULAS.pagina, `Página.: ${opcoes.numPagina}/${opcoes.totalPaginas}`);
+    celCentralizada(CELULAS.pagina, 'Página.: 1/1'); // RDO sempre cabe em 1 página (área de impressão fixa) - paginação automática abandonada em 11/07
 
-    // Contratante/Obra/Objeto do Contrato/Local, Data, Dia da Semana,
-    // Tempo e Observações repetem em TODA folha (pedido do Paulo, 11/07 -
-    // "repetindo tudo").
+    // Contratante/Obra/Objeto do Contrato/Local: rótulo na 1ª linha, valor
+    // na 2ª (mesma célula, quebra de linha manual) - pedido do Paulo
+    // (10/07 tarde) "preenchido abaixo do nome" do rótulo. As 4 células já
+    // vêm do modelo com wrapText ligado e altura dobrada (linhas 6/7 =
+    // 33.75pt, o dobro do normal) pra caber as 2 linhas.
     sh.getCell(CELULAS.contratante).value = 'CONTRATANTE:\n' + state.contratante;
     sh.getCell(CELULAS.obra).value = 'OBRA:\n' + state.obra;
     sh.getCell(CELULAS.objeto).value = 'OBJETO DO CONTRATO:\n' + state.objetoContrato;
@@ -449,111 +406,36 @@ const RdoExcel = (function () {
 
     preencherTempo_(sh, state.tempo);
     preencherObservacoes_(sh, state.observacoes);
-    corrigirCabecalhoHorario_(sh);
 
-    // Efetivo/Equipamentos/Veículos repetem em TODA folha (correção de
-    // 11/07 à noite - a decisão anterior de deixar só na folha 1 fazia a
-    // folha 2 mostrar o texto de EXEMPLO do próprio modelo em branco
-    // (ex: "Engenheiro" hardcoded no template), que não bate com o que
-    // foi realmente digitado - parecia dado errado/bugado. Repetir
-    // sempre evita esse vazamento do template e combina com "repetir
-    // tudo" da folha 1, pedido do Paulo).
+    corrigirCabecalhoHorario_(sh);
     preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos);
     preencherTotais_(sh, state.efetivo, state.equipamentos);
 
-    escreverAtividadesNaPagina_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, opcoes.chunkContratada, opcoes.numeroInicialContratada);
-    escreverAtividadesNaPagina_(sh, LINHA_ATIV_CONTRATANTE_INICIO, CAPACIDADE_CONTRATANTE, opcoes.chunkContratante, opcoes.numeroInicialContratante);
+    const resContratada = preencherAtividades_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, state.atividadesContratada);
+    const resContratante = preencherAtividades_(sh, LINHA_ATIV_CONTRATANTE_INICIO, CAPACIDADE_CONTRATANTE, state.atividadesContratante);
 
-    // Assinaturas repetem em TODA folha, com a MESMA imagem/nome (pedido
-    // do Paulo, 11/07) - cada folha tem sua própria cópia da imagem
-    // (addImage de novo por folha), já que imageId não atravessa folhas.
     inserirAssinaturaContratada_(workbook, sh, state.assinaturaContratadaNome, state.assinaturaContratadaImagemBase64);
     inserirAssinatura_(workbook, sh, state.assinaturaNome, state.assinaturaImagemBase64);
-  }
 
-  // Gera o RDO inteiro: descobre quantas folhas são necessárias (a maior
-  // entre o nº de folhas que Contratada e Contratante precisariam cada
-  // uma na sua própria paginação - ver particionarAtividades_), monta o
-  // arquivo xlsx COMBINADO (1 aba por folha, é o anexo final) e, SEPARADO,
-  // um xlsx de UMA folha só por página (usados só internamente pra gerar
-  // o PDF de cada página via o mesmo conversor do backend que já existia,
-  // sem precisar ensinar o backend a lidar com planilhas de várias abas -
-  // ver [[feedback_exceljs_template_fill]] e a memória do projeto RDO App
-  // pro raciocínio completo por trás dessa divisão).
-  async function gerarDocumento(state, numero) {
-    const templateBuffer = await carregarTemplateBuffer_();
-
-    const naoVaziosContratada = state.atividadesContratada.filter(item => (item.discriminacao || '').trim() || item.inicio || item.fim);
-    const naoVaziosContratante = state.atividadesContratante.filter(item => (item.discriminacao || '').trim() || item.inicio || item.fim);
-    const particaoContratada = particionarAtividades_(naoVaziosContratada, CAPACIDADE_CONTRATADA);
-    const particaoContratante = particionarAtividades_(naoVaziosContratante, CAPACIDADE_CONTRATANTE);
-    const totalPaginas = Math.max(1, particaoContratada.paginas.length, particaoContratante.paginas.length);
-
-    // acumuladores de numeração (continuam de folha em folha mesmo quando
-    // uma seção não tem chunk numa folha - ver escreverAtividadesNaPagina_).
-    let numeroContratadaAcumulado = 1;
-    let numeroContratanteAcumulado = 1;
-
-    // 1) Arquivo combinado (anexo final): folha 1 é a do template
-    // carregado uma vez, as seguintes são CLONES dela dentro do MESMO
-    // workbook (ver clonarPaginaTemplate_).
-    const workbookCombinado = await carregarTemplate_(templateBuffer);
-    const shBase = workbookCombinado.getWorksheet('RDO');
-    shBase.name = 'Página 1';
-    const folhasCombinado = [shBase];
-    for (let p = 2; p <= totalPaginas; p++) {
-      folhasCombinado.push(clonarPaginaTemplate_(workbookCombinado, shBase, `Página ${p}`));
-    }
-
-    // 2) Uma folha individual (workbook próprio, carregado do zero) por
-    // página, só pra conversão em PDF - ver comentário da função.
-    const paginasParaPdf = [];
-
-    for (let i = 0; i < totalPaginas; i++) {
-      const numPagina = i + 1;
-      const chunkContratada = particaoContratada.paginas[i];
-      const chunkContratante = particaoContratante.paginas[i];
-      const opcoes = {
-        numPagina,
-        totalPaginas,
-        chunkContratada,
-        chunkContratante,
-        numeroInicialContratada: numeroContratadaAcumulado,
-        numeroInicialContratante: numeroContratanteAcumulado
-      };
-
-      preencherPagina_(workbookCombinado, folhasCombinado[i], state, numero, opcoes);
-
-      const workbookPagina = await carregarTemplate_(templateBuffer);
-      const shPagina = workbookPagina.getWorksheet('RDO');
-      preencherPagina_(workbookPagina, shPagina, state, numero, opcoes);
-      const bufferPagina = await workbookPagina.xlsx.writeBuffer();
-      const { base64: base64Pagina } = await bufferParaBase64_(bufferPagina, MIME_XLSX);
-      paginasParaPdf.push({ base64: base64Pagina, numPagina });
-
-      numeroContratadaAcumulado += chunkContratada ? chunkContratada.itens.length : 0;
-      numeroContratanteAcumulado += chunkContratante ? chunkContratante.itens.length : 0;
-    }
-
-    const bufferCombinado = await workbookCombinado.xlsx.writeBuffer();
-    const { base64, blob } = await bufferParaBase64_(bufferCombinado, MIME_XLSX);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const { base64, blob } = await bufferParaBase64_(buffer);
 
     const numeroFormatado = String(numero).padStart(3, '0');
     const fileName = `RDO_${numeroFormatado}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
 
     const avisos = [];
-    if (particaoContratada.itensDescartados > 0) {
-      avisos.push(`${particaoContratada.itensDescartados} atividade(s) da CONTRATADA não coube(ram) nem paginando automaticamente (limite de ${MAX_PAGINAS} folhas atingido).`);
+    if (resContratada.itensDescartados > 0) {
+      avisos.push(`${resContratada.itensDescartados} atividade(s) da CONTRATADA não coube(ram) no RDO (espaço da página esgotado).`);
     }
-    if (particaoContratante.itensDescartados > 0) {
-      avisos.push(`${particaoContratante.itensDescartados} atividade(s) da CONTRATANTE não coube(ram) nem paginando automaticamente (limite de ${MAX_PAGINAS} folhas atingido).`);
+    if (resContratante.itensDescartados > 0) {
+      avisos.push(`${resContratante.itensDescartados} atividade(s) da CONTRATANTE não coube(ram) no RDO (espaço da página esgotado).`);
     }
 
-    return { base64, blob, fileName, paginasParaPdf, totalPaginas, avisos };
+    return { base64, blob, fileName, avisos };
   }
 
   return {
-    gerarDocumento,
+    gerarWorkbook,
     estimarLinhasAtividade,
     CAPACIDADE_CONTRATADA,
     CAPACIDADE_CONTRATANTE,

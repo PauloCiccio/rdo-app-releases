@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.7';
+const VERSAO_APP = 'BETA 0.2.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -168,9 +168,14 @@ const state = {
   assinaturaImagemBase64: null, // preenchido só na hora de gerar, a partir do canvas
   assinaturaConcordo: false,
   // e-mail do responsável da Contratante, pra receber cópia (CC) do RDO -
-  // pedido do Paulo, 10/07. Igual nome/assinatura, é "por RDO" (limpa
-  // depois de enviar), não fica salvo entre RDOs.
-  emailContratante: ''
+  // pedido do Paulo, 10/07. Fica SALVO entre RDOs (localStorage, ver
+  // salvarUltimaIdentificacao_) desde 11/07 - é o mesmo responsável da
+  // mesma obra na maioria dos dias, não faz sentido redigitar toda vez.
+  emailContratante: '',
+  // Checkbox "Contratante irá verificar o RDO em seu E-mail" (11/07) - por
+  // RDO, não persiste. Quando true, o botão final manda pra aprovação em
+  // vez de enviar direto (ver btnConfirmarEnvio).
+  aprovacaoContratante: false
 };
 
 let obrasDisponiveis = [];
@@ -218,6 +223,8 @@ const el = {
   btnLimparAssinatura: document.getElementById('btn-limpar-assinatura'),
   btnTravarAssinatura: document.getElementById('btn-travar-assinatura'),
   concordo: document.getElementById('campo-concordo'),
+  aprovacaoContratante: document.getElementById('campo-aprovacao-contratante'),
+  avisoAprovacaoContratante: document.getElementById('aviso-aprovacao-contratante'),
   btnGerar: document.getElementById('btn-gerar'),
   status: document.getElementById('status-envio'),
   cartaoPreview: document.getElementById('cartao-preview'),
@@ -347,14 +354,40 @@ function renderizarListaAtividades(cfg) {
     function atualizarEstimativa() {
       const n = RdoExcel.estimarLinhasAtividade(item.discriminacao);
       elEstimativa.textContent = (item.discriminacao || '').trim() ? `~${n} linha(s) no RDO` : '';
+      elEstimativa.classList.remove('estimativa-bloqueada');
       atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd);
     }
 
     linha.querySelector('.input-inicio').addEventListener('input', e => { item.inicio = e.target.value; });
     linha.querySelector('.input-fim').addEventListener('input', e => { item.fim = e.target.value; });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
+    let valorAnterior = item.discriminacao || '';
+    // Não basta desabilitar "+ Adicionar" quando o orçamento de linhas
+    // enche (isso já existia) - um item JÁ existente ainda podia estourar
+    // o limite digitando/colando mais texto ou dando Enter (quebra de
+    // linha manual), e só descobria isso depois, na hora de gerar o RDO
+    // (pedido do Paulo, 11/07 à noite: "não deve permitir... nem pular
+    // linha no teclado"). Aqui a checagem é no RESULTADO (linhas totais
+    // após a edição), não só na tecla Enter especificamente - cobre
+    // digitação normal que também quebra linha sozinha ao encher a largura
+    // do bloco, não só o Enter manual.
     areaDiscriminacao.addEventListener('input', e => {
-      item.discriminacao = e.target.value;
+      const textoNovo = e.target.value;
+      const contribuicaoAnterior = temConteudoAtividade(item) ? RdoExcel.estimarLinhasAtividade(item.discriminacao) : 0;
+      const usadosSemEste = calcularLinhasUsadas(itens) - contribuicaoAnterior;
+      const nLinhasNovo = RdoExcel.estimarLinhasAtividade(textoNovo);
+      const temInicioOuFim = Boolean(item.inicio || item.fim);
+      const contribuicaoNova = (textoNovo.trim() || temInicioOuFim) ? nLinhasNovo : 0;
+
+      if (usadosSemEste + contribuicaoNova > capacidade) {
+        e.target.value = valorAnterior; // reverte - não deixa a edição estourar o orçamento da página
+        elEstimativa.textContent = 'Limite de linhas da página atingido - apague algo pra continuar.';
+        elEstimativa.classList.add('estimativa-bloqueada');
+        return;
+      }
+
+      valorAnterior = textoNovo;
+      item.discriminacao = textoNovo;
       autoGrow(e.target);
       atualizarEstimativa();
     });
@@ -466,7 +499,11 @@ function salvarUltimaIdentificacao_() {
       obra: state.obra,
       servico: state.servico,
       objetoContrato: state.objetoContrato,
-      local: state.local
+      local: state.local,
+      // e-mail do responsável da Contratante (11/07): geralmente o mesmo
+      // pra mesma obra por semanas/meses, não faz sentido redigitar toda
+      // vez - ver aviso do botão "Limpar dados salvos" que também apaga.
+      emailContratante: state.emailContratante
     }));
   } catch (err) {
     console.warn('Falha ao salvar última identificação:', err);
@@ -496,11 +533,13 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   state.servico = '';
   state.objetoContrato = '';
   state.local = '';
+  state.emailContratante = '';
   el.contratante.value = '';
   el.obra.value = '';
   el.servico.value = '';
   el.objeto.value = '';
   el.trecho.value = '';
+  el.emailContratante.value = '';
   preencherDatalist(el.dlObra, []);
   preencherDatalist(el.dlServico, []);
 
@@ -517,6 +556,46 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
     el.btnLimparIdentificacao.disabled = false;
   }, 2000);
 });
+
+// ---------------------------------------------------------------------------
+// Assinatura da Contratada fica salva no aparelho (localStorage) e
+// restaurada já desenhada no canvas na próxima abertura do app - pedido do
+// Paulo (11/07 noite): agora que a assinatura da Contratada é OBRIGATÓRIA
+// em todo RDO, não faz sentido redesenhar a mesma assinatura toda vez (é
+// sempre o mesmo responsável da FN assinando). Continua TRAVADA (padrão),
+// e pode ser limpa/redesenhada se for outra pessoa assinando naquele dia -
+// nesse caso a nova assinatura é salva de novo ao gerar o próximo RDO.
+// ---------------------------------------------------------------------------
+const CHAVE_ASSINATURA_CONTRATADA = 'rdo_assinatura_contratada';
+
+function salvarAssinaturaContratada_() {
+  if (!state.assinaturaContratadaImagemBase64) return;
+  try {
+    localStorage.setItem(CHAVE_ASSINATURA_CONTRATADA, JSON.stringify({
+      nome: state.assinaturaContratadaNome,
+      imagemBase64: state.assinaturaContratadaImagemBase64
+    }));
+  } catch (err) {
+    console.warn('Falha ao salvar assinatura da Contratada:', err);
+  }
+}
+
+async function restaurarAssinaturaContratada_() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_ASSINATURA_CONTRATADA);
+    if (!bruto) return;
+    const dados = JSON.parse(bruto);
+    if (dados.nome) {
+      el.nomeAssinanteContratada.value = dados.nome;
+      state.assinaturaContratadaNome = dados.nome;
+    }
+    if (dados.imagemBase64) {
+      await assinaturaContratada.restaurar(dados.imagemBase64);
+    }
+  } catch (err) {
+    console.warn('Falha ao restaurar assinatura da Contratada:', err);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Contratante -> Obra -> Serviço, como campos de texto com sugestões
@@ -617,7 +696,14 @@ async function carregarObras() {
 // pro Contratante pré-preenchido.
 async function preencherUltimaIdentificacao_() {
   const ultima = carregarUltimaIdentificacao_();
-  if (!ultima || !ultima.contratante) return;
+  if (!ultima) return;
+
+  if (ultima.emailContratante) {
+    el.emailContratante.value = ultima.emailContratante;
+    state.emailContratante = ultima.emailContratante;
+  }
+
+  if (!ultima.contratante) return;
 
   el.contratante.value = ultima.contratante;
   state.contratante = ultima.contratante;
@@ -770,6 +856,24 @@ function configurarCanvasAssinatura_(canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       estado.temAssinatura = false;
     },
+    // Redesenha uma assinatura já salva (localStorage) no canvas, como se
+    // já tivesse sido assinada agora - usado pra "lembrar" a assinatura da
+    // Contratada de um RDO pro outro (mesma pessoa assina quase sempre,
+    // pedido do Paulo 11/07). Continua TRAVADO por padrão mesmo restaurada
+    // (não desenha por cima sem querer); usuário destrava/limpa se for
+    // outra pessoa assinando naquele dia.
+    restaurar(base64Png) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          estado.temAssinatura = true;
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = 'data:image/png;base64,' + base64Png;
+      });
+    },
     // Travado: solta o touch-action (deixa rolar a tela passando o dedo por
     // cima do canvas, já que desenhar está desligado mesmo). Destravado:
     // volta a capturar o toque pra desenhar sem disparar rolagem da página
@@ -804,8 +908,15 @@ configurarBotaoTravar_(el.btnTravarAssinaturaContratada, assinaturaContratada);
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
 el.nomeAssinante.addEventListener('input', () => { state.assinaturaNome = el.nomeAssinante.value; });
-el.emailContratante.addEventListener('input', () => { state.emailContratante = el.emailContratante.value.trim(); });
+el.emailContratante.addEventListener('input', () => {
+  state.emailContratante = el.emailContratante.value.trim();
+  salvarUltimaIdentificacao_();
+});
 el.concordo.addEventListener('change', () => { state.assinaturaConcordo = el.concordo.checked; });
+el.aprovacaoContratante.addEventListener('change', () => {
+  state.aprovacaoContratante = el.aprovacaoContratante.checked;
+  el.avisoAprovacaoContratante.style.display = state.aprovacaoContratante ? 'block' : 'none';
+});
 configurarBotaoTravar_(el.btnTravarAssinatura, assinaturaContratante);
 
 // ---------------------------------------------------------------------------
@@ -821,12 +932,25 @@ function validar() {
   if (!state.contratante) return 'Selecione o Contratante.';
   if (!state.obra) return 'Selecione a Obra.';
   if (!state.data) return 'Selecione a Data.';
+  // Assinatura da Contratada virou OBRIGATÓRIA (pedido do Paulo, 11/07
+  // noite) - antes era opcional junto com a Contratante.
+  if (!state.assinaturaContratadaNome.trim()) {
+    return 'Preencha o nome de quem está assinando pela Contratada (obrigatório).';
+  }
+  if (!assinaturaContratada.estado.temAssinatura) {
+    return 'Assinatura da Contratada é obrigatória.';
+  }
   const tentandoAssinar = state.assinaturaNome.trim() || assinaturaContratante.estado.temAssinatura;
   if (tentandoAssinar && !state.assinaturaConcordo) {
     return 'Marque a caixa de concordância do Contratante (ou limpe o nome/assinatura se ele não vai assinar agora).';
   }
   if (state.emailContratante && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.emailContratante)) {
     return 'E-mail do responsável da Contratante parece inválido.';
+  }
+  // Se o RDO vai pra aprovação por e-mail, o e-mail do responsável é
+  // obrigatório (é pra lá que o link de aprovação é enviado).
+  if (state.aprovacaoContratante && !state.emailContratante.trim()) {
+    return 'Preencha o e-mail do responsável da Contratante pra mandar pra aprovação.';
   }
   return null;
 }
@@ -840,29 +964,6 @@ function base64ParaBytes_(base64) {
 
 function base64ParaBlob_(base64, mime) {
   return new Blob([base64ParaBytes_(base64)], { type: mime });
-}
-
-// RDO com mais de 1 folha (ver particionarAtividades_/gerarDocumento em
-// excel-fill.js) gera um PDF de UMA página por vez - o conversor do
-// backend (Apps Script) só sabe transformar UMA aba do Excel em PDF por
-// chamada. Junta tudo num PDF final contínuo aqui no cliente com pdf-lib
-// (vendorizado em vendor/pdf-lib.min.js) - mais simples e confiável do
-// que ensinar o Apps Script a lidar com planilhas de várias abas.
-async function juntarPdfsBase64_(pdfsBase64) {
-  if (pdfsBase64.length === 1) return pdfsBase64[0];
-
-  const { PDFDocument } = PDFLib;
-  const final = await PDFDocument.create();
-  for (const base64 of pdfsBase64) {
-    const doc = await PDFDocument.load(base64ParaBytes_(base64));
-    const paginas = await final.copyPages(doc, doc.getPageIndices());
-    paginas.forEach(pagina => final.addPage(pagina));
-  }
-
-  const bytesFinais = await final.save();
-  let binario = '';
-  for (let i = 0; i < bytesFinais.length; i++) binario += String.fromCharCode(bytesFinais[i]);
-  return btoa(binario);
 }
 
 // rodandoNoApp_() já foi definida lá no topo do arquivo (usada também na
@@ -974,33 +1075,31 @@ el.btnGerar.addEventListener('click', async () => {
     state.assinaturaContratadaImagemBase64 = assinaturaContratada.estado.temAssinatura
       ? el.canvasAssinaturaContratada.toDataURL('image/png').split(',')[1]
       : null;
+    salvarAssinaturaContratada_(); // lembra pro próximo RDO (11/07 noite)
 
     mostrarStatus('Reservando número do RDO (prévia)...');
     const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
 
     mostrarStatus('Gerando planilha...');
-    const { base64, fileName, paginasParaPdf, totalPaginas, avisos } = await RdoExcel.gerarDocumento(state, numero);
+    const { base64, fileName, avisos } = await RdoExcel.gerarWorkbook(state, numero);
 
-    mostrarStatus(totalPaginas > 1
-      ? `Gerando PDF pra prévia (${totalPaginas} folhas)...`
-      : 'Gerando PDF pra prévia...');
-    const pdfsBase64 = [];
-    for (const pagina of paginasParaPdf) {
-      const respPagina = await RdoApi.previsualizarRDO({ xlsxBase64: pagina.base64, fileName });
-      pdfsBase64.push(respPagina.pdfBase64);
-    }
+    mostrarStatus('Gerando PDF pra prévia...');
+    const resp = await RdoApi.previsualizarRDO({ xlsxBase64: base64, fileName });
 
-    previewPdfBase64 = await juntarPdfsBase64_(pdfsBase64);
+    previewPdfBase64 = resp.pdfBase64;
     previewFileName = fileName.replace(/\.xlsx$/i, '.pdf');
     previewXlsxBase64 = base64;
 
-    let mensagem = totalPaginas > 1
-      ? `RDO gerado em ${totalPaginas} folhas (atividades continuaram nas folhas seguintes). Toque em "Baixar PDF pra conferir" antes de enviar.`
-      : 'RDO gerado. Toque em "Baixar PDF pra conferir" antes de enviar.';
+    let mensagem = 'RDO gerado. Toque em "Baixar PDF pra conferir" antes de enviar.';
     if (avisos && avisos.length) mensagem += '\nAtenção: ' + avisos.join(' ');
     mostrarStatus('');
     el.statusConfirmacao.textContent = mensagem;
     el.statusConfirmacao.className = 'status' + (avisos && avisos.length ? ' erro' : '');
+    // Botão final muda de rótulo quando o RDO vai pra aprovação da
+    // Contratante em vez de ser enviado direto (pedido do Paulo, 11/07).
+    el.btnConfirmarEnvio.textContent = state.aprovacaoContratante
+      ? 'ENVIAR À CONTRATANTE PARA APROVAÇÃO FINAL'
+      : 'Confirmar e Enviar por E-mail';
     el.cartaoPreview.style.display = 'block';
     el.cartaoPreview.scrollIntoView({ behavior: 'smooth' });
   } catch (err) {
@@ -1033,44 +1132,71 @@ el.btnCancelarPreview.addEventListener('click', () => {
 el.btnConfirmarEnvio.addEventListener('click', async () => {
   el.btnConfirmarEnvio.disabled = true;
   try {
-    el.statusConfirmacao.textContent = 'Enviando por e-mail...';
-    el.statusConfirmacao.className = 'status';
+    let resp;
 
-    const resp = await RdoApi.enviarRDO({
-      cliente: state.contratante,
-      obra: state.obra,
-      data: state.data,
-      xlsxBase64: previewXlsxBase64,
-      pdfBase64: previewPdfBase64,
-      fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
-      emailContratante: state.emailContratante
-    });
+    if (state.aprovacaoContratante) {
+      // Manda só pro Contratante revisar - o RDO final (com as atividades
+      // e assinatura da Contratante) só sai depois que ele concluir pelo
+      // link (ver www/aprovacao.html). O `state` inteiro vai junto (JSON)
+      // pra pagina de aprovação conseguir continuar o preenchimento com o
+      // que já foi feito aqui.
+      el.statusConfirmacao.textContent = 'Enviando pra aprovação da Contratante...';
+      el.statusConfirmacao.className = 'status';
+      resp = await RdoApi.enviarParaAprovacao({
+        cliente: state.contratante,
+        obra: state.obra,
+        data: state.data,
+        xlsxBase64: previewXlsxBase64,
+        pdfBase64: previewPdfBase64,
+        fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
+        stateJSON: JSON.stringify(state),
+        emailResponsavel: state.emailContratante
+      });
+      el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado pra aprovação da Contratante! ` +
+        'O RDO final chega por e-mail (pra você e pra ela) assim que ela concluir pelo link.';
+      el.statusConfirmacao.className = 'status sucesso';
+      el.btnCompartilhar.style.display = 'none';
+    } else {
+      el.statusConfirmacao.textContent = 'Enviando por e-mail...';
+      el.statusConfirmacao.className = 'status';
+      resp = await RdoApi.enviarRDO({
+        cliente: state.contratante,
+        obra: state.obra,
+        data: state.data,
+        xlsxBase64: previewXlsxBase64,
+        pdfBase64: previewPdfBase64,
+        fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
+        emailContratante: state.emailContratante
+      });
+      el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado com sucesso!`;
+      el.statusConfirmacao.className = 'status sucesso';
+      el.btnCompartilhar.style.display = 'block';
+      el.btnCompartilhar.onclick = async () => {
+        try {
+          await compartilharPdf_(previewPdfBase64, previewFileName);
+        } catch (err) {
+          console.error(err);
+          el.statusConfirmacao.textContent = 'Erro ao compartilhar o PDF: ' + err.message;
+          el.statusConfirmacao.className = 'status erro';
+          RdoApi.logErro('compartilhar_pdf', err && err.message ? err.message : String(err));
+        }
+      };
+    }
 
-    el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado com sucesso!`;
-    el.statusConfirmacao.className = 'status sucesso';
-    el.btnCompartilhar.style.display = 'block';
-    el.btnCompartilhar.onclick = async () => {
-      try {
-        await compartilharPdf_(previewPdfBase64, previewFileName);
-      } catch (err) {
-        console.error(err);
-        el.statusConfirmacao.textContent = 'Erro ao compartilhar o PDF: ' + err.message;
-        el.statusConfirmacao.className = 'status erro';
-        RdoApi.logErro('compartilhar_pdf', err && err.message ? err.message : String(err));
-      }
-    };
-
-    // assinaturas, nomes, e-mail e concordância são por RDO - limpa pra não ir junto no próximo
+    // Assinatura/nome da Contratada NÃO limpa mais (persistida entre RDOs,
+    // ver salvarAssinaturaContratada_/restaurarAssinaturaContratada_) -
+    // nome/assinatura/concordância do CONTRATANTE e o checkbox de
+    // aprovação continuam por RDO (limpa pra não ir junto no próximo). O
+    // e-mail do responsável da Contratante também não limpa mais (fica
+    // salvo, ver salvarUltimaIdentificacao_).
     assinaturaContratante.limpar();
     el.nomeAssinante.value = '';
     state.assinaturaNome = '';
-    el.emailContratante.value = '';
-    state.emailContratante = '';
     el.concordo.checked = false;
     state.assinaturaConcordo = false;
-    assinaturaContratada.limpar();
-    el.nomeAssinanteContratada.value = '';
-    state.assinaturaContratadaNome = '';
+    el.aprovacaoContratante.checked = false;
+    state.aprovacaoContratante = false;
+    el.avisoAprovacaoContratante.style.display = 'none';
   } catch (err) {
     console.error(err);
     el.statusConfirmacao.textContent = 'Erro ao enviar o RDO: ' + err.message;
@@ -1082,4 +1208,5 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
 });
 
 carregarObras().then(preencherUltimaIdentificacao_);
+restaurarAssinaturaContratada_();
 carregarEquipamentosVeiculos();

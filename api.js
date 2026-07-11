@@ -234,6 +234,20 @@ const RdoApi = (function () {
     return postJson_({ action: 'previsualizarRDO', xlsxBase64, fileName });
   }
 
+  // Aprovação do Contratante por e-mail (11/07) - ver www/aprovacao.html.
+  function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel }) {
+    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel });
+  }
+
+  async function buscarAprovacao(token) {
+    const resp = await fetch(APPS_SCRIPT_URL + '?action=buscarAprovacao&token=' + encodeURIComponent(token));
+    return await resp.json();
+  }
+
+  function finalizarAprovacao({ token, xlsxBase64, pdfBase64, fileName }) {
+    return postJson_({ action: 'finalizarAprovacao', token, xlsxBase64, pdfBase64, fileName });
+  }
+
   async function getVersaoApp() {
     if (!APPS_SCRIPT_URL) return { ok: false };
     try {
@@ -265,5 +279,8 @@ const RdoApi = (function () {
     }
   }
 
-  return { getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO, getVersaoApp, logErro };
+  return {
+    getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO,
+    getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao
+  };
 })();

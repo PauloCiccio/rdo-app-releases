@@ -304,6 +304,11 @@ textarea { resize: vertical; overflow: hidden; }
   text-align: right;
   margin-top: 2px;
 }
+.linha-atividade .linhas-estimadas.estimativa-bloqueada {
+  color: var(--vermelho);
+  font-weight: bold;
+  text-align: left;
+}
 
 .botao-principal {
   width: 100%;

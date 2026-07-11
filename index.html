@@ -6,7 +6,6 @@
 <title>RDO - FN Engenharia</title>
 <link rel="stylesheet" href="style.css">
 <script src="vendor/exceljs.min.js"></script>
-<script src="vendor/pdf-lib.min.js"></script>
 </head>
 <body>
 
@@ -125,9 +124,9 @@
   </section>
 
   <section class="cartao">
-    <h2>Assinatura da Contratada (opcional)</h2>
+    <h2>Assinatura da Contratada (obrigatório)</h2>
     <label for="campo-nome-assinante-contratada">Nome de quem está assinando</label>
-    <input type="text" id="campo-nome-assinante-contratada" placeholder="Nome completo">
+    <input type="text" id="campo-nome-assinante-contratada" placeholder="Nome completo" required>
     <label>Assine abaixo com o dedo</label>
     <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
     <div class="linha-botoes-assinatura">
@@ -153,6 +152,15 @@
       <input type="checkbox" id="campo-concordo">
       Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
     </label>
+    <label class="linha-checkbox">
+      <input type="checkbox" id="campo-aprovacao-contratante">
+      Contratante irá verificar o RDO em seu E-mail
+    </label>
+    <p class="orcamento-info" id="aviso-aprovacao-contratante" style="display:none;">
+      O Contratante vai receber um e-mail com o PDF e um link pra escrever as
+      atividades da Contratante e assinar. O RDO final só é enviado (pra você
+      e pro Contratante) depois que ele concluir por lá.
+    </p>
   </section>
 
   <section class="cartao">

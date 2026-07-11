@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Aprovação do RDO - FN Engenharia</title>
+<link rel="stylesheet" href="style.css">
+<script src="vendor/exceljs.min.js"></script>
+</head>
+<body>
+
+<header class="topo">
+  <img src="assets/logo_fn_bola.png" alt="FN Engenharia" class="logo">
+  <div>
+    <h1>Aprovação do RDO</h1>
+    <p class="subtitulo">FN Engenharia</p>
+  </div>
+</header>
+
+<main id="conteudo">
+
+  <section class="cartao" id="cartao-carregando">
+    <p>Carregando informações do RDO...</p>
+  </section>
+
+  <section class="cartao" id="cartao-erro" style="display:none;">
+    <p id="mensagem-erro"></p>
+  </section>
+
+  <section class="cartao" id="cartao-info" style="display:none;">
+    <h2>Identificação</h2>
+    <p><strong>RDO nº:</strong> <span id="info-numero"></span></p>
+    <p><strong>Obra:</strong> <span id="info-obra"></span></p>
+    <p><strong>Contratante:</strong> <span id="info-cliente"></span></p>
+    <p><strong>Data:</strong> <span id="info-data"></span></p>
+  </section>
+
+  <section class="cartao" id="cartao-form" style="display:none;">
+    <h2>Atividades - Contratante</h2>
+    <div id="lista-atividades-contratante" class="lista-atividades"></div>
+    <button type="button" id="btn-add-contratante" class="botao-secundario">+ Adicionar atividade</button>
+    <p class="orcamento-info" id="orcamento-contratante">0 / 10</p>
+  </section>
+
+  <section class="cartao" id="cartao-assinatura" style="display:none;">
+    <h2>Assinatura do Contratante</h2>
+    <label for="campo-nome-assinante">Nome de quem está assinando</label>
+    <input type="text" id="campo-nome-assinante" placeholder="Nome completo" required>
+    <label>Assine abaixo com o dedo ou mouse</label>
+    <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
+    <div class="linha-botoes-assinatura">
+      <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
+      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+    </div>
+    <label class="linha-checkbox">
+      <input type="checkbox" id="campo-concordo">
+      Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
+    </label>
+  </section>
+
+  <section class="cartao" id="cartao-enviar" style="display:none;">
+    <button type="button" id="btn-concluir" class="botao-principal">Concluir e Enviar RDO Final</button>
+    <div id="status-envio" class="status" aria-live="polite"></div>
+  </section>
+
+  <section class="cartao" id="cartao-sucesso" style="display:none;">
+    <p>RDO concluído e enviado com sucesso! Você já pode fechar esta página.</p>
+  </section>
+
+</main>
+
+<script src="excel-fill.js"></script>
+<script src="api.js"></script>
+<script src="aprovacao.js"></script>
+</body>
+</html>
