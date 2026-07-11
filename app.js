@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.4.0';
+const VERSAO_APP = 'BETA 0.4.1';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -301,6 +301,7 @@ function renderizarListaQuantCrescente(cfg) {
         suprimirListaAteDesfocar_(e.target);
       }
       item.descricao = e.target.value;
+      salvarUltimaIdentificacao_();
     });
     // ver configurarListaSempreCompleta_ - sem isso, linhas já preenchidas
     // (ex: "Engenheiro" nas 6 funções padrão do M.O.D.) não mostram a
@@ -308,11 +309,15 @@ function renderizarListaQuantCrescente(cfg) {
     // atual.
     configurarListaSempreCompleta_(inputDescricao);
 
-    linha.querySelector('.input-quant').addEventListener('input', e => { item.quant = e.target.value; });
+    linha.querySelector('.input-quant').addEventListener('input', e => {
+      item.quant = e.target.value;
+      salvarUltimaIdentificacao_();
+    });
 
     linha.querySelector('.btn-remover-quant').addEventListener('click', () => {
       itens.splice(i, 1);
       renderizarListaQuantCrescente(cfg);
+      salvarUltimaIdentificacao_();
     });
   });
 
@@ -470,10 +475,12 @@ const cfgEquipamentos = {
 el.btnAddEfetivo.addEventListener('click', () => {
   state.efetivo.push({ descricao: '', quant: '' });
   renderizarListaQuantCrescente(cfgEfetivo);
+  salvarUltimaIdentificacao_();
 });
 el.btnAddEquipamentos.addEventListener('click', () => {
   state.equipamentos.push({ descricao: '', quant: '' });
   renderizarListaQuantCrescente(cfgEquipamentos);
+  salvarUltimaIdentificacao_();
 });
 renderizarListaQuantCrescente(cfgEfetivo);
 renderizarListaQuantCrescente(cfgEquipamentos);
@@ -525,7 +532,14 @@ function salvarUltimaIdentificacao_() {
       // e-mail do responsável da Contratante (11/07): geralmente o mesmo
       // pra mesma obra por semanas/meses, não faz sentido redigitar toda
       // vez - ver aviso do botão "Limpar dados salvos" que também apaga.
-      emailContratante: state.emailContratante
+      emailContratante: state.emailContratante,
+      // Efetivo/Equipamentos (11/07 tarde): mesma obra geralmente usa a
+      // mesma equipe/maquinário por dias seguidos - salva pra não precisar
+      // redigitar tudo todo santo dia, igual já acontecia com a
+      // identificação. "Limpar dados salvos" também zera os dois de volta
+      // pro padrão de app recém-aberto (ver btnLimparIdentificacao).
+      efetivo: state.efetivo,
+      equipamentos: state.equipamentos
     }));
   } catch (err) {
     console.warn('Falha ao salvar última identificação:', err);
@@ -546,7 +560,7 @@ function carregarUltimaIdentificacao_() {
 // útil quando o app fixou a obra errada (ex: emprestou o celular pra outra
 // equipe) e precisa "esquecer" antes de preencher um RDO de obra diferente.
 el.btnLimparIdentificacao.addEventListener('click', () => {
-  if (!confirm('Apagar Contratante/Obra/Serviço/Objeto/Local salvos neste aparelho?')) return;
+  if (!confirm('Apagar Contratante/Obra/Serviço/Objeto/Local/Efetivo/Equipamentos salvos neste aparelho? O formulário volta a ficar como se tivesse acabado de abrir o app.')) return;
 
   localStorage.removeItem(CHAVE_ULTIMA_IDENTIFICACAO);
 
@@ -564,6 +578,15 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   el.emailContratante.value = '';
   preencherDatalist(el.dlObra, []);
   preencherDatalist(el.dlServico, []);
+
+  // Efetivo/Equipamentos voltam ao mesmo estado de um app recém-aberto
+  // (6 funções padrão pré-preenchidas / lista de equipamentos vazia) -
+  // igual à definição inicial de `state` lá em cima.
+  state.efetivo.length = 0;
+  EFETIVO_PADRAO.forEach(descricao => state.efetivo.push({ descricao, quant: '' }));
+  state.equipamentos.length = 0;
+  renderizarListaQuantCrescente(cfgEfetivo);
+  renderizarListaQuantCrescente(cfgEquipamentos);
 
   numeroReservado = null;
   el.previewNumero.textContent = '-';
@@ -752,6 +775,22 @@ async function preencherUltimaIdentificacao_() {
   if (ultima.servico) { el.servico.value = ultima.servico; state.servico = ultima.servico; }
   if (ultima.objetoContrato) { el.objeto.value = ultima.objetoContrato; state.objetoContrato = ultima.objetoContrato; }
   if (ultima.local) { el.trecho.value = ultima.local; state.local = ultima.local; }
+
+  // Efetivo/Equipamentos salvos (11/07 tarde) - substitui o conteúdo dos
+  // arrays do state SEM trocar a referência (cfgEfetivo/cfgEquipamentos
+  // guardam o mesmo array em `itens`, reatribuir state.efetivo quebraria
+  // essa referência), igual ao padrão já usado em aprovacao.js pras
+  // atividades da Contratante.
+  if (Array.isArray(ultima.efetivo) && ultima.efetivo.length) {
+    state.efetivo.length = 0;
+    ultima.efetivo.forEach(item => state.efetivo.push(item));
+    renderizarListaQuantCrescente(cfgEfetivo);
+  }
+  if (Array.isArray(ultima.equipamentos) && ultima.equipamentos.length) {
+    state.equipamentos.length = 0;
+    ultima.equipamentos.forEach(item => state.equipamentos.push(item));
+    renderizarListaQuantCrescente(cfgEquipamentos);
+  }
 
   await atualizarPreviewNumero();
 }
@@ -1074,7 +1113,19 @@ el.emailContratante.addEventListener('input', () => {
   salvarUltimaIdentificacao_();
 });
 el.concordo.addEventListener('change', () => { state.assinaturaConcordo = el.concordo.checked; });
+// E-mail do responsável da Contratante virou PRÉ-REQUISITO pra marcar
+// esta caixa (pedido do Paulo, 11/07 tarde) - antes só bloqueava lá na
+// hora de "Gerar" (validar()), tarde demais (dava pra marcar a caixa e só
+// descobrir o problema depois de preencher tudo o resto). Agora bloqueia
+// na hora do clique: sem e-mail preenchido, desmarca a caixa de volta e
+// avisa, sem deixar marcar.
 el.aprovacaoContratante.addEventListener('change', () => {
+  if (el.aprovacaoContratante.checked && !state.emailContratante.trim()) {
+    el.aprovacaoContratante.checked = false;
+    alert('Preencha o e-mail do responsável da Contratante antes de marcar esta opção - é pra lá que o link de aprovação é enviado.');
+    el.emailContratante.focus();
+    return;
+  }
   state.aprovacaoContratante = el.aprovacaoContratante.checked;
   el.avisoAprovacaoContratante.style.display = state.aprovacaoContratante ? 'block' : 'none';
 });
@@ -1221,6 +1272,60 @@ function fecharPreview_() {
   el.statusConfirmacao.className = 'status';
 }
 
+// Depois de mandar o RDO (direto ou pra aprovação da Contratante), o
+// formulário volta pro estado "normal" de um RDO novo - pedido do Paulo
+// (11/07 tarde): antes ficava tudo preenchido até fechar e abrir o app de
+// novo. Mantém só o que é convenção entre RDOs da MESMA obra
+// (Contratante/Obra/Serviço/Objeto/Local/E-mail/Efetivo/Equipamentos, ver
+// salvarUltimaIdentificacao_) e a sessão de login (assinatura da
+// Contratada) - tudo que é ESPECÍFICO deste RDO (Data, Tempo,
+// Observações, Atividades, assinatura/concordância da Contratante,
+// checkbox de aprovação) volta a ficar em branco, como se o app tivesse
+// acabado de abrir pra um RDO novo.
+async function resetarParaProximoRdo_() {
+  state.data = '';
+  el.data.value = '';
+
+  state.tempo = {
+    bom: { manha: false, tarde: false, noite: false },
+    chuva: { manha: false, tarde: false, noite: false },
+    mm: { manha: '', tarde: '', noite: '' }
+  };
+  document.querySelectorAll('.balao').forEach(botao => botao.classList.remove('marcado'));
+  document.querySelectorAll('.mm-chuva').forEach(input => { input.value = ''; });
+
+  state.observacoes = '';
+  el.observacoes.value = '';
+  el.observacoes.style.height = 'auto';
+
+  state.atividadesContratada.length = 0;
+  state.atividadesContratada.push({ inicio: '', fim: '', discriminacao: '' });
+  renderizarListaAtividades(cfgAtivContratada);
+
+  state.atividadesContratante.length = 0;
+  state.atividadesContratante.push({ inicio: '', fim: '', discriminacao: '' });
+  renderizarListaAtividades(cfgAtivContratante);
+
+  assinaturaContratante.limpar();
+  el.nomeAssinante.value = '';
+  state.assinaturaNome = '';
+  el.concordo.checked = false;
+  state.assinaturaConcordo = false;
+  el.aprovacaoContratante.checked = false;
+  state.aprovacaoContratante = false;
+  el.avisoAprovacaoContratante.style.display = 'none';
+
+  // Contratante/Obra continuam preenchidos (mesma obra) - reserva o
+  // PRÓXIMO número já de cara, senão a prévia ficava travada em "-" até
+  // o usuário tocar de novo no campo Obra pra disparar isso sozinho.
+  numeroReservado = null;
+  if (state.contratante && state.obra) {
+    await atualizarPreviewNumero();
+  } else {
+    el.previewNumero.textContent = '-';
+  }
+}
+
 el.btnGerar.addEventListener('click', async () => {
   const erro = validar();
   if (erro) { mostrarStatus(erro, 'erro'); return; }
@@ -1341,20 +1446,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       };
     }
 
-    // Assinatura/nome da Contratada NÃO limpa mais (vêm do login/sessão
-    // do usuário, ver CHAVE_SESSAO_USUARIO) - nome/assinatura/concordância
-    // do CONTRATANTE e o checkbox de
-    // aprovação continuam por RDO (limpa pra não ir junto no próximo). O
-    // e-mail do responsável da Contratante também não limpa mais (fica
-    // salvo, ver salvarUltimaIdentificacao_).
-    assinaturaContratante.limpar();
-    el.nomeAssinante.value = '';
-    state.assinaturaNome = '';
-    el.concordo.checked = false;
-    state.assinaturaConcordo = false;
-    el.aprovacaoContratante.checked = false;
-    state.aprovacaoContratante = false;
-    el.avisoAprovacaoContratante.style.display = 'none';
+    await resetarParaProximoRdo_();
   } catch (err) {
     console.error(err);
     el.statusConfirmacao.textContent = 'Erro ao enviar o RDO: ' + err.message;
