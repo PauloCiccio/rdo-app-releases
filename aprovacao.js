@@ -32,8 +32,13 @@ const el = {
   btnTravarAssinatura: document.getElementById('btn-travar-assinatura'),
   concordo: document.getElementById('campo-concordo'),
   cartaoEnviar: document.getElementById('cartao-enviar'),
-  btnConcluir: document.getElementById('btn-concluir'),
+  btnPrevisualizar: document.getElementById('btn-previsualizar'),
   statusEnvio: document.getElementById('status-envio'),
+  cartaoPreviewFinal: document.getElementById('cartao-preview-final'),
+  btnVerPdfFinal: document.getElementById('btn-ver-pdf-final'),
+  btnConcluir: document.getElementById('btn-concluir'),
+  btnEditar: document.getElementById('btn-editar'),
+  statusConfirmacao: document.getElementById('status-confirmacao'),
   sucesso: document.getElementById('cartao-sucesso')
 };
 
@@ -280,7 +285,21 @@ async function iniciar() {
   renderizarListaAtividades(cfgAtivContratante);
 }
 
-el.btnConcluir.addEventListener('click', async () => {
+function base64ParaBytes_(base64) {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// Igual o app principal: Pré-visualizar -> conferir o PDF -> só então
+// Concluir/Enviar de verdade (pedido do Paulo, 11/07 - antes ia direto
+// pro envio sem chance de conferir o resultado final).
+let previewXlsxBase64 = null;
+let previewPdfBase64 = null;
+let previewFileName = null;
+
+el.btnPrevisualizar.addEventListener('click', async () => {
   const nome = el.nomeAssinante.value.trim();
   if (!nome) {
     el.statusEnvio.textContent = 'Preencha o nome de quem está assinando.';
@@ -293,12 +312,12 @@ el.btnConcluir.addEventListener('click', async () => {
     return;
   }
   if (!el.concordo.checked) {
-    el.statusEnvio.textContent = 'Marque a caixa de concordância antes de concluir.';
+    el.statusEnvio.textContent = 'Marque a caixa de concordância antes de continuar.';
     el.statusEnvio.className = 'status erro';
     return;
   }
 
-  el.btnConcluir.disabled = true;
+  el.btnPrevisualizar.disabled = true;
   try {
     el.statusEnvio.textContent = 'Gerando RDO final...';
     el.statusEnvio.className = 'status';
@@ -312,21 +331,59 @@ el.btnConcluir.addEventListener('click', async () => {
 
     const { base64, fileName } = await RdoExcel.gerarWorkbook(stateFinal, numero);
 
-    el.statusEnvio.textContent = 'Gerando PDF...';
+    el.statusEnvio.textContent = 'Gerando PDF pra prévia...';
     const respPdf = await RdoApi.previsualizarRDO({ xlsxBase64: base64, fileName });
 
-    el.statusEnvio.textContent = 'Enviando RDO final...';
-    await RdoApi.finalizarAprovacao({ token, xlsxBase64: base64, pdfBase64: respPdf.pdfBase64, fileName });
+    previewXlsxBase64 = base64;
+    previewPdfBase64 = respPdf.pdfBase64;
+    previewFileName = fileName;
+
+    el.statusEnvio.textContent = '';
+    el.cartaoPreviewFinal.style.display = 'block';
+    el.cartaoPreviewFinal.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.error(err);
+    el.statusEnvio.textContent = 'Erro ao gerar a prévia: ' + (err && err.message ? err.message : err);
+    el.statusEnvio.className = 'status erro';
+    RdoApi.logErro('previsualizar_aprovacao', err && err.message ? err.message : String(err), { token });
+  } finally {
+    el.btnPrevisualizar.disabled = false;
+  }
+});
+
+el.btnVerPdfFinal.addEventListener('click', () => {
+  const blob = new Blob([base64ParaBytes_(previewPdfBase64)], { type: 'application/pdf' });
+  window.open(URL.createObjectURL(blob), '_blank');
+});
+
+el.btnEditar.addEventListener('click', () => {
+  el.cartaoPreviewFinal.style.display = 'none';
+  el.statusConfirmacao.textContent = '';
+});
+
+el.btnConcluir.addEventListener('click', async () => {
+  el.btnConcluir.disabled = true;
+  try {
+    el.statusConfirmacao.textContent = 'Enviando RDO final...';
+    el.statusConfirmacao.className = 'status';
+
+    await RdoApi.finalizarAprovacao({
+      token,
+      xlsxBase64: previewXlsxBase64,
+      pdfBase64: previewPdfBase64,
+      fileName: previewFileName
+    });
 
     el.form.style.display = 'none';
     el.cartaoAssinatura.style.display = 'none';
     el.cartaoEnviar.style.display = 'none';
+    el.cartaoPreviewFinal.style.display = 'none';
     el.info.style.display = 'none';
     el.sucesso.style.display = 'block';
   } catch (err) {
     console.error(err);
-    el.statusEnvio.textContent = 'Erro ao concluir: ' + (err && err.message ? err.message : err);
-    el.statusEnvio.className = 'status erro';
+    el.statusConfirmacao.textContent = 'Erro ao concluir: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.className = 'status erro';
     RdoApi.logErro('finalizar_aprovacao', err && err.message ? err.message : String(err), { token });
   } finally {
     el.btnConcluir.disabled = false;
