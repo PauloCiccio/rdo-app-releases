@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.1.4';
+const VERSAO_APP = 'BETA 0.1.5';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -193,6 +193,7 @@ const el = {
   objeto: document.getElementById('campo-objeto'),
   trecho: document.getElementById('campo-trecho'),
   data: document.getElementById('campo-data'),
+  btnLimparIdentificacao: document.getElementById('btn-limpar-identificacao'),
   previewNumero: document.getElementById('preview-numero'),
   observacoes: document.getElementById('campo-observacoes'),
   listaEfetivo: document.getElementById('lista-efetivo'),
@@ -480,6 +481,42 @@ function carregarUltimaIdentificacao_() {
     return null;
   }
 }
+
+// Botão "Limpar dados salvos" (pedido do Paulo, 10/07): apaga o cache de
+// Contratante/Obra/Serviço/Objeto/Local e limpa os mesmos campos na tela -
+// útil quando o app fixou a obra errada (ex: emprestou o celular pra outra
+// equipe) e precisa "esquecer" antes de preencher um RDO de obra diferente.
+el.btnLimparIdentificacao.addEventListener('click', () => {
+  if (!confirm('Apagar Contratante/Obra/Serviço/Objeto/Local salvos neste aparelho?')) return;
+
+  localStorage.removeItem(CHAVE_ULTIMA_IDENTIFICACAO);
+
+  state.contratante = '';
+  state.obra = '';
+  state.servico = '';
+  state.objetoContrato = '';
+  state.local = '';
+  el.contratante.value = '';
+  el.obra.value = '';
+  el.servico.value = '';
+  el.objeto.value = '';
+  el.trecho.value = '';
+  preencherDatalist(el.dlObra, []);
+  preencherDatalist(el.dlServico, []);
+
+  numeroReservado = null;
+  el.previewNumero.textContent = '-';
+
+  // Feedback no próprio botão (não no status de envio lá embaixo, longe
+  // demais da seção Identificação pro usuário notar).
+  const rotuloOriginal = el.btnLimparIdentificacao.textContent;
+  el.btnLimparIdentificacao.textContent = 'Dados apagados ✓';
+  el.btnLimparIdentificacao.disabled = true;
+  setTimeout(() => {
+    el.btnLimparIdentificacao.textContent = rotuloOriginal;
+    el.btnLimparIdentificacao.disabled = false;
+  }, 2000);
+});
 
 // ---------------------------------------------------------------------------
 // Contratante -> Obra -> Serviço, como campos de texto com sugestões
