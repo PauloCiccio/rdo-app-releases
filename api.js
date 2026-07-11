@@ -270,6 +270,23 @@ const RdoApi = (function () {
     return postJson_({ action: 'salvarAssinaturaUsuario', login, senha, assinaturaBase64 });
   }
 
+  // Tela de Perfil (11/07 tarde, ícone da FN no topo) - ver telaPerfil_ em app.js.
+  function meusRdos(login, senha) {
+    return postJson_({ action: 'meusRdos', login, senha });
+  }
+
+  function buscarPdfPorId(login, senha, pdfFileId) {
+    return postJson_({ action: 'buscarPdfPorId', login, senha, pdfFileId });
+  }
+
+  function reenviarLinkAprovacao(login, senha, token) {
+    return postJson_({ action: 'reenviarLinkAprovacao', login, senha, token });
+  }
+
+  function corrigirEmailAprovacao(login, senha, token, novoEmail) {
+    return postJson_({ action: 'corrigirEmailAprovacao', login, senha, token, novoEmail });
+  }
+
   async function getVersaoApp() {
     if (!APPS_SCRIPT_URL) return { ok: false };
     try {
@@ -304,6 +321,7 @@ const RdoApi = (function () {
   return {
     getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO,
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
-    buscarCliente, cadastrarCliente, login, salvarAssinaturaUsuario
+    buscarCliente, cadastrarCliente, login, salvarAssinaturaUsuario,
+    meusRdos, buscarPdfPorId, reenviarLinkAprovacao, corrigirEmailAprovacao
   };
 })();

@@ -10,7 +10,9 @@
 <body>
 
 <header class="topo">
-  <img src="assets/logo_fn_bola.png" alt="FN Engenharia" class="logo">
+  <button type="button" id="btn-abrir-perfil" class="botao-logo" title="Meu perfil">
+    <img src="assets/logo_fn_bola.png" alt="Meu perfil" class="logo">
+  </button>
   <div>
     <h1>Relatório Diário de Obra</h1>
     <p class="subtitulo">FN Engenharia</p>
@@ -23,6 +25,25 @@
     <button type="button" id="btn-sair" class="link-atualizacao" style="display:none;">Sair</button>
   </div>
 </header>
+
+<section class="cartao" id="cartao-perfil" style="display:none;">
+  <div class="cabecalho-secao">
+    <h2>Meu Perfil</h2>
+    <button type="button" id="btn-fechar-perfil" class="link-limpar-cache">Fechar</button>
+  </div>
+  <p class="orcamento-info" id="perfil-nome-usuario"></p>
+  <div id="perfil-carregando" class="status">Carregando seus RDOs...</div>
+  <div id="perfil-erro" class="status erro" style="display:none;"></div>
+  <div id="perfil-conteudo" style="display:none;">
+    <h3 class="subtitulo-perfil">Para aprovação do Contratante</h3>
+    <div id="perfil-pendentes"></div>
+    <p class="orcamento-info" id="perfil-sem-pendentes" style="display:none;">Nenhum RDO aguardando aprovação no momento.</p>
+
+    <h3 class="subtitulo-perfil">Aprovados</h3>
+    <div id="perfil-aprovados"></div>
+    <p class="orcamento-info" id="perfil-sem-aprovados" style="display:none;">Nenhum RDO aprovado ainda.</p>
+  </div>
+</section>
 
 <section class="cartao" id="cartao-login">
   <h2>Login</h2>

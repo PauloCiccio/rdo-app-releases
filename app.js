@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.4.2';
+const VERSAO_APP = 'BETA 0.5.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -254,7 +254,19 @@ const el = {
   btnLimparAssinaturaPrimeiroLogin: document.getElementById('btn-limpar-assinatura-primeiro-login'),
   btnTravarAssinaturaPrimeiroLogin: document.getElementById('btn-travar-assinatura-primeiro-login'),
   btnSalvarPrimeiraAssinatura: document.getElementById('btn-salvar-primeira-assinatura'),
-  statusPrimeiraAssinatura: document.getElementById('status-primeira-assinatura')
+  statusPrimeiraAssinatura: document.getElementById('status-primeira-assinatura'),
+
+  btnAbrirPerfil: document.getElementById('btn-abrir-perfil'),
+  cartaoPerfil: document.getElementById('cartao-perfil'),
+  btnFecharPerfil: document.getElementById('btn-fechar-perfil'),
+  perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
+  perfilCarregando: document.getElementById('perfil-carregando'),
+  perfilErro: document.getElementById('perfil-erro'),
+  perfilConteudo: document.getElementById('perfil-conteudo'),
+  perfilPendentes: document.getElementById('perfil-pendentes'),
+  perfilSemPendentes: document.getElementById('perfil-sem-pendentes'),
+  perfilAprovados: document.getElementById('perfil-aprovados'),
+  perfilSemAprovados: document.getElementById('perfil-sem-aprovados')
 };
 
 // ---------------------------------------------------------------------------
@@ -1142,6 +1154,209 @@ el.btnSair.addEventListener('click', () => {
   location.reload();
 });
 
+// ---------------------------------------------------------------------------
+// Tela de Perfil (11/07 tarde) - tocar no ícone da FN mostra todos os RDOs
+// que ESSE usuário gerou, agrupados por obra: "Aprovados" (envio direto ou
+// aprovação do Contratante já concluída - dá pra visualizar/compartilhar o
+// PDF de novo) e "Para aprovação do Contratante" (ainda pendentes - dá pra
+// reenviar o link por e-mail, e corrigir o e-mail se o Contratante disser
+// que não recebeu porque estava errado).
+// ---------------------------------------------------------------------------
+
+function agruparPorObra_(itens) {
+  const grupos = new Map();
+  itens.slice().reverse().forEach(item => { // reverse: mais recente primeiro
+    const chave = `${item.cliente} - ${item.obra}`;
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push(item);
+  });
+  return grupos;
+}
+
+function renderizarGrupoPerfil_(container, itens, montarLinha) {
+  container.innerHTML = '';
+  const grupos = agruparPorObra_(itens);
+  grupos.forEach((lista, chave) => {
+    const titulo = document.createElement('div');
+    titulo.className = 'grupo-obra-perfil';
+    titulo.textContent = chave;
+    container.appendChild(titulo);
+    lista.forEach(item => container.appendChild(montarLinha(item)));
+  });
+}
+
+function montarLinhaAprovado_(item) {
+  const linha = document.createElement('div');
+  linha.className = 'linha-rdo-perfil';
+  linha.innerHTML = `
+    <div class="info-rdo-perfil">RDO nº ${item.numero} - ${item.data || ''}</div>
+    <div class="botoes-rdo-perfil">
+      <button type="button" class="botao-mini btn-ver-perfil">Visualizar PDF</button>
+      <button type="button" class="botao-mini btn-compartilhar-perfil">Compartilhar</button>
+    </div>
+    <div class="status status-linha-perfil"></div>`;
+
+  const statusLinha = linha.querySelector('.status-linha-perfil');
+  const sessao = carregarSessaoUsuario_();
+
+  async function buscarPdf_() {
+    const resp = await RdoApi.buscarPdfPorId(sessao.login, sessao.senha, item.pdfFileId);
+    if (!resp.ok) throw new Error(resp.erro || 'Não consegui abrir esse PDF.');
+    return resp.pdfBase64;
+  }
+
+  linha.querySelector('.btn-ver-perfil').addEventListener('click', async (e) => {
+    const botao = e.currentTarget;
+    botao.disabled = true;
+    try {
+      statusLinha.textContent = 'Abrindo...';
+      statusLinha.className = 'status status-linha-perfil';
+      const base64 = await buscarPdf_();
+      await abrirPdfParaVisualizar_(base64, item.fileName);
+      statusLinha.textContent = '';
+    } catch (err) {
+      statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+      statusLinha.className = 'status status-linha-perfil erro';
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  linha.querySelector('.btn-compartilhar-perfil').addEventListener('click', async (e) => {
+    const botao = e.currentTarget;
+    botao.disabled = true;
+    try {
+      statusLinha.textContent = 'Preparando...';
+      statusLinha.className = 'status status-linha-perfil';
+      const base64 = await buscarPdf_();
+      await compartilharPdf_(base64, item.fileName);
+      statusLinha.textContent = '';
+    } catch (err) {
+      statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+      statusLinha.className = 'status status-linha-perfil erro';
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  return linha;
+}
+
+function montarLinhaPendente_(item) {
+  const linha = document.createElement('div');
+  linha.className = 'linha-rdo-perfil';
+  linha.innerHTML = `
+    <div class="info-rdo-perfil">RDO nº ${item.numero} - ${item.data || ''} - aguardando aprovação de <strong class="email-pendente-perfil">${item.emailResponsavel}</strong></div>
+    <div class="botoes-rdo-perfil">
+      <button type="button" class="botao-mini btn-reenviar-perfil">Reenviar link por e-mail</button>
+    </div>
+    <button type="button" class="link-corrigir-email">O e-mail está errado?</button>
+    <div class="bloco-corrigir-email" style="display:none;">
+      <input type="email" class="input-corrigir-email" value="${item.emailResponsavel || ''}" autocomplete="off">
+      <button type="button" class="botao-mini btn-salvar-email-perfil">Salvar e reenviar</button>
+    </div>
+    <div class="status status-linha-perfil"></div>`;
+
+  const statusLinha = linha.querySelector('.status-linha-perfil');
+  const elEmailPendente = linha.querySelector('.email-pendente-perfil');
+  const sessao = carregarSessaoUsuario_();
+
+  linha.querySelector('.btn-reenviar-perfil').addEventListener('click', async (e) => {
+    const botao = e.currentTarget;
+    botao.disabled = true;
+    try {
+      statusLinha.textContent = 'Reenviando...';
+      statusLinha.className = 'status status-linha-perfil';
+      const resp = await RdoApi.reenviarLinkAprovacao(sessao.login, sessao.senha, item.token);
+      if (!resp.ok) throw new Error(resp.erro || 'Não consegui reenviar.');
+      statusLinha.textContent = 'Link reenviado para ' + resp.emailResponsavel + '!';
+      statusLinha.className = 'status status-linha-perfil sucesso';
+    } catch (err) {
+      statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+      statusLinha.className = 'status status-linha-perfil erro';
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  const blocoCorrigir = linha.querySelector('.bloco-corrigir-email');
+  linha.querySelector('.link-corrigir-email').addEventListener('click', () => {
+    blocoCorrigir.style.display = blocoCorrigir.style.display === 'flex' ? 'none' : 'flex';
+  });
+
+  linha.querySelector('.btn-salvar-email-perfil').addEventListener('click', async (e) => {
+    const botao = e.currentTarget;
+    const novoEmail = linha.querySelector('.input-corrigir-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(novoEmail)) {
+      statusLinha.textContent = 'E-mail parece inválido.';
+      statusLinha.className = 'status status-linha-perfil erro';
+      return;
+    }
+    botao.disabled = true;
+    try {
+      statusLinha.textContent = 'Salvando e reenviando...';
+      statusLinha.className = 'status status-linha-perfil';
+      const respCorrigir = await RdoApi.corrigirEmailAprovacao(sessao.login, sessao.senha, item.token, novoEmail);
+      if (!respCorrigir.ok) throw new Error(respCorrigir.erro || 'Não consegui salvar o e-mail.');
+      elEmailPendente.textContent = novoEmail;
+      const respReenviar = await RdoApi.reenviarLinkAprovacao(sessao.login, sessao.senha, item.token);
+      if (!respReenviar.ok) throw new Error(respReenviar.erro || 'E-mail salvo, mas não consegui reenviar.');
+      statusLinha.textContent = 'E-mail corrigido e link reenviado para ' + novoEmail + '!';
+      statusLinha.className = 'status status-linha-perfil sucesso';
+      blocoCorrigir.style.display = 'none';
+    } catch (err) {
+      statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+      statusLinha.className = 'status status-linha-perfil erro';
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  return linha;
+}
+
+async function carregarPerfil_() {
+  const sessao = carregarSessaoUsuario_();
+  if (!sessao) { mostrarTelaLogin_(); return; }
+
+  el.perfilNomeUsuario.textContent = sessao.nome;
+  el.perfilCarregando.style.display = 'block';
+  el.perfilErro.style.display = 'none';
+  el.perfilConteudo.style.display = 'none';
+
+  try {
+    const resp = await RdoApi.meusRdos(sessao.login, sessao.senha);
+    if (!resp.ok) throw new Error(resp.erro || 'Não consegui carregar seus RDOs.');
+
+    el.perfilCarregando.style.display = 'none';
+    el.perfilConteudo.style.display = 'block';
+
+    renderizarGrupoPerfil_(el.perfilPendentes, resp.pendentes, montarLinhaPendente_);
+    el.perfilSemPendentes.style.display = resp.pendentes.length ? 'none' : 'block';
+
+    renderizarGrupoPerfil_(el.perfilAprovados, resp.aprovados, montarLinhaAprovado_);
+    el.perfilSemAprovados.style.display = resp.aprovados.length ? 'none' : 'block';
+  } catch (err) {
+    console.error(err);
+    el.perfilCarregando.style.display = 'none';
+    el.perfilErro.style.display = 'block';
+    el.perfilErro.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    RdoApi.logErro('carregar_perfil', err && err.message ? err.message : String(err));
+  }
+}
+
+el.btnAbrirPerfil.addEventListener('click', () => {
+  if (!carregarSessaoUsuario_()) return; // sem sessão (tela de login) - ícone não faz nada
+  el.formRdo.style.display = 'none';
+  el.cartaoPerfil.style.display = 'block';
+  carregarPerfil_();
+});
+
+el.btnFecharPerfil.addEventListener('click', () => {
+  el.cartaoPerfil.style.display = 'none';
+  el.formRdo.style.display = 'block';
+});
+
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
 el.nomeAssinante.addEventListener('input', () => { state.assinaturaNome = el.nomeAssinante.value; });
@@ -1434,6 +1649,13 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
   try {
     let resp;
 
+    // Login de quem está gerando (11/07 tarde, tela de Perfil) - lido
+    // fresco do localStorage (não confia numa variável do momento do
+    // carregamento da página, já que o login pode ter acontecido durante
+    // esta mesma sessão do navegador).
+    const sessaoAtual = carregarSessaoUsuario_();
+    const loginAtual = sessaoAtual ? sessaoAtual.login : '';
+
     if (state.aprovacaoContratante) {
       // Manda só pro Contratante revisar - o RDO final (com as atividades
       // e assinatura da Contratante) só sai depois que ele concluir pelo
@@ -1450,7 +1672,8 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
         pdfBase64: previewPdfBase64,
         fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
         stateJSON: JSON.stringify(state),
-        emailResponsavel: state.emailContratante
+        emailResponsavel: state.emailContratante,
+        login: loginAtual
       });
       el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado pra aprovação da Contratante! ` +
         'O RDO final chega por e-mail (pra você e pra ela) assim que ela concluir pelo link.';
@@ -1466,7 +1689,8 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
         xlsxBase64: previewXlsxBase64,
         pdfBase64: previewPdfBase64,
         fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
-        emailContratante: state.emailContratante
+        emailContratante: state.emailContratante,
+        login: loginAtual
       });
       el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado com sucesso!`;
       el.statusConfirmacao.className = 'status sucesso';
