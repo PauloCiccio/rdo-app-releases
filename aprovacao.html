@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Aprovação do RDO - FN Engenharia</title>
 <link rel="stylesheet" href="style.css">
 <script src="vendor/exceljs.min.js"></script>
@@ -31,7 +31,7 @@
     <h2>Identifique-se</h2>
     <p class="orcamento-info">Informe seu CPF e nome completo. Se for a primeira vez, vamos pedir mais alguns dados.</p>
     <label for="campo-cpf">CPF</label>
-    <input type="text" id="campo-cpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off">
+    <input type="text" id="campo-cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
     <label for="campo-nome-identificacao">Nome completo</label>
     <input type="text" id="campo-nome-identificacao" placeholder="Nome completo" autocomplete="off">
     <button type="button" id="btn-continuar-identificacao" class="botao-principal">Continuar</button>
@@ -49,6 +49,25 @@
     <div id="status-cadastro" class="status" aria-live="polite"></div>
   </section>
 
+  <section class="cartao" id="cartao-confirmar-dados" style="display:none;">
+    <h2>Confirme seus dados</h2>
+    <p class="orcamento-info">Esses são os dados que já temos salvos. Se você mudou de função ou de empresa, toque em "Editar".</p>
+    <div id="confirmar-dados-texto">
+      <p><strong>Função:</strong> <span id="confirmar-funcao-texto"></span></p>
+      <p><strong>Empresa:</strong> <span id="confirmar-empresa-texto"></span></p>
+      <button type="button" id="btn-proximo-confirmar-dados" class="botao-principal">Próximo</button>
+      <button type="button" id="btn-editar-confirmar-dados" class="botao-secundario">Editar</button>
+    </div>
+    <div id="confirmar-dados-edicao" style="display:none;">
+      <label for="campo-funcao-editar">Função</label>
+      <input type="text" id="campo-funcao-editar" autocomplete="off">
+      <label for="campo-empresa-editar">Responsável por qual empresa</label>
+      <input type="text" id="campo-empresa-editar" autocomplete="off">
+      <button type="button" id="btn-salvar-edicao-dados" class="botao-principal">Salvar e continuar</button>
+    </div>
+    <div id="status-confirmar-dados" class="status" aria-live="polite"></div>
+  </section>
+
   <section class="cartao" id="cartao-info" style="display:none;">
     <h2>Identificação</h2>
     <p><strong>RDO nº:</strong> <span id="info-numero"></span></p>
@@ -56,8 +75,14 @@
     <p><strong>Contratante:</strong> <span id="info-cliente"></span></p>
     <p><strong>Data:</strong> <span id="info-data"></span></p>
     <p><strong>Você:</strong> <span id="info-identificado"></span></p>
-    <p class="orcamento-info">Confira abaixo o RDO preenchido pela Contratada até agora (ainda sem as suas atividades). Use dois dedos pra dar zoom.</p>
-    <iframe id="visualizador-pdf" style="display:none; width:100%; height:75vh; border:1px solid var(--borda); border-radius:8px;"></iframe>
+    <p class="orcamento-info">Confira abaixo o RDO preenchido pela Contratada até agora (ainda sem as suas atividades). Use os botões de zoom pra ampliar.</p>
+    <div id="wrap-visualizador-pdf" class="wrap-visualizador-pdf" style="display:none;">
+      <div class="botoes-zoom-pdf">
+        <button type="button" id="btn-zoom-menos" class="botao-mini">－</button>
+        <button type="button" id="btn-zoom-mais" class="botao-mini">＋</button>
+      </div>
+      <iframe id="visualizador-pdf"></iframe>
+    </div>
   </section>
 
   <section class="cartao" id="cartao-form" style="display:none;">
@@ -74,7 +99,7 @@
     <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
     <div class="linha-botoes-assinatura">
       <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
-      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">Destravar para assinar</button>
     </div>
     <label class="linha-checkbox">
       <input type="checkbox" id="campo-concordo">
@@ -89,8 +114,8 @@
 
   <section class="cartao" id="cartao-preview-final" style="display:none;">
     <h2>Pré-visualização</h2>
-    <p>Confira o RDO com suas atividades e assinatura antes de concluir.</p>
-    <button type="button" id="btn-ver-pdf-final" class="botao-principal">Visualizar PDF</button>
+    <p>Confira o RDO com suas atividades e assinatura antes de concluir. O PDF baixado vem com marca d'água "PRÉ-VISUALIZAÇÃO" - só o envio final sai sem ela.</p>
+    <button type="button" id="btn-ver-pdf-final" class="botao-principal">Baixar PDF de prévia</button>
     <button type="button" id="btn-concluir" class="botao-principal">Concluir e Enviar RDO Final</button>
     <button type="button" id="btn-editar" class="botao-secundario">Cancelar / Editar</button>
     <div id="status-confirmacao" class="status" aria-live="polite"></div>

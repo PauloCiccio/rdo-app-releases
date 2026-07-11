@@ -369,6 +369,35 @@ const RdoExcel = (function () {
     return workbook;
   }
 
+  let marcaDaguaPreviewBase64_ = null;
+  async function carregarMarcaDaguaPreview_() {
+    if (marcaDaguaPreviewBase64_) return marcaDaguaPreviewBase64_;
+    const resp = await fetch('assets/marca_dagua_preview.png');
+    const buffer = await resp.arrayBuffer();
+    let binario = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i++) binario += String.fromCharCode(bytes[i]);
+    marcaDaguaPreviewBase64_ = btoa(binario);
+    return marcaDaguaPreviewBase64_;
+  }
+
+  // Marca d'água "PRÉ-VISUALIZAÇÃO" (11/07 tarde) - pedido do Paulo: o
+  // botão "Visualizar PDF" (antes de enviar/concluir de verdade) virou um
+  // DOWNLOAD de um PDF com essa marca carimbada, pra nunca poder passar
+  // por documento oficial. Span cobrindo toda a área de impressão
+  // (A2:V71) via âncora de DUAS células (tl+br) - estica a imagem pro
+  // tamanho exato do intervalo de células, não depende de calibrar
+  // largura/altura em pixel por coluna (essas variam).
+  async function inserirMarcaDaguaPreview_(workbook, sh) {
+    const base64Png = await carregarMarcaDaguaPreview_();
+    const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
+    sh.addImage(imageId, {
+      tl: { col: 0, row: 1 },
+      br: { col: 22, row: 71 },
+      editAs: 'absolute'
+    });
+  }
+
   function bufferParaBase64_(buffer) {
     return new Promise((resolve, reject) => {
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -382,7 +411,7 @@ const RdoExcel = (function () {
     });
   }
 
-  async function gerarWorkbook(state, numero) {
+  async function gerarWorkbook(state, numero, opts) {
     const workbook = await carregarTemplate_();
     const sh = workbook.getWorksheet('RDO');
 
@@ -423,6 +452,10 @@ const RdoExcel = (function () {
 
     inserirAssinaturaContratada_(workbook, sh, state.assinaturaContratadaNome, state.assinaturaContratadaImagemBase64);
     inserirAssinatura_(workbook, sh, state.assinaturaNome, state.assinaturaImagemBase64);
+
+    if (opts && opts.apenasPreview) {
+      await inserirMarcaDaguaPreview_(workbook, sh);
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     const { base64, blob } = await bufferParaBase64_(buffer);

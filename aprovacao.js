@@ -32,13 +32,28 @@ const el = {
   btnSalvarCadastro: document.getElementById('btn-salvar-cadastro'),
   statusCadastro: document.getElementById('status-cadastro'),
 
+  cartaoConfirmarDados: document.getElementById('cartao-confirmar-dados'),
+  confirmarDadosTexto: document.getElementById('confirmar-dados-texto'),
+  confirmarFuncaoTexto: document.getElementById('confirmar-funcao-texto'),
+  confirmarEmpresaTexto: document.getElementById('confirmar-empresa-texto'),
+  btnProximoConfirmarDados: document.getElementById('btn-proximo-confirmar-dados'),
+  btnEditarConfirmarDados: document.getElementById('btn-editar-confirmar-dados'),
+  confirmarDadosEdicao: document.getElementById('confirmar-dados-edicao'),
+  funcaoEditar: document.getElementById('campo-funcao-editar'),
+  empresaEditar: document.getElementById('campo-empresa-editar'),
+  btnSalvarEdicaoDados: document.getElementById('btn-salvar-edicao-dados'),
+  statusConfirmarDados: document.getElementById('status-confirmar-dados'),
+
   info: document.getElementById('cartao-info'),
   infoNumero: document.getElementById('info-numero'),
   infoObra: document.getElementById('info-obra'),
   infoCliente: document.getElementById('info-cliente'),
   infoData: document.getElementById('info-data'),
   infoIdentificado: document.getElementById('info-identificado'),
+  wrapVisualizadorPdf: document.getElementById('wrap-visualizador-pdf'),
   visualizadorPdf: document.getElementById('visualizador-pdf'),
+  btnZoomMenos: document.getElementById('btn-zoom-menos'),
+  btnZoomMais: document.getElementById('btn-zoom-mais'),
 
   form: document.getElementById('cartao-form'),
   listaAtivContratante: document.getElementById('lista-atividades-contratante'),
@@ -114,20 +129,29 @@ function validarCpf_(cpf) {
   return true;
 }
 
-// Seletores de Hora/Minuto (cópia de app.js, ver comentário lá pro
-// histórico completo) - substituem o <input type="time"> nativo porque o
-// relógio nativo do Android fica cortado com o celular na vertical.
-const HORAS_SELECT_ = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTOS_SELECT_ = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
-
-function montarOpcoesHorario_(opcoes, valorAtual) {
-  return '<option value="">--</option>' + opcoes.map(o =>
-    `<option value="${o}"${o === valorAtual ? ' selected' : ''}>${o}</option>`
-  ).join('');
+// Máscara automática do CPF (XXX.XXX.XXX-XX) enquanto digita - pedido do
+// Paulo, 11/07 tarde ("hoje quando digito o CPF não vem os separadores
+// automáticos"). Só formata, não valida (validarCpf_ acima continua
+// cuidando disso).
+function aplicarMascaraCpf_(valor) {
+  const digitos = (valor || '').replace(/\D/g, '').slice(0, 11);
+  if (digitos.length > 9) return digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+  if (digitos.length > 6) return digitos.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+  if (digitos.length > 3) return digitos.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  return digitos;
 }
 
-function combinarHorario_(hora, minuto) {
-  return (hora && minuto) ? `${hora}:${minuto}` : '';
+// Campo de horário com máscara (cópia de app.js, ver comentário lá pro
+// histórico completo - relógio nativo cortava, 2 selects "ficou péssimo",
+// versão final é 1 campo de texto com teclado numérico simples).
+function aplicarMascaraHorario_(valor) {
+  const digitos = (valor || '').replace(/\D/g, '').slice(0, 4);
+  if (digitos.length <= 2) return digitos;
+  let hh = digitos.slice(0, 2);
+  let mm = digitos.slice(2);
+  if (Number(hh) > 23) hh = '23';
+  if (mm.length === 2 && Number(mm) > 59) mm = '59';
+  return hh + ':' + mm;
 }
 
 // Mesma lógica de renderizarListaAtividades do app.js, incluindo o bloqueio
@@ -139,8 +163,6 @@ function renderizarListaAtividades(cfg) {
   container.innerHTML = '';
 
   itens.forEach((item, i) => {
-    const [horaInicioAtual, minInicioAtual] = (item.inicio || '').split(':');
-    const [horaFimAtual, minFimAtual] = (item.fim || '').split(':');
     const linha = document.createElement('div');
     linha.className = 'linha-atividade';
     linha.innerHTML = `
@@ -152,19 +174,11 @@ function renderizarListaAtividades(cfg) {
       <div class="linha-horarios">
         <div class="campo-horario">
           <label>Início</label>
-          <div class="seletor-hora">
-            <select class="select-hora-inicio">${montarOpcoesHorario_(HORAS_SELECT_, horaInicioAtual)}</select>
-            <span class="separador-hora">:</span>
-            <select class="select-min-inicio">${montarOpcoesHorario_(MINUTOS_SELECT_, minInicioAtual)}</select>
-          </div>
+          <input type="text" inputmode="numeric" class="input-inicio" placeholder="00:00" maxlength="5" value="${item.inicio || ''}">
         </div>
         <div class="campo-horario">
           <label>Fim</label>
-          <div class="seletor-hora">
-            <select class="select-hora-fim">${montarOpcoesHorario_(HORAS_SELECT_, horaFimAtual)}</select>
-            <span class="separador-hora">:</span>
-            <select class="select-min-fim">${montarOpcoesHorario_(MINUTOS_SELECT_, minFimAtual)}</select>
-          </div>
+          <input type="text" inputmode="numeric" class="input-fim" placeholder="00:00" maxlength="5" value="${item.fim || ''}">
         </div>
       </div>
       <label>Discriminação da Atividade</label>
@@ -180,14 +194,14 @@ function renderizarListaAtividades(cfg) {
       atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd);
     }
 
-    const selectHoraInicio = linha.querySelector('.select-hora-inicio');
-    const selectMinInicio = linha.querySelector('.select-min-inicio');
-    const selectHoraFim = linha.querySelector('.select-hora-fim');
-    const selectMinFim = linha.querySelector('.select-min-fim');
-    selectHoraInicio.addEventListener('change', () => { item.inicio = combinarHorario_(selectHoraInicio.value, selectMinInicio.value); });
-    selectMinInicio.addEventListener('change', () => { item.inicio = combinarHorario_(selectHoraInicio.value, selectMinInicio.value); });
-    selectHoraFim.addEventListener('change', () => { item.fim = combinarHorario_(selectHoraFim.value, selectMinFim.value); });
-    selectMinFim.addEventListener('change', () => { item.fim = combinarHorario_(selectHoraFim.value, selectMinFim.value); });
+    linha.querySelector('.input-inicio').addEventListener('input', e => {
+      e.target.value = aplicarMascaraHorario_(e.target.value);
+      item.inicio = e.target.value;
+    });
+    linha.querySelector('.input-fim').addEventListener('input', e => {
+      e.target.value = aplicarMascaraHorario_(e.target.value);
+      item.fim = e.target.value;
+    });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
     let valorAnterior = item.discriminacao || '';
     areaDiscriminacao.addEventListener('input', e => {
@@ -275,11 +289,11 @@ function configurarCanvasAssinatura_(canvas) {
 }
 
 function configurarBotaoTravar_(botao, assinatura) {
-  botao.textContent = assinatura.estado.travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
+  botao.textContent = assinatura.estado.travada ? 'Destravar para assinar' : 'Travar assinatura';
   botao.classList.toggle('travado', assinatura.estado.travada);
   botao.addEventListener('click', () => {
     const travada = assinatura.alternarTravamento();
-    botao.textContent = travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
+    botao.textContent = travada ? 'Destravar para assinar' : 'Travar assinatura';
     botao.classList.toggle('travado', travada);
   });
 }
@@ -297,6 +311,25 @@ fetch('https://api.ipify.org?format=json')
   .then(r => r.json())
   .then(j => { ipClienteDetectado = j.ip; })
   .catch(() => {});
+
+// Zoom do preview do PDF SÓ dentro da caixa (pedido do Paulo, 11/07
+// tarde: "o zoom com dois dedos ficou ruim porque dá zoom na página
+// inteira"). Como o pinch-zoom nativo do navegador não dá pra restringir
+// a um elemento só (é sempre a página inteira), a solução é aumentar a
+// LARGURA do iframe além de 100% - o visualizador do Google Drive
+// reflui/amplia o conteúdo pra largura nova de verdade (não é só um
+// "esticar" visual), e o wrapper com overflow:auto deixa rolar pra ver o
+// resto. maximum-scale=1 no viewport principal continua desligando o
+// pinch-zoom da página toda.
+let zoomPdfAtual_ = 100;
+el.btnZoomMais.addEventListener('click', () => {
+  zoomPdfAtual_ = Math.min(zoomPdfAtual_ + 25, 250);
+  el.visualizadorPdf.style.width = zoomPdfAtual_ + '%';
+});
+el.btnZoomMenos.addEventListener('click', () => {
+  zoomPdfAtual_ = Math.max(zoomPdfAtual_ - 25, 100);
+  el.visualizadorPdf.style.width = zoomPdfAtual_ + '%';
+});
 
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token');
@@ -362,15 +395,38 @@ async function iniciar() {
 
   if (resp.pdfUrl) {
     el.visualizadorPdf.src = resp.pdfUrl;
-    el.visualizadorPdf.style.display = 'block';
+    el.wrapVisualizadorPdf.style.display = 'block';
   }
 
   el.carregando.style.display = 'none';
   el.cartaoIdentificacao.style.display = 'block';
 }
 
+// Máscara automática do CPF enquanto digita, e auto-preenchimento do nome
+// (pedido do Paulo, 11/07 tarde) assim que o CPF fica completo/válido -
+// só um "peek" pelo nome (buscarNomeCliente_ não exige nome nenhum de
+// entrada, ver Code.gs) pra poupar a pessoa de redigitar o próprio nome
+// toda vez que volta. A conferência de verdade (CPF+Nome) continua
+// acontecendo no clique de "Continuar" abaixo, sem pular esse passo.
+let ultimoCpfBuscado_ = null;
+el.cpf.addEventListener('input', async () => {
+  el.cpf.value = aplicarMascaraCpf_(el.cpf.value);
+  const digitos = el.cpf.value.replace(/\D/g, '');
+  if (digitos.length !== 11 || !validarCpf_(el.cpf.value) || digitos === ultimoCpfBuscado_) return;
+  ultimoCpfBuscado_ = digitos;
+  try {
+    const resp = await RdoApi.buscarNomeCliente(el.cpf.value);
+    if (resp.ok && resp.encontrado && !el.nomeIdentificacao.value.trim()) {
+      el.nomeIdentificacao.value = resp.nome;
+    }
+  } catch (err) {
+    console.warn('Falha ao auto-preencher nome pelo CPF (ignorado):', err);
+  }
+});
+
 // Identificação (CPF+Nome, pedido do Paulo 11/07) - se o CPF já estiver
-// cadastrado (com o nome batendo), pula direto pro formulário. Se não,
+// cadastrado (com o nome batendo), mostra os dados salvos (Função/
+// Empresa) pra confirmar/editar antes de liberar o formulário. Se não,
 // pede Função/Empresa (cadastro na primeira vez, salvo pra próxima).
 el.btnContinuarIdentificacao.addEventListener('click', async () => {
   const cpf = el.cpf.value.trim();
@@ -405,7 +461,11 @@ el.btnContinuarIdentificacao.addEventListener('click', async () => {
       funcaoAtual = resp.funcao;
       empresaAtual = resp.empresa;
       el.cartaoIdentificacao.style.display = 'none';
-      liberarFormularioPrincipal_();
+      el.confirmarFuncaoTexto.textContent = funcaoAtual;
+      el.confirmarEmpresaTexto.textContent = empresaAtual;
+      el.confirmarDadosTexto.style.display = 'block';
+      el.confirmarDadosEdicao.style.display = 'none';
+      el.cartaoConfirmarDados.style.display = 'block';
     } else {
       el.cartaoIdentificacao.style.display = 'none';
       el.cartaoCadastro.style.display = 'block';
@@ -416,6 +476,54 @@ el.btnContinuarIdentificacao.addEventListener('click', async () => {
     el.statusIdentificacao.className = 'status erro';
   } finally {
     el.btnContinuarIdentificacao.disabled = false;
+  }
+});
+
+// Confirma Função/Empresa já salvos (retorno) sem editar nada.
+el.btnProximoConfirmarDados.addEventListener('click', () => {
+  el.cartaoConfirmarDados.style.display = 'none';
+  liberarFormularioPrincipal_();
+});
+
+// Revela os campos de edição pré-preenchidos com o que já está salvo -
+// caso da pessoa ter sido promovida ou passado a trabalhar em outra
+// empresa desde o último RDO (pedido do Paulo, 11/07 tarde).
+el.btnEditarConfirmarDados.addEventListener('click', () => {
+  el.funcaoEditar.value = funcaoAtual;
+  el.empresaEditar.value = empresaAtual;
+  el.confirmarDadosTexto.style.display = 'none';
+  el.confirmarDadosEdicao.style.display = 'block';
+});
+
+el.btnSalvarEdicaoDados.addEventListener('click', async () => {
+  const funcao = el.funcaoEditar.value.trim();
+  const empresa = el.empresaEditar.value.trim();
+  if (!funcao || !empresa) {
+    el.statusConfirmarDados.textContent = 'Preencha função e empresa.';
+    el.statusConfirmarDados.className = 'status erro';
+    return;
+  }
+
+  el.btnSalvarEdicaoDados.disabled = true;
+  try {
+    el.statusConfirmarDados.textContent = 'Salvando...';
+    el.statusConfirmarDados.className = 'status';
+    const resp = await RdoApi.cadastrarCliente({ cpf: cpfAtual, nome: nomeAtual, funcao, empresa });
+    if (!resp.ok) {
+      el.statusConfirmarDados.textContent = resp.erro || 'Não consegui salvar.';
+      el.statusConfirmarDados.className = 'status erro';
+      return;
+    }
+    funcaoAtual = funcao;
+    empresaAtual = empresa;
+    el.cartaoConfirmarDados.style.display = 'none';
+    liberarFormularioPrincipal_();
+  } catch (err) {
+    console.error(err);
+    el.statusConfirmarDados.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    el.statusConfirmarDados.className = 'status erro';
+  } finally {
+    el.btnSalvarEdicaoDados.disabled = false;
   }
 });
 
@@ -474,6 +582,17 @@ function base64ParaBytes_(base64) {
 let previewXlsxBase64 = null;
 let previewPdfBase64 = null;
 let previewFileName = null;
+let stateFinalAtual = null; // guardado pra poder regerar a prévia com marca d'água (ver btnVerPdfFinal)
+
+function baixarPdf_(base64, fileName) {
+  const blob = new Blob([base64ParaBytes_(base64)], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 el.btnPrevisualizar.addEventListener('click', async () => {
   if (!assinaturaContratante.estado.temAssinatura) {
@@ -508,6 +627,7 @@ el.btnPrevisualizar.addEventListener('click', async () => {
     previewXlsxBase64 = base64;
     previewPdfBase64 = respPdf.pdfBase64;
     previewFileName = fileName;
+    stateFinalAtual = stateFinal;
 
     el.statusEnvio.textContent = '';
     el.cartaoPreviewFinal.style.display = 'block';
@@ -522,9 +642,29 @@ el.btnPrevisualizar.addEventListener('click', async () => {
   }
 });
 
-el.btnVerPdfFinal.addEventListener('click', () => {
-  const blob = new Blob([base64ParaBytes_(previewPdfBase64)], { type: 'application/pdf' });
-  window.open(URL.createObjectURL(blob), '_blank');
+// "Visualizar PDF" virou DOWNLOAD com marca d'água "PRÉ-VISUALIZAÇÃO"
+// (pedido do Paulo, 11/07 tarde: visualizar no navegador "buga demais",
+// e o documento pré-visualizado nunca pode ser confundido com o final) -
+// gera uma cópia SEPARADA (apenasPreview:true) só pra esse download; o
+// xlsx/pdf que realmente vai ser enviado (previewXlsxBase64/
+// previewPdfBase64) não muda.
+el.btnVerPdfFinal.addEventListener('click', async () => {
+  el.btnVerPdfFinal.disabled = true;
+  try {
+    el.statusConfirmacao.textContent = 'Gerando PDF de prévia (com marca d\'água)...';
+    el.statusConfirmacao.className = 'status';
+    const { base64: xlsxPreviaBase64, fileName: fileNamePrevia } = await RdoExcel.gerarWorkbook(stateFinalAtual, numero, { apenasPreview: true });
+    const respPdf = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
+    baixarPdf_(respPdf.pdfBase64, fileNamePrevia.replace(/\.xlsx$/i, '_PREVIA.pdf'));
+    el.statusConfirmacao.textContent = '';
+  } catch (err) {
+    console.error(err);
+    el.statusConfirmacao.textContent = 'Erro ao baixar o PDF de prévia: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.className = 'status erro';
+    RdoApi.logErro('visualizar_pdf_aprovacao', err && err.message ? err.message : String(err), { token });
+  } finally {
+    el.btnVerPdfFinal.disabled = false;
+  }
 });
 
 el.btnEditar.addEventListener('click', () => {

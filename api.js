@@ -257,6 +257,12 @@ const RdoApi = (function () {
     return postJson_({ action: 'buscarCliente', cpf, nome });
   }
 
+  // Só o nome, pra auto-preencher o campo antes da conferência completa
+  // (CPF+Nome) de buscarCliente acima - ver aprovacao.js.
+  function buscarNomeCliente(cpf) {
+    return postJson_({ action: 'buscarNomeCliente', cpf });
+  }
+
   function cadastrarCliente({ cpf, nome, funcao, empresa }) {
     return postJson_({ action: 'cadastrarCliente', cpf, nome, funcao, empresa });
   }
@@ -321,7 +327,7 @@ const RdoApi = (function () {
   return {
     getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO,
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
-    buscarCliente, cadastrarCliente, login, salvarAssinaturaUsuario,
+    buscarCliente, buscarNomeCliente, cadastrarCliente, login, salvarAssinaturaUsuario,
     meusRdos, buscarPdfPorId, reenviarLinkAprovacao, corrigirEmailAprovacao
   };
 })();

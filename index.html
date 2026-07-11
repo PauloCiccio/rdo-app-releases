@@ -34,14 +34,25 @@
   <p class="orcamento-info" id="perfil-nome-usuario"></p>
   <div id="perfil-carregando" class="status">Carregando seus RDOs...</div>
   <div id="perfil-erro" class="status erro" style="display:none;"></div>
-  <div id="perfil-conteudo" style="display:none;">
+
+  <div id="perfil-lista-obras" style="display:none;">
+    <h3 class="subtitulo-perfil">Minhas Obras</h3>
+    <div id="perfil-obras"></div>
+    <p class="orcamento-info" id="perfil-sem-obras" style="display:none;">Você ainda não gerou nenhum RDO.</p>
+  </div>
+
+  <div id="perfil-detalhe-obra" style="display:none;">
+    <div class="cabecalho-secao">
+      <h3 id="perfil-obra-selecionada" class="subtitulo-perfil"></h3>
+      <button type="button" id="btn-voltar-obras" class="link-limpar-cache">‹ Minhas Obras</button>
+    </div>
     <h3 class="subtitulo-perfil">Para aprovação do Contratante</h3>
     <div id="perfil-pendentes"></div>
-    <p class="orcamento-info" id="perfil-sem-pendentes" style="display:none;">Nenhum RDO aguardando aprovação no momento.</p>
+    <p class="orcamento-info" id="perfil-sem-pendentes" style="display:none;">Nenhum RDO aguardando aprovação nesta obra.</p>
 
     <h3 class="subtitulo-perfil">Aprovados</h3>
     <div id="perfil-aprovados"></div>
-    <p class="orcamento-info" id="perfil-sem-aprovados" style="display:none;">Nenhum RDO aprovado ainda.</p>
+    <p class="orcamento-info" id="perfil-sem-aprovados" style="display:none;">Nenhum RDO aprovado ainda nesta obra.</p>
   </div>
 </section>
 
@@ -62,7 +73,7 @@
   <canvas id="canvas-assinatura-primeiro-login" class="canvas-assinatura" width="600" height="200"></canvas>
   <div class="linha-botoes-assinatura">
     <button type="button" id="btn-limpar-assinatura-primeiro-login" class="botao-secundario">Limpar assinatura</button>
-    <button type="button" id="btn-travar-assinatura-primeiro-login" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+    <button type="button" id="btn-travar-assinatura-primeiro-login" class="botao-secundario btn-travar travado">Destravar para assinar</button>
   </div>
   <button type="button" id="btn-salvar-primeira-assinatura" class="botao-principal">Salvar assinatura e continuar</button>
   <div id="status-primeira-assinatura" class="status" aria-live="polite"></div>
@@ -179,7 +190,7 @@
       <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
       <div class="linha-botoes-assinatura">
         <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
-        <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+        <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">Destravar para assinar</button>
       </div>
       <button type="button" id="btn-salvar-nova-assinatura-contratada" class="botao-principal">Salvar nova assinatura</button>
       <div id="status-nova-assinatura-contratada" class="status" aria-live="polite"></div>
@@ -197,7 +208,7 @@
     <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
     <div class="linha-botoes-assinatura">
       <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
-      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">Destravar para assinar</button>
     </div>
     <label class="linha-checkbox">
       <input type="checkbox" id="campo-concordo">
@@ -221,8 +232,8 @@
 
   <section class="cartao" id="cartao-preview" style="display:none;">
     <h2>Pré-visualização</h2>
-    <p>O RDO foi gerado. Toque em <strong>"Visualizar PDF"</strong> pra abrir e conferir o documento num leitor de PDF antes de confirmar o envio.</p>
-    <button type="button" id="btn-baixar-pdf" class="botao-principal">Visualizar PDF</button>
+    <p>O RDO foi gerado. Toque em <strong>"Baixar PDF de prévia"</strong> pra baixar e conferir o documento (vem com marca d'água "PRÉ-VISUALIZAÇÃO", só o envio final sai sem ela) antes de confirmar o envio.</p>
+    <button type="button" id="btn-baixar-pdf" class="botao-principal">Baixar PDF de prévia</button>
     <button type="button" id="btn-compartilhar" class="botao-secundario" style="display:none;">Compartilhar PDF</button>
     <button type="button" id="btn-confirmar-envio" class="botao-principal">Confirmar e Enviar por E-mail</button>
     <button type="button" id="btn-cancelar-preview" class="botao-secundario">Cancelar / Editar</button>

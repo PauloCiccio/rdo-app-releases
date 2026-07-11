@@ -204,25 +204,13 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-atividade .linha-horarios {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 28px;
   margin-bottom: 8px;
 }
 .linha-atividade .campo-horario { min-width: 0; }
-.seletor-hora {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.seletor-hora select {
-  width: auto;
-  flex: 1;
-  min-width: 0;
-  padding: 9px 2px;
+.linha-atividade .input-inicio,
+.linha-atividade .input-fim {
   text-align: center;
-}
-.seletor-hora .separador-hora {
-  font-weight: bold;
-  color: var(--cinza);
 }
 .linha-atividade label { margin: 0 0 4px; }
 .linha-atividade textarea { min-height: 40px; }
@@ -360,6 +348,20 @@ textarea { resize: vertical; overflow: hidden; }
   border-bottom: 1px solid var(--borda);
   padding-bottom: 4px;
 }
+.linha-obra-perfil {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #222;
+}
+.linha-obra-perfil .nome-obra-perfil { font-weight: bold; color: var(--azul); display: block; }
+.linha-obra-perfil .contagem-obra-perfil { font-size: 12px; color: var(--cinza); }
 .linha-rdo-perfil {
   border: 1px solid var(--borda);
   border-radius: 8px;
@@ -401,3 +403,32 @@ textarea { resize: vertical; overflow: hidden; }
   margin-top: 6px;
 }
 .bloco-corrigir-email input { flex: 1; margin: 0; }
+
+/* Preview do PDF parcial (aprovacao.html) com zoom SÓ dentro da caixa -
+   pinch-zoom da página inteira fica desligado (maximum-scale=1 no
+   viewport), então o zoom aqui é feito ampliando a largura do iframe
+   dentro de um wrapper com scroll, via botões +/- (ver aprovacao.js). */
+.wrap-visualizador-pdf {
+  overflow: auto;
+  max-height: 75vh;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  position: relative;
+}
+.botoes-zoom-pdf {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255,255,255,.9);
+  border-bottom: 1px solid var(--borda);
+}
+#visualizador-pdf {
+  display: block;
+  width: 100%;
+  height: 75vh;
+  border: none;
+}

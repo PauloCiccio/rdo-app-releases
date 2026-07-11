@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.5.0';
+const VERSAO_APP = 'BETA 0.6.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,12 @@ const el = {
   perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
   perfilCarregando: document.getElementById('perfil-carregando'),
   perfilErro: document.getElementById('perfil-erro'),
-  perfilConteudo: document.getElementById('perfil-conteudo'),
+  perfilListaObras: document.getElementById('perfil-lista-obras'),
+  perfilObras: document.getElementById('perfil-obras'),
+  perfilSemObras: document.getElementById('perfil-sem-obras'),
+  perfilDetalheObra: document.getElementById('perfil-detalhe-obra'),
+  perfilObraSelecionada: document.getElementById('perfil-obra-selecionada'),
+  btnVoltarObras: document.getElementById('btn-voltar-obras'),
   perfilPendentes: document.getElementById('perfil-pendentes'),
   perfilSemPendentes: document.getElementById('perfil-sem-pendentes'),
   perfilAprovados: document.getElementById('perfil-aprovados'),
@@ -361,25 +366,20 @@ function atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd) {
   btnAdd.disabled = usados >= capacidade;
 }
 
-// Seletores de Hora/Minuto (11/07 à noite) - substituem o <input
-// type="time"> nativo. Motivo: o seletor nativo do Android (relógio) fica
-// CORTADO com o celular na vertical (confirmado pelo Paulo: "quando vira
-// pra horizontal corrige") - é um popup do PRÓPRIO SISTEMA/WebView, fora
-// do nosso HTML/CSS, então não tem como consertar o tamanho dele direto.
-// Dois <select> simples (Hora/Minuto, desenhados por nós) nunca dependem
-// desse popup, então nunca cortam - só muda a forma de preencher (2
-// toques em vez de 1 relógio), decisão confirmada com o Paulo.
-const HORAS_SELECT_ = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-const MINUTOS_SELECT_ = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
-
-function montarOpcoesHorario_(opcoes, valorAtual) {
-  return '<option value="">--</option>' + opcoes.map(o =>
-    `<option value="${o}"${o === valorAtual ? ' selected' : ''}>${o}</option>`
-  ).join('');
-}
-
-function combinarHorario_(hora, minuto) {
-  return (hora && minuto) ? `${hora}:${minuto}` : '';
+// Campo de horário com máscara (11/07 tarde, 2ª volta) - depois de tentar
+// o relógio nativo (cortava na vertical) e depois 2 <select> de Hora/
+// Minuto ("ficou péssimo", segundo o Paulo), a versão final é um único
+// campo de texto com teclado NUMÉRICO simples (`inputmode="numeric"`,
+// nunca abre nem o relógio nem um popup nativo) e máscara "HH:MM" que se
+// forma sozinha enquanto a pessoa digita os 4 dígitos.
+function aplicarMascaraHorario_(valor) {
+  const digitos = (valor || '').replace(/\D/g, '').slice(0, 4);
+  if (digitos.length <= 2) return digitos;
+  let hh = digitos.slice(0, 2);
+  let mm = digitos.slice(2);
+  if (Number(hh) > 23) hh = '23';
+  if (mm.length === 2 && Number(mm) > 59) mm = '59';
+  return hh + ':' + mm;
 }
 
 function renderizarListaAtividades(cfg) {
@@ -387,8 +387,6 @@ function renderizarListaAtividades(cfg) {
   container.innerHTML = '';
 
   itens.forEach((item, i) => {
-    const [horaInicioAtual, minInicioAtual] = (item.inicio || '').split(':');
-    const [horaFimAtual, minFimAtual] = (item.fim || '').split(':');
     const linha = document.createElement('div');
     linha.className = 'linha-atividade';
     linha.innerHTML = `
@@ -400,19 +398,11 @@ function renderizarListaAtividades(cfg) {
       <div class="linha-horarios">
         <div class="campo-horario">
           <label>Início</label>
-          <div class="seletor-hora">
-            <select class="select-hora-inicio">${montarOpcoesHorario_(HORAS_SELECT_, horaInicioAtual)}</select>
-            <span class="separador-hora">:</span>
-            <select class="select-min-inicio">${montarOpcoesHorario_(MINUTOS_SELECT_, minInicioAtual)}</select>
-          </div>
+          <input type="text" inputmode="numeric" class="input-inicio" placeholder="00:00" maxlength="5" value="${item.inicio || ''}">
         </div>
         <div class="campo-horario">
           <label>Fim</label>
-          <div class="seletor-hora">
-            <select class="select-hora-fim">${montarOpcoesHorario_(HORAS_SELECT_, horaFimAtual)}</select>
-            <span class="separador-hora">:</span>
-            <select class="select-min-fim">${montarOpcoesHorario_(MINUTOS_SELECT_, minFimAtual)}</select>
-          </div>
+          <input type="text" inputmode="numeric" class="input-fim" placeholder="00:00" maxlength="5" value="${item.fim || ''}">
         </div>
       </div>
       <label>Discriminação da Atividade</label>
@@ -428,14 +418,14 @@ function renderizarListaAtividades(cfg) {
       atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd);
     }
 
-    const selectHoraInicio = linha.querySelector('.select-hora-inicio');
-    const selectMinInicio = linha.querySelector('.select-min-inicio');
-    const selectHoraFim = linha.querySelector('.select-hora-fim');
-    const selectMinFim = linha.querySelector('.select-min-fim');
-    selectHoraInicio.addEventListener('change', () => { item.inicio = combinarHorario_(selectHoraInicio.value, selectMinInicio.value); });
-    selectMinInicio.addEventListener('change', () => { item.inicio = combinarHorario_(selectHoraInicio.value, selectMinInicio.value); });
-    selectHoraFim.addEventListener('change', () => { item.fim = combinarHorario_(selectHoraFim.value, selectMinFim.value); });
-    selectMinFim.addEventListener('change', () => { item.fim = combinarHorario_(selectHoraFim.value, selectMinFim.value); });
+    linha.querySelector('.input-inicio').addEventListener('input', e => {
+      e.target.value = aplicarMascaraHorario_(e.target.value);
+      item.inicio = e.target.value;
+    });
+    linha.querySelector('.input-fim').addEventListener('input', e => {
+      e.target.value = aplicarMascaraHorario_(e.target.value);
+      item.fim = e.target.value;
+    });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
     let valorAnterior = item.discriminacao || '';
     // Não basta desabilitar "+ Adicionar" quando o orçamento de linhas
@@ -1013,11 +1003,11 @@ function configurarBotaoTravar_(botao, assinatura) {
   // (canvas nasce travado agora) - o HTML traz um texto/classe "padrão
   // antigo" fixo que não bate mais, então sincroniza aqui em vez de só no
   // click.
-  botao.textContent = assinatura.estado.travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
+  botao.textContent = assinatura.estado.travada ? 'Destravar para assinar' : 'Travar assinatura';
   botao.classList.toggle('travado', assinatura.estado.travada);
   botao.addEventListener('click', () => {
     const travada = assinatura.alternarTravamento();
-    botao.textContent = travada ? '🔒 Destravar assinatura' : '🔓 Travar assinatura';
+    botao.textContent = travada ? 'Destravar para assinar' : 'Travar assinatura';
     botao.classList.toggle('travado', travada);
   });
 }
@@ -1163,26 +1153,64 @@ el.btnSair.addEventListener('click', () => {
 // que não recebeu porque estava errado).
 // ---------------------------------------------------------------------------
 
-function agruparPorObra_(itens) {
-  const grupos = new Map();
-  itens.slice().reverse().forEach(item => { // reverse: mais recente primeiro
-    const chave = `${item.cliente} - ${item.obra}`;
-    if (!grupos.has(chave)) grupos.set(chave, []);
-    grupos.get(chave).push(item);
-  });
-  return grupos;
+function chaveObraPerfil_(item) {
+  return `${item.cliente} - ${item.obra}`;
 }
 
-function renderizarGrupoPerfil_(container, itens, montarLinha) {
-  container.innerHTML = '';
-  const grupos = agruparPorObra_(itens);
-  grupos.forEach((lista, chave) => {
-    const titulo = document.createElement('div');
-    titulo.className = 'grupo-obra-perfil';
-    titulo.textContent = chave;
-    container.appendChild(titulo);
-    lista.forEach(item => container.appendChild(montarLinha(item)));
+// Guarda a resposta CRUA de meusRdos (todas as obras juntas) - a
+// navegação "Minhas Obras" (pedido do Paulo, 11/07 tarde: antes mostrava
+// tudo junto numa lista só, agora precisa escolher a obra primeiro) só
+// filtra esses dois arrays na hora de abrir o detalhe, sem rebuscar no
+// servidor.
+let perfilDadosAtuais = null;
+
+function listarObrasUnicasPerfil_() {
+  const mapa = new Map(); // chave "Cliente - Obra" -> {cliente, obra, nAprovados, nPendentes}
+  perfilDadosAtuais.pendentes.forEach(item => {
+    const chave = chaveObraPerfil_(item);
+    if (!mapa.has(chave)) mapa.set(chave, { cliente: item.cliente, obra: item.obra, nAprovados: 0, nPendentes: 0 });
+    mapa.get(chave).nPendentes++;
   });
+  perfilDadosAtuais.aprovados.forEach(item => {
+    const chave = chaveObraPerfil_(item);
+    if (!mapa.has(chave)) mapa.set(chave, { cliente: item.cliente, obra: item.obra, nAprovados: 0, nPendentes: 0 });
+    mapa.get(chave).nAprovados++;
+  });
+  return mapa;
+}
+
+function renderizarListaObrasPerfil_() {
+  el.perfilObras.innerHTML = '';
+  const mapa = listarObrasUnicasPerfil_();
+  mapa.forEach((info, chave) => {
+    const partes = [];
+    if (info.nPendentes) partes.push(`${info.nPendentes} para aprovação`);
+    if (info.nAprovados) partes.push(`${info.nAprovados} aprovado(s)`);
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'linha-obra-perfil';
+    botao.innerHTML = `<span class="nome-obra-perfil">${chave}</span><span class="contagem-obra-perfil">${partes.join(' · ')}</span>`;
+    botao.addEventListener('click', () => abrirDetalheObraPerfil_(chave));
+    el.perfilObras.appendChild(botao);
+  });
+  el.perfilSemObras.style.display = mapa.size ? 'none' : 'block';
+}
+
+function abrirDetalheObraPerfil_(chave) {
+  el.perfilObraSelecionada.textContent = chave;
+  el.perfilListaObras.style.display = 'none';
+  el.perfilDetalheObra.style.display = 'block';
+
+  const pendentesDaObra = perfilDadosAtuais.pendentes.filter(item => chaveObraPerfil_(item) === chave).reverse();
+  const aprovadosDaObra = perfilDadosAtuais.aprovados.filter(item => chaveObraPerfil_(item) === chave).reverse();
+
+  el.perfilPendentes.innerHTML = '';
+  pendentesDaObra.forEach(item => el.perfilPendentes.appendChild(montarLinhaPendente_(item)));
+  el.perfilSemPendentes.style.display = pendentesDaObra.length ? 'none' : 'block';
+
+  el.perfilAprovados.innerHTML = '';
+  aprovadosDaObra.forEach(item => el.perfilAprovados.appendChild(montarLinhaAprovado_(item)));
+  el.perfilSemAprovados.style.display = aprovadosDaObra.length ? 'none' : 'block';
 }
 
 function montarLinhaAprovado_(item) {
@@ -1322,20 +1350,17 @@ async function carregarPerfil_() {
   el.perfilNomeUsuario.textContent = sessao.nome;
   el.perfilCarregando.style.display = 'block';
   el.perfilErro.style.display = 'none';
-  el.perfilConteudo.style.display = 'none';
+  el.perfilListaObras.style.display = 'none';
+  el.perfilDetalheObra.style.display = 'none';
 
   try {
     const resp = await RdoApi.meusRdos(sessao.login, sessao.senha);
     if (!resp.ok) throw new Error(resp.erro || 'Não consegui carregar seus RDOs.');
 
+    perfilDadosAtuais = { aprovados: resp.aprovados, pendentes: resp.pendentes };
     el.perfilCarregando.style.display = 'none';
-    el.perfilConteudo.style.display = 'block';
-
-    renderizarGrupoPerfil_(el.perfilPendentes, resp.pendentes, montarLinhaPendente_);
-    el.perfilSemPendentes.style.display = resp.pendentes.length ? 'none' : 'block';
-
-    renderizarGrupoPerfil_(el.perfilAprovados, resp.aprovados, montarLinhaAprovado_);
-    el.perfilSemAprovados.style.display = resp.aprovados.length ? 'none' : 'block';
+    el.perfilListaObras.style.display = 'block';
+    renderizarListaObrasPerfil_();
   } catch (err) {
     console.error(err);
     el.perfilCarregando.style.display = 'none';
@@ -1355,6 +1380,11 @@ el.btnAbrirPerfil.addEventListener('click', () => {
 el.btnFecharPerfil.addEventListener('click', () => {
   el.cartaoPerfil.style.display = 'none';
   el.formRdo.style.display = 'block';
+});
+
+el.btnVoltarObras.addEventListener('click', () => {
+  el.perfilDetalheObra.style.display = 'none';
+  el.perfilListaObras.style.display = 'block';
 });
 
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
@@ -1517,6 +1547,7 @@ async function compartilharPdf_(base64, fileName) {
 let previewPdfBase64 = null;
 let previewFileName = null;
 let previewXlsxBase64 = null;
+let previewNumeroAtual = null; // guardado pra poder regerar a prévia com marca d'água (ver btnBaixarPdf)
 
 function fecharPreview_() {
   el.cartaoPreview.style.display = 'none';
@@ -1604,6 +1635,7 @@ el.btnGerar.addEventListener('click', async () => {
     previewPdfBase64 = resp.pdfBase64;
     previewFileName = fileName.replace(/\.xlsx$/i, '.pdf');
     previewXlsxBase64 = base64;
+    previewNumeroAtual = numero;
 
     let mensagem = 'RDO gerado. Toque em "Baixar PDF pra conferir" antes de enviar.';
     if (avisos && avisos.length) mensagem += '\nAtenção: ' + avisos.join(' ');
@@ -1626,13 +1658,25 @@ el.btnGerar.addEventListener('click', async () => {
   }
 });
 
+// "Visualizar PDF" (antes de enviar) virou DOWNLOAD de verdade com marca
+// d'água "PRÉ-VISUALIZAÇÃO" carimbada no documento (pedido do Paulo,
+// 11/07 tarde: "isso buga demais" abrir num visualizador inline - e o
+// documento pré-visualizado NUNCA pode ser confundido com o RDO final de
+// verdade). Gera uma cópia SEPARADA (com `apenasPreview: true`) só pra
+// esse download - o xlsx/pdf usado de verdade no envio (previewXlsxBase64/
+// previewPdfBase64, sem marca d'água) não muda.
 el.btnBaixarPdf.addEventListener('click', async () => {
   el.btnBaixarPdf.disabled = true;
   try {
-    await abrirPdfParaVisualizar_(previewPdfBase64, previewFileName);
+    el.statusConfirmacao.textContent = 'Gerando PDF de prévia (com marca d\'água)...';
+    el.statusConfirmacao.className = 'status';
+    const { base64: xlsxPreviewBase64, fileName: fileNamePreview } = await RdoExcel.gerarWorkbook(state, previewNumeroAtual, { apenasPreview: true });
+    const respPdf = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
+    await compartilharPdf_(respPdf.pdfBase64, fileNamePreview.replace(/\.xlsx$/i, '_PREVIA.pdf'));
+    el.statusConfirmacao.textContent = '';
   } catch (err) {
     console.error(err);
-    el.statusConfirmacao.textContent = 'Erro ao abrir o PDF: ' + err.message;
+    el.statusConfirmacao.textContent = 'Erro ao baixar o PDF de prévia: ' + err.message;
     el.statusConfirmacao.className = 'status erro';
     RdoApi.logErro('visualizar_pdf', err && err.message ? err.message : String(err));
   } finally {
