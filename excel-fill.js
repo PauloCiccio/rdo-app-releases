@@ -451,14 +451,15 @@ const RdoExcel = (function () {
     preencherObservacoes_(sh, state.observacoes);
     corrigirCabecalhoHorario_(sh);
 
-    // Efetivo/Equipamentos/Veículos: só na folha 1 (pedido do Paulo,
-    // 11/07 - a mão de obra/equipamentos do dia não muda de folha pra
-    // folha, não faz sentido repetir). Nas folhas seguintes a área fica em
-    // branco, exatamente como vem no modelo original.
-    if (opcoes.numPagina === 1) {
-      preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos);
-      preencherTotais_(sh, state.efetivo, state.equipamentos);
-    }
+    // Efetivo/Equipamentos/Veículos repetem em TODA folha (correção de
+    // 11/07 à noite - a decisão anterior de deixar só na folha 1 fazia a
+    // folha 2 mostrar o texto de EXEMPLO do próprio modelo em branco
+    // (ex: "Engenheiro" hardcoded no template), que não bate com o que
+    // foi realmente digitado - parecia dado errado/bugado. Repetir
+    // sempre evita esse vazamento do template e combina com "repetir
+    // tudo" da folha 1, pedido do Paulo).
+    preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos);
+    preencherTotais_(sh, state.efetivo, state.equipamentos);
 
     escreverAtividadesNaPagina_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, opcoes.chunkContratada, opcoes.numeroInicialContratada);
     escreverAtividadesNaPagina_(sh, LINHA_ATIV_CONTRATANTE_INICIO, CAPACIDADE_CONTRATANTE, opcoes.chunkContratante, opcoes.numeroInicialContratante);
