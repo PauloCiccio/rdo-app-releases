@@ -106,7 +106,7 @@ label {
   color: var(--cinza);
   margin: 10px 0 4px;
 }
-select, input[type="text"], input[type="date"], input[type="time"], input[type="number"], textarea {
+select, input[type="text"], input[type="date"], input[type="time"], input[type="number"], input[type="password"], input[type="email"], textarea {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;

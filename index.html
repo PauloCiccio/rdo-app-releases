@@ -19,10 +19,35 @@
     <span id="versao-app" class="versao-app"></span>
     <button type="button" id="btn-verificar-atualizacao" class="link-atualizacao">Verificar atualizações</button>
     <span id="status-atualizacao" class="status-atualizacao"></span>
+    <span id="usuario-logado" class="status-atualizacao" style="display:none;"></span>
+    <button type="button" id="btn-sair" class="link-atualizacao" style="display:none;">Sair</button>
   </div>
 </header>
 
-<main id="form-rdo">
+<section class="cartao" id="cartao-login">
+  <h2>Login</h2>
+  <label for="campo-login-usuario">Usuário</label>
+  <input type="text" id="campo-login-usuario" autocomplete="username" autocapitalize="off" autocorrect="off">
+  <label for="campo-senha-usuario">Senha</label>
+  <input type="password" id="campo-senha-usuario" autocomplete="current-password">
+  <button type="button" id="btn-entrar" class="botao-principal">Entrar</button>
+  <div id="status-login" class="status" aria-live="polite"></div>
+</section>
+
+<section class="cartao" id="cartao-primeira-assinatura" style="display:none;">
+  <h2>Cadastre sua assinatura</h2>
+  <p class="orcamento-info">Primeira vez que você entra - sua assinatura fica salva no servidor e não precisa ser desenhada de novo nos próximos RDOs.</p>
+  <label>Assine abaixo com o dedo</label>
+  <canvas id="canvas-assinatura-primeiro-login" class="canvas-assinatura" width="600" height="200"></canvas>
+  <div class="linha-botoes-assinatura">
+    <button type="button" id="btn-limpar-assinatura-primeiro-login" class="botao-secundario">Limpar assinatura</button>
+    <button type="button" id="btn-travar-assinatura-primeiro-login" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+  </div>
+  <button type="button" id="btn-salvar-primeira-assinatura" class="botao-principal">Salvar assinatura e continuar</button>
+  <div id="status-primeira-assinatura" class="status" aria-live="polite"></div>
+</section>
+
+<main id="form-rdo" style="display:none;">
 
   <section class="cartao">
     <div class="cabecalho-secao">
@@ -124,14 +149,19 @@
   </section>
 
   <section class="cartao">
-    <h2>Assinatura da Contratada (obrigatório)</h2>
-    <label for="campo-nome-assinante-contratada">Nome de quem está assinando</label>
-    <input type="text" id="campo-nome-assinante-contratada" placeholder="Nome completo" required>
-    <label>Assine abaixo com o dedo</label>
-    <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
-    <div class="linha-botoes-assinatura">
-      <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
-      <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+    <h2>Assinatura da Contratada</h2>
+    <p id="assinatura-contratada-info"></p>
+    <button type="button" id="btn-atualizar-assinatura-contratada" class="botao-secundario">Atualizar minha assinatura</button>
+
+    <div id="bloco-redesenhar-assinatura-contratada" style="display:none;">
+      <label>Assine abaixo com o dedo</label>
+      <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
+      <div class="linha-botoes-assinatura">
+        <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
+        <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">🔒 Destravar assinatura</button>
+      </div>
+      <button type="button" id="btn-salvar-nova-assinatura-contratada" class="botao-principal">Salvar nova assinatura</button>
+      <div id="status-nova-assinatura-contratada" class="status" aria-live="polite"></div>
     </div>
   </section>
 

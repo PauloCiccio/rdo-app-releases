@@ -248,6 +248,15 @@ const RdoApi = (function () {
     return postJson_({ action: 'finalizarAprovacao', token, xlsxBase64, pdfBase64, fileName });
   }
 
+  // Login dos usuários da Contratada (11/07) - ver CHAVE_SESSAO_USUARIO em app.js.
+  function login(login, senha) {
+    return postJson_({ action: 'login', login, senha });
+  }
+
+  function salvarAssinaturaUsuario(login, senha, assinaturaBase64) {
+    return postJson_({ action: 'salvarAssinaturaUsuario', login, senha, assinaturaBase64 });
+  }
+
   async function getVersaoApp() {
     if (!APPS_SCRIPT_URL) return { ok: false };
     try {
@@ -281,6 +290,7 @@ const RdoApi = (function () {
 
   return {
     getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO,
-    getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao
+    getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
+    login, salvarAssinaturaUsuario
   };
 })();

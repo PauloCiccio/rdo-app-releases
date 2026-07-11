@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.2.2';
+const VERSAO_APP = 'BETA 0.3.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -162,8 +162,11 @@ const state = {
   // CAPACIDADE_CONTRATANTE) - um item com texto longo consome mais de uma.
   atividadesContratada: [{ inicio: '', fim: '', discriminacao: '' }],
   atividadesContratante: [{ inicio: '', fim: '', discriminacao: '' }],
+  // Nome/assinatura da Contratada não são mais digitados/desenhados a
+  // cada RDO (11/07 noite) - vêm do LOGIN do usuário (ver
+  // CHAVE_SESSAO_USUARIO), cadastrados uma única vez no primeiro acesso.
   assinaturaContratadaNome: '',
-  assinaturaContratadaImagemBase64: null, // preenchido só na hora de gerar, a partir do canvas
+  assinaturaContratadaImagemBase64: null,
   assinaturaNome: '',
   assinaturaImagemBase64: null, // preenchido só na hora de gerar, a partir do canvas
   assinaturaConcordo: false,
@@ -213,10 +216,14 @@ const el = {
   orcamentoContratante: document.getElementById('orcamento-contratante'),
   btnAddContratada: document.getElementById('btn-add-contratada'),
   btnAddContratante: document.getElementById('btn-add-contratante'),
-  nomeAssinanteContratada: document.getElementById('campo-nome-assinante-contratada'),
+  assinaturaContratadaInfo: document.getElementById('assinatura-contratada-info'),
+  btnAtualizarAssinaturaContratada: document.getElementById('btn-atualizar-assinatura-contratada'),
+  blocoRedesenharAssinaturaContratada: document.getElementById('bloco-redesenhar-assinatura-contratada'),
   canvasAssinaturaContratada: document.getElementById('canvas-assinatura-contratada'),
   btnLimparAssinaturaContratada: document.getElementById('btn-limpar-assinatura-contratada'),
   btnTravarAssinaturaContratada: document.getElementById('btn-travar-assinatura-contratada'),
+  btnSalvarNovaAssinaturaContratada: document.getElementById('btn-salvar-nova-assinatura-contratada'),
+  statusNovaAssinaturaContratada: document.getElementById('status-nova-assinatura-contratada'),
   nomeAssinante: document.getElementById('campo-nome-assinante'),
   emailContratante: document.getElementById('campo-email-contratante'),
   canvasAssinatura: document.getElementById('canvas-assinatura'),
@@ -232,7 +239,22 @@ const el = {
   btnCompartilhar: document.getElementById('btn-compartilhar'),
   btnConfirmarEnvio: document.getElementById('btn-confirmar-envio'),
   btnCancelarPreview: document.getElementById('btn-cancelar-preview'),
-  statusConfirmacao: document.getElementById('status-confirmacao')
+  statusConfirmacao: document.getElementById('status-confirmacao'),
+
+  formRdo: document.getElementById('form-rdo'),
+  usuarioLogado: document.getElementById('usuario-logado'),
+  btnSair: document.getElementById('btn-sair'),
+  cartaoLogin: document.getElementById('cartao-login'),
+  loginUsuario: document.getElementById('campo-login-usuario'),
+  senhaUsuario: document.getElementById('campo-senha-usuario'),
+  btnEntrar: document.getElementById('btn-entrar'),
+  statusLogin: document.getElementById('status-login'),
+  cartaoPrimeiraAssinatura: document.getElementById('cartao-primeira-assinatura'),
+  canvasAssinaturaPrimeiroLogin: document.getElementById('canvas-assinatura-primeiro-login'),
+  btnLimparAssinaturaPrimeiroLogin: document.getElementById('btn-limpar-assinatura-primeiro-login'),
+  btnTravarAssinaturaPrimeiroLogin: document.getElementById('btn-travar-assinatura-primeiro-login'),
+  btnSalvarPrimeiraAssinatura: document.getElementById('btn-salvar-primeira-assinatura'),
+  statusPrimeiraAssinatura: document.getElementById('status-primeira-assinatura')
 };
 
 // ---------------------------------------------------------------------------
@@ -558,43 +580,55 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Assinatura da Contratada fica salva no aparelho (localStorage) e
-// restaurada já desenhada no canvas na próxima abertura do app - pedido do
-// Paulo (11/07 noite): agora que a assinatura da Contratada é OBRIGATÓRIA
-// em todo RDO, não faz sentido redesenhar a mesma assinatura toda vez (é
-// sempre o mesmo responsável da FN assinando). Continua TRAVADA (padrão),
-// e pode ser limpa/redesenhada se for outra pessoa assinando naquele dia -
-// nesse caso a nova assinatura é salva de novo ao gerar o próximo RDO.
+// Login do usuário da Contratada (11/07 noite) - substitui o campo manual
+// de nome+assinatura por conta cadastrada (ver login_/salvarAssinaturaUsuario_
+// no Code.gs). Sessão fica salva no aparelho (localStorage) indefinidamente
+// (pedido do Paulo: "continua logado" - só sai com "Sair" manual) - contém
+// a própria senha em texto puro, mesmo nível de confiança já aceito pro
+// cadastro de usuários (aba "Usuarios" da planilha também em texto puro),
+// e permite salvar uma assinatura nova (ver "Atualizar minha assinatura")
+// sem pedir a senha de novo.
 // ---------------------------------------------------------------------------
-const CHAVE_ASSINATURA_CONTRATADA = 'rdo_assinatura_contratada';
+const CHAVE_SESSAO_USUARIO = 'rdo_sessao_usuario';
 
-function salvarAssinaturaContratada_() {
-  if (!state.assinaturaContratadaImagemBase64) return;
+function salvarSessaoUsuario_(sessao) {
   try {
-    localStorage.setItem(CHAVE_ASSINATURA_CONTRATADA, JSON.stringify({
-      nome: state.assinaturaContratadaNome,
-      imagemBase64: state.assinaturaContratadaImagemBase64
-    }));
+    localStorage.setItem(CHAVE_SESSAO_USUARIO, JSON.stringify(sessao));
   } catch (err) {
-    console.warn('Falha ao salvar assinatura da Contratada:', err);
+    console.warn('Falha ao salvar sessão do usuário:', err);
   }
 }
 
-async function restaurarAssinaturaContratada_() {
+function carregarSessaoUsuario_() {
   try {
-    const bruto = localStorage.getItem(CHAVE_ASSINATURA_CONTRATADA);
-    if (!bruto) return;
-    const dados = JSON.parse(bruto);
-    if (dados.nome) {
-      el.nomeAssinanteContratada.value = dados.nome;
-      state.assinaturaContratadaNome = dados.nome;
-    }
-    if (dados.imagemBase64) {
-      await assinaturaContratada.restaurar(dados.imagemBase64);
-    }
+    const bruto = localStorage.getItem(CHAVE_SESSAO_USUARIO);
+    return bruto ? JSON.parse(bruto) : null;
   } catch (err) {
-    console.warn('Falha ao restaurar assinatura da Contratada:', err);
+    return null;
   }
+}
+
+// Aplica a sessão (nome+assinatura já cadastrados) no formulário e mostra
+// o app - chamado tanto na abertura (sessão já existente) quanto logo
+// depois de um login/cadastro de assinatura bem-sucedido.
+function aplicarSessaoNoFormulario_(sessao) {
+  state.assinaturaContratadaNome = sessao.nome;
+  state.assinaturaContratadaImagemBase64 = sessao.assinaturaBase64;
+  el.assinaturaContratadaInfo.textContent = 'Assinando como: ' + sessao.nome;
+  el.usuarioLogado.textContent = 'Olá, ' + sessao.nome;
+  el.usuarioLogado.style.display = 'inline';
+  el.btnSair.style.display = 'inline';
+  el.cartaoLogin.style.display = 'none';
+  el.cartaoPrimeiraAssinatura.style.display = 'none';
+  el.formRdo.style.display = 'block';
+}
+
+function mostrarTelaLogin_() {
+  el.cartaoLogin.style.display = 'block';
+  el.cartaoPrimeiraAssinatura.style.display = 'none';
+  el.formRdo.style.display = 'none';
+  el.usuarioLogado.style.display = 'none';
+  el.btnSair.style.display = 'none';
 }
 
 // ---------------------------------------------------------------------------
@@ -900,10 +934,137 @@ function configurarBotaoTravar_(botao, assinatura) {
   });
 }
 
+// Canvas da Contratada agora só é usado pra "Atualizar minha assinatura"
+// (nome vem do login, não é mais digitado aqui - ver btnAtualizarAssinaturaContratada).
 const assinaturaContratada = configurarCanvasAssinatura_(el.canvasAssinaturaContratada);
 el.btnLimparAssinaturaContratada.addEventListener('click', () => assinaturaContratada.limpar());
-el.nomeAssinanteContratada.addEventListener('input', () => { state.assinaturaContratadaNome = el.nomeAssinanteContratada.value; });
 configurarBotaoTravar_(el.btnTravarAssinaturaContratada, assinaturaContratada);
+
+el.btnAtualizarAssinaturaContratada.addEventListener('click', () => {
+  const mostrando = el.blocoRedesenharAssinaturaContratada.style.display === 'block';
+  el.blocoRedesenharAssinaturaContratada.style.display = mostrando ? 'none' : 'block';
+});
+
+el.btnSalvarNovaAssinaturaContratada.addEventListener('click', async () => {
+  if (!assinaturaContratada.estado.temAssinatura) {
+    el.statusNovaAssinaturaContratada.textContent = 'Desenhe a nova assinatura antes de salvar.';
+    el.statusNovaAssinaturaContratada.className = 'status erro';
+    return;
+  }
+  const sessao = carregarSessaoUsuario_();
+  if (!sessao) { location.reload(); return; }
+
+  el.btnSalvarNovaAssinaturaContratada.disabled = true;
+  try {
+    el.statusNovaAssinaturaContratada.textContent = 'Salvando...';
+    el.statusNovaAssinaturaContratada.className = 'status';
+    const base64 = el.canvasAssinaturaContratada.toDataURL('image/png').split(',')[1];
+    const resp = await RdoApi.salvarAssinaturaUsuario(sessao.login, sessao.senha, base64);
+    if (!resp.ok) {
+      el.statusNovaAssinaturaContratada.textContent = resp.erro || 'Não consegui salvar a assinatura.';
+      el.statusNovaAssinaturaContratada.className = 'status erro';
+      return;
+    }
+    sessao.assinaturaBase64 = base64;
+    salvarSessaoUsuario_(sessao);
+    state.assinaturaContratadaImagemBase64 = base64;
+    el.statusNovaAssinaturaContratada.textContent = 'Assinatura atualizada com sucesso!';
+    el.statusNovaAssinaturaContratada.className = 'status sucesso';
+    assinaturaContratada.limpar();
+    el.blocoRedesenharAssinaturaContratada.style.display = 'none';
+  } catch (err) {
+    console.error(err);
+    el.statusNovaAssinaturaContratada.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    el.statusNovaAssinaturaContratada.className = 'status erro';
+  } finally {
+    el.btnSalvarNovaAssinaturaContratada.disabled = false;
+  }
+});
+
+// Canvas do primeiro login (cadastro obrigatório de assinatura antes de
+// usar o app pela primeira vez).
+const assinaturaPrimeiroLogin = configurarCanvasAssinatura_(el.canvasAssinaturaPrimeiroLogin);
+el.btnLimparAssinaturaPrimeiroLogin.addEventListener('click', () => assinaturaPrimeiroLogin.limpar());
+configurarBotaoTravar_(el.btnTravarAssinaturaPrimeiroLogin, assinaturaPrimeiroLogin);
+
+let sessaoTemp_ = null; // guarda {login, senha, nome} entre o login e o cadastro da 1ª assinatura
+
+el.btnEntrar.addEventListener('click', async () => {
+  const login = el.loginUsuario.value.trim();
+  const senha = el.senhaUsuario.value;
+  if (!login || !senha) {
+    el.statusLogin.textContent = 'Preencha usuário e senha.';
+    el.statusLogin.className = 'status erro';
+    return;
+  }
+
+  el.btnEntrar.disabled = true;
+  try {
+    el.statusLogin.textContent = 'Entrando...';
+    el.statusLogin.className = 'status';
+    const resp = await RdoApi.login(login, senha);
+    if (!resp.ok) {
+      el.statusLogin.textContent = resp.erro || 'Usuário ou senha inválidos.';
+      el.statusLogin.className = 'status erro';
+      return;
+    }
+
+    if (resp.assinaturaBase64) {
+      const sessao = { login, senha, nome: resp.nome, assinaturaBase64: resp.assinaturaBase64 };
+      salvarSessaoUsuario_(sessao);
+      aplicarSessaoNoFormulario_(sessao);
+    } else {
+      // Primeiro login desse usuário (Paulo só cadastrou Login/Senha/Nome
+      // na planilha) - pede a assinatura antes de liberar o app.
+      sessaoTemp_ = { login, senha, nome: resp.nome };
+      el.cartaoLogin.style.display = 'none';
+      el.cartaoPrimeiraAssinatura.style.display = 'block';
+    }
+  } catch (err) {
+    console.error(err);
+    el.statusLogin.textContent = 'Erro ao entrar: ' + (err && err.message ? err.message : err);
+    el.statusLogin.className = 'status erro';
+  } finally {
+    el.btnEntrar.disabled = false;
+  }
+});
+
+el.btnSalvarPrimeiraAssinatura.addEventListener('click', async () => {
+  if (!assinaturaPrimeiroLogin.estado.temAssinatura) {
+    el.statusPrimeiraAssinatura.textContent = 'Desenhe sua assinatura antes de continuar.';
+    el.statusPrimeiraAssinatura.className = 'status erro';
+    return;
+  }
+
+  el.btnSalvarPrimeiraAssinatura.disabled = true;
+  try {
+    el.statusPrimeiraAssinatura.textContent = 'Salvando...';
+    el.statusPrimeiraAssinatura.className = 'status';
+    const base64 = el.canvasAssinaturaPrimeiroLogin.toDataURL('image/png').split(',')[1];
+    const resp = await RdoApi.salvarAssinaturaUsuario(sessaoTemp_.login, sessaoTemp_.senha, base64);
+    if (!resp.ok) {
+      el.statusPrimeiraAssinatura.textContent = resp.erro || 'Não consegui salvar a assinatura.';
+      el.statusPrimeiraAssinatura.className = 'status erro';
+      return;
+    }
+    const sessao = { login: sessaoTemp_.login, senha: sessaoTemp_.senha, nome: sessaoTemp_.nome, assinaturaBase64: base64 };
+    salvarSessaoUsuario_(sessao);
+    aplicarSessaoNoFormulario_(sessao);
+    sessaoTemp_ = null;
+  } catch (err) {
+    console.error(err);
+    el.statusPrimeiraAssinatura.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    el.statusPrimeiraAssinatura.className = 'status erro';
+  } finally {
+    el.btnSalvarPrimeiraAssinatura.disabled = false;
+  }
+});
+
+el.btnSair.addEventListener('click', () => {
+  if (!confirm('Sair da conta? Vai pedir login de novo na próxima vez que abrir o app.')) return;
+  localStorage.removeItem(CHAVE_SESSAO_USUARIO);
+  location.reload();
+});
 
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
@@ -932,13 +1093,11 @@ function validar() {
   if (!state.contratante) return 'Selecione o Contratante.';
   if (!state.obra) return 'Selecione a Obra.';
   if (!state.data) return 'Selecione a Data.';
-  // Assinatura da Contratada virou OBRIGATÓRIA (pedido do Paulo, 11/07
-  // noite) - antes era opcional junto com a Contratante.
-  if (!state.assinaturaContratadaNome.trim()) {
-    return 'Preencha o nome de quem está assinando pela Contratada (obrigatório).';
-  }
-  if (!assinaturaContratada.estado.temAssinatura) {
-    return 'Assinatura da Contratada é obrigatória.';
+  // Assinatura da Contratada vem do login (ver aplicarSessaoNoFormulario_) -
+  // só falharia aqui se a sessão tivesse se perdido no meio do uso, o que
+  // não deveria acontecer (o app já bloqueia o formulário sem login).
+  if (!state.assinaturaContratadaNome.trim() || !state.assinaturaContratadaImagemBase64) {
+    return 'Sessão de login perdida - recarregue a página e entre de novo.';
   }
   const tentandoAssinar = state.assinaturaNome.trim() || assinaturaContratante.estado.temAssinatura;
   if (tentandoAssinar && !state.assinaturaConcordo) {
@@ -1072,10 +1231,9 @@ el.btnGerar.addEventListener('click', async () => {
     state.assinaturaImagemBase64 = assinaturaContratante.estado.temAssinatura
       ? el.canvasAssinatura.toDataURL('image/png').split(',')[1]
       : null;
-    state.assinaturaContratadaImagemBase64 = assinaturaContratada.estado.temAssinatura
-      ? el.canvasAssinaturaContratada.toDataURL('image/png').split(',')[1]
-      : null;
-    salvarAssinaturaContratada_(); // lembra pro próximo RDO (11/07 noite)
+    // state.assinaturaContratadaNome/ImagemBase64 já vêm prontos da sessão
+    // de login (ver aplicarSessaoNoFormulario_) - não precisa capturar de
+    // canvas nenhum aqui.
 
     mostrarStatus('Reservando número do RDO (prévia)...');
     const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
@@ -1183,9 +1341,9 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       };
     }
 
-    // Assinatura/nome da Contratada NÃO limpa mais (persistida entre RDOs,
-    // ver salvarAssinaturaContratada_/restaurarAssinaturaContratada_) -
-    // nome/assinatura/concordância do CONTRATANTE e o checkbox de
+    // Assinatura/nome da Contratada NÃO limpa mais (vêm do login/sessão
+    // do usuário, ver CHAVE_SESSAO_USUARIO) - nome/assinatura/concordância
+    // do CONTRATANTE e o checkbox de
     // aprovação continuam por RDO (limpa pra não ir junto no próximo). O
     // e-mail do responsável da Contratante também não limpa mais (fica
     // salvo, ver salvarUltimaIdentificacao_).
@@ -1208,5 +1366,11 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
 });
 
 carregarObras().then(preencherUltimaIdentificacao_);
-restaurarAssinaturaContratada_();
 carregarEquipamentosVeiculos();
+
+const sessaoInicial = carregarSessaoUsuario_();
+if (sessaoInicial && sessaoInicial.assinaturaBase64) {
+  aplicarSessaoNoFormulario_(sessaoInicial);
+} else {
+  mostrarTelaLogin_();
+}
