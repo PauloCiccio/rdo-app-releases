@@ -27,13 +27,36 @@
     <p id="mensagem-erro"></p>
   </section>
 
+  <section class="cartao" id="cartao-identificacao" style="display:none;">
+    <h2>Identifique-se</h2>
+    <p class="orcamento-info">Informe seu CPF e nome completo. Se for a primeira vez, vamos pedir mais alguns dados.</p>
+    <label for="campo-cpf">CPF</label>
+    <input type="text" id="campo-cpf" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off">
+    <label for="campo-nome-identificacao">Nome completo</label>
+    <input type="text" id="campo-nome-identificacao" placeholder="Nome completo" autocomplete="off">
+    <button type="button" id="btn-continuar-identificacao" class="botao-principal">Continuar</button>
+    <div id="status-identificacao" class="status" aria-live="polite"></div>
+  </section>
+
+  <section class="cartao" id="cartao-cadastro" style="display:none;">
+    <h2>Complete seu cadastro</h2>
+    <p class="orcamento-info">Primeira vez que você aprova um RDO da FN - esses dados ficam salvos, não precisa preencher de novo nas próximas obras.</p>
+    <label for="campo-funcao">Função</label>
+    <input type="text" id="campo-funcao" placeholder="Ex: Fiscal de obra, Engenheiro responsável" autocomplete="off">
+    <label for="campo-empresa">Responsável por qual empresa</label>
+    <input type="text" id="campo-empresa" placeholder="Nome da empresa" autocomplete="off">
+    <button type="button" id="btn-salvar-cadastro" class="botao-principal">Salvar e continuar</button>
+    <div id="status-cadastro" class="status" aria-live="polite"></div>
+  </section>
+
   <section class="cartao" id="cartao-info" style="display:none;">
     <h2>Identificação</h2>
     <p><strong>RDO nº:</strong> <span id="info-numero"></span></p>
     <p><strong>Obra:</strong> <span id="info-obra"></span></p>
     <p><strong>Contratante:</strong> <span id="info-cliente"></span></p>
     <p><strong>Data:</strong> <span id="info-data"></span></p>
-    <p class="orcamento-info">Confira abaixo o RDO preenchido pela Contratada até agora (ainda sem as suas atividades/assinatura).</p>
+    <p><strong>Você:</strong> <span id="info-identificado"></span></p>
+    <p class="orcamento-info">Confira abaixo o RDO preenchido pela Contratada até agora (ainda sem as suas atividades).</p>
     <iframe id="visualizador-pdf" style="display:none; width:100%; height:70vh; border:1px solid var(--borda); border-radius:8px;"></iframe>
     <a id="link-pdf-nova-aba" href="#" target="_blank" rel="noopener" class="botao-secundario" style="display:none; text-align:center; text-decoration:none; margin-top:8px;">Abrir PDF em outra aba</a>
   </section>
@@ -46,10 +69,9 @@
   </section>
 
   <section class="cartao" id="cartao-assinatura" style="display:none;">
-    <h2>Assinatura do Contratante</h2>
-    <label for="campo-nome-assinante">Nome de quem está assinando</label>
-    <input type="text" id="campo-nome-assinante" placeholder="Nome completo" required>
-    <label>Assine abaixo com o dedo ou mouse</label>
+    <h2>Assinatura</h2>
+    <p class="orcamento-info">Assinando como: <strong id="assinatura-nome-exibicao"></strong></p>
+    <label>Assine abaixo com o dedo</label>
     <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
     <div class="linha-botoes-assinatura">
       <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
@@ -57,18 +79,18 @@
     </div>
     <label class="linha-checkbox">
       <input type="checkbox" id="campo-concordo">
-      Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
+      Declaro que sou responsável pela Contratante e concordo com as informações registradas neste RDO
     </label>
   </section>
 
   <section class="cartao" id="cartao-enviar" style="display:none;">
-    <button type="button" id="btn-previsualizar" class="botao-principal">Pré-visualizar RDO Final</button>
+    <button type="button" id="btn-previsualizar" class="botao-principal">Pré-visualizar RDO</button>
     <div id="status-envio" class="status" aria-live="polite"></div>
   </section>
 
   <section class="cartao" id="cartao-preview-final" style="display:none;">
-    <h2>Pré-visualização do RDO Final</h2>
-    <p>Confira o RDO completo (com suas atividades e assinatura) antes de concluir.</p>
+    <h2>Pré-visualização</h2>
+    <p>Confira o RDO com suas atividades e assinatura antes de concluir.</p>
     <button type="button" id="btn-ver-pdf-final" class="botao-principal">Visualizar PDF</button>
     <button type="button" id="btn-concluir" class="botao-principal">Concluir e Enviar RDO Final</button>
     <button type="button" id="btn-editar" class="botao-secundario">Cancelar / Editar</button>
@@ -76,7 +98,7 @@
   </section>
 
   <section class="cartao" id="cartao-sucesso" style="display:none;">
-    <p>RDO concluído e enviado com sucesso! Você já pode fechar esta página.</p>
+    <p>RDO concluído e enviado! Você e a FN vão receber por e-mail a versão final, com todas as atividades e a assinatura.</p>
   </section>
 
 </main>

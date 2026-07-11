@@ -1,44 +1,68 @@
 // Página pública (link mandado por e-mail, ver enviarParaAprovacao_ no
-// Code.gs) onde o Contratante escreve as atividades dele e assina por
-// toque - sem assinador eletrônico pago (decisão do Paulo, 11/07: "não
-// vou conseguir pagar os planos por enquanto"), reaproveitando a MESMA
-// técnica de canvas já usada no app principal. Algumas funções abaixo
-// (temConteudoAtividade/calcularLinhasUsadas/atualizarOrcamento/
-// renderizarListaAtividades/autoGrow/configurarCanvasAssinatura_/
-// configurarBotaoTravar_) são cópias das equivalentes em app.js - mantidas
-// sincronizadas à mão (mesmo padrão já usado entre excel-fill.js e
-// test_excel_fill.js neste projeto), já que são páginas HTML separadas
-// sem um bundler que permita compartilhar módulos entre elas.
+// Code.gs) onde o Contratante se identifica (CPF+Nome, cadastro na
+// primeira vez), escreve as atividades dele e assina por toque (mesmo
+// mecanismo do app principal - canvas). O RDO final (FN + Contratante)
+// é enviado direto nesta mesma página, sem serviço externo - o registro
+// de auditoria (CPF conferido + horário do servidor + IP/navegador do
+// cliente) é o que dá a esse "visto" digital o mesmo valor (ou mais) que
+// um visto em papel (ver finalizarAprovacao_ no Code.gs).
+//
+// Algumas funções abaixo (temConteudoAtividade/calcularLinhasUsadas/
+// atualizarOrcamento/renderizarListaAtividades/autoGrow/
+// configurarCanvasAssinatura_/configurarBotaoTravar_) são cópias das
+// equivalentes em app.js - mantidas sincronizadas à mão (mesmo padrão já
+// usado entre excel-fill.js e test_excel_fill.js neste projeto), já que
+// são páginas HTML separadas sem um bundler que permita compartilhar
+// módulos entre elas.
 
 const el = {
   carregando: document.getElementById('cartao-carregando'),
   erro: document.getElementById('cartao-erro'),
   mensagemErro: document.getElementById('mensagem-erro'),
+
+  cartaoIdentificacao: document.getElementById('cartao-identificacao'),
+  cpf: document.getElementById('campo-cpf'),
+  nomeIdentificacao: document.getElementById('campo-nome-identificacao'),
+  btnContinuarIdentificacao: document.getElementById('btn-continuar-identificacao'),
+  statusIdentificacao: document.getElementById('status-identificacao'),
+
+  cartaoCadastro: document.getElementById('cartao-cadastro'),
+  funcao: document.getElementById('campo-funcao'),
+  empresa: document.getElementById('campo-empresa'),
+  btnSalvarCadastro: document.getElementById('btn-salvar-cadastro'),
+  statusCadastro: document.getElementById('status-cadastro'),
+
   info: document.getElementById('cartao-info'),
   infoNumero: document.getElementById('info-numero'),
   infoObra: document.getElementById('info-obra'),
   infoCliente: document.getElementById('info-cliente'),
   infoData: document.getElementById('info-data'),
+  infoIdentificado: document.getElementById('info-identificado'),
   visualizadorPdf: document.getElementById('visualizador-pdf'),
   linkPdfNovaAba: document.getElementById('link-pdf-nova-aba'),
+
   form: document.getElementById('cartao-form'),
   listaAtivContratante: document.getElementById('lista-atividades-contratante'),
   btnAddContratante: document.getElementById('btn-add-contratante'),
   orcamentoContratante: document.getElementById('orcamento-contratante'),
+
   cartaoAssinatura: document.getElementById('cartao-assinatura'),
-  nomeAssinante: document.getElementById('campo-nome-assinante'),
+  assinaturaNomeExibicao: document.getElementById('assinatura-nome-exibicao'),
   canvasAssinatura: document.getElementById('canvas-assinatura'),
   btnLimparAssinatura: document.getElementById('btn-limpar-assinatura'),
   btnTravarAssinatura: document.getElementById('btn-travar-assinatura'),
   concordo: document.getElementById('campo-concordo'),
+
   cartaoEnviar: document.getElementById('cartao-enviar'),
   btnPrevisualizar: document.getElementById('btn-previsualizar'),
   statusEnvio: document.getElementById('status-envio'),
+
   cartaoPreviewFinal: document.getElementById('cartao-preview-final'),
   btnVerPdfFinal: document.getElementById('btn-ver-pdf-final'),
   btnConcluir: document.getElementById('btn-concluir'),
   btnEditar: document.getElementById('btn-editar'),
   statusConfirmacao: document.getElementById('status-confirmacao'),
+
   sucesso: document.getElementById('cartao-sucesso')
 };
 
@@ -68,6 +92,27 @@ function atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd) {
   elOrcamento.textContent = `${usados} / ${capacidade}`;
   elOrcamento.parentElement.classList.toggle('cheio', usados >= capacidade);
   btnAdd.disabled = usados >= capacidade;
+}
+
+// Algoritmo padrão de validação de CPF (dígitos verificadores) - só pra
+// pegar erro de digitação cedo, antes de mandar pro backend.
+function validarCpf_(cpf) {
+  const digitos = (cpf || '').replace(/\D/g, '');
+  if (digitos.length !== 11 || /^(\d)\1{10}$/.test(digitos)) return false;
+
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += Number(digitos[i]) * (10 - i);
+  let resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  if (resto !== Number(digitos[9])) return false;
+
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += Number(digitos[i]) * (11 - i);
+  resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  if (resto !== Number(digitos[10])) return false;
+
+  return true;
 }
 
 // Mesma lógica de renderizarListaAtividades do app.js, incluindo o bloqueio
@@ -146,8 +191,8 @@ function renderizarListaAtividades(cfg) {
   atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd);
 }
 
-// Cópia de configurarCanvasAssinatura_ do app.js (ver lá pro histórico das
-// decisões: travado por padrão, touch-action pan-y/none).
+// Assinatura por toque - cópia de configurarCanvasAssinatura_/
+// configurarBotaoTravar_ do app.js (ver comentário no topo do arquivo).
 function configurarCanvasAssinatura_(canvas) {
   const ctx = canvas.getContext('2d');
   ctx.lineWidth = 2.5;
@@ -212,11 +257,26 @@ const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
 configurarBotaoTravar_(el.btnTravarAssinatura, assinaturaContratante);
 
+// IP do cliente (só pra registro de auditoria, ver finalizarAprovacao_ no
+// Code.gs) - reportado pelo PRÓPRIO navegador via serviço público
+// (ipify), não verificado pelo servidor. Melhor esforço: se falhar
+// (offline, bloqueado etc.) segue sem IP, não trava o fluxo.
+let ipClienteDetectado = null;
+fetch('https://api.ipify.org?format=json')
+  .then(r => r.json())
+  .then(j => { ipClienteDetectado = j.ip; })
+  .catch(() => {});
+
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token');
 
 let stateOriginal = null;
 let numero = null;
+let cpfAtual = null;
+let nomeAtual = null;
+let funcaoAtual = null;
+let empresaAtual = null;
+
 const atividadesContratante = [{ inicio: '', fim: '', discriminacao: '' }];
 const cfgAtivContratante = {
   itens: atividadesContratante,
@@ -277,11 +337,99 @@ async function iniciar() {
   }
 
   el.carregando.style.display = 'none';
+  el.cartaoIdentificacao.style.display = 'block';
+}
+
+// Identificação (CPF+Nome, pedido do Paulo 11/07) - se o CPF já estiver
+// cadastrado (com o nome batendo), pula direto pro formulário. Se não,
+// pede Função/Empresa (cadastro na primeira vez, salvo pra próxima).
+el.btnContinuarIdentificacao.addEventListener('click', async () => {
+  const cpf = el.cpf.value.trim();
+  const nome = el.nomeIdentificacao.value.trim();
+
+  if (!validarCpf_(cpf)) {
+    el.statusIdentificacao.textContent = 'CPF inválido - confira os números digitados.';
+    el.statusIdentificacao.className = 'status erro';
+    return;
+  }
+  if (!nome) {
+    el.statusIdentificacao.textContent = 'Preencha seu nome completo.';
+    el.statusIdentificacao.className = 'status erro';
+    return;
+  }
+
+  el.btnContinuarIdentificacao.disabled = true;
+  try {
+    el.statusIdentificacao.textContent = 'Verificando...';
+    el.statusIdentificacao.className = 'status';
+    const resp = await RdoApi.buscarCliente(cpf, nome);
+    if (!resp.ok) {
+      el.statusIdentificacao.textContent = resp.erro || 'Não foi possível verificar seus dados.';
+      el.statusIdentificacao.className = 'status erro';
+      return;
+    }
+
+    cpfAtual = cpf;
+    nomeAtual = nome;
+
+    if (resp.encontrado) {
+      funcaoAtual = resp.funcao;
+      empresaAtual = resp.empresa;
+      el.cartaoIdentificacao.style.display = 'none';
+      liberarFormularioPrincipal_();
+    } else {
+      el.cartaoIdentificacao.style.display = 'none';
+      el.cartaoCadastro.style.display = 'block';
+    }
+  } catch (err) {
+    console.error(err);
+    el.statusIdentificacao.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    el.statusIdentificacao.className = 'status erro';
+  } finally {
+    el.btnContinuarIdentificacao.disabled = false;
+  }
+});
+
+el.btnSalvarCadastro.addEventListener('click', async () => {
+  const funcao = el.funcao.value.trim();
+  const empresa = el.empresa.value.trim();
+  if (!funcao || !empresa) {
+    el.statusCadastro.textContent = 'Preencha função e empresa.';
+    el.statusCadastro.className = 'status erro';
+    return;
+  }
+
+  el.btnSalvarCadastro.disabled = true;
+  try {
+    el.statusCadastro.textContent = 'Salvando...';
+    el.statusCadastro.className = 'status';
+    const resp = await RdoApi.cadastrarCliente({ cpf: cpfAtual, nome: nomeAtual, funcao, empresa });
+    if (!resp.ok) {
+      el.statusCadastro.textContent = resp.erro || 'Não consegui salvar o cadastro.';
+      el.statusCadastro.className = 'status erro';
+      return;
+    }
+
+    funcaoAtual = funcao;
+    empresaAtual = empresa;
+    el.cartaoCadastro.style.display = 'none';
+    liberarFormularioPrincipal_();
+  } catch (err) {
+    console.error(err);
+    el.statusCadastro.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    el.statusCadastro.className = 'status erro';
+  } finally {
+    el.btnSalvarCadastro.disabled = false;
+  }
+});
+
+function liberarFormularioPrincipal_() {
+  el.infoIdentificado.textContent = `${nomeAtual} (${funcaoAtual} - ${empresaAtual})`;
+  el.assinaturaNomeExibicao.textContent = nomeAtual;
   el.info.style.display = 'block';
   el.form.style.display = 'block';
   el.cartaoAssinatura.style.display = 'block';
   el.cartaoEnviar.style.display = 'block';
-
   renderizarListaAtividades(cfgAtivContratante);
 }
 
@@ -293,21 +441,14 @@ function base64ParaBytes_(base64) {
 }
 
 // Igual o app principal: Pré-visualizar -> conferir o PDF -> só então
-// Concluir/Enviar de verdade (pedido do Paulo, 11/07 - antes ia direto
-// pro envio sem chance de conferir o resultado final).
+// mandar pra assinatura eletrônica de verdade.
 let previewXlsxBase64 = null;
 let previewPdfBase64 = null;
 let previewFileName = null;
 
 el.btnPrevisualizar.addEventListener('click', async () => {
-  const nome = el.nomeAssinante.value.trim();
-  if (!nome) {
-    el.statusEnvio.textContent = 'Preencha o nome de quem está assinando.';
-    el.statusEnvio.className = 'status erro';
-    return;
-  }
   if (!assinaturaContratante.estado.temAssinatura) {
-    el.statusEnvio.textContent = 'Assinatura é obrigatória.';
+    el.statusEnvio.textContent = 'Desenhe sua assinatura antes de continuar.';
     el.statusEnvio.className = 'status erro';
     return;
   }
@@ -319,13 +460,14 @@ el.btnPrevisualizar.addEventListener('click', async () => {
 
   el.btnPrevisualizar.disabled = true;
   try {
-    el.statusEnvio.textContent = 'Gerando RDO final...';
+    el.statusEnvio.textContent = 'Gerando RDO...';
     el.statusEnvio.className = 'status';
 
+    const assinaturaImagemBase64 = el.canvasAssinatura.toDataURL('image/png').split(',')[1];
     const stateFinal = Object.assign({}, stateOriginal, {
       atividadesContratante: atividadesContratante.filter(temConteudoAtividade),
-      assinaturaNome: nome,
-      assinaturaImagemBase64: el.canvasAssinatura.toDataURL('image/png').split(',')[1],
+      assinaturaNome: nomeAtual,
+      assinaturaImagemBase64,
       assinaturaConcordo: true
     });
 
@@ -367,12 +509,18 @@ el.btnConcluir.addEventListener('click', async () => {
     el.statusConfirmacao.textContent = 'Enviando RDO final...';
     el.statusConfirmacao.className = 'status';
 
-    await RdoApi.finalizarAprovacao({
+    const resp = await RdoApi.finalizarAprovacao({
       token,
       xlsxBase64: previewXlsxBase64,
       pdfBase64: previewPdfBase64,
-      fileName: previewFileName
+      fileName: previewFileName,
+      assinaturaNome: nomeAtual,
+      assinaturaImagemBase64: el.canvasAssinatura.toDataURL('image/png').split(',')[1],
+      cpf: cpfAtual,
+      ipCliente: ipClienteDetectado,
+      userAgent: navigator.userAgent
     });
+    if (!resp.ok) throw new Error(resp.erro || 'Falha ao concluir');
 
     el.form.style.display = 'none';
     el.cartaoAssinatura.style.display = 'none';
@@ -382,7 +530,7 @@ el.btnConcluir.addEventListener('click', async () => {
     el.sucesso.style.display = 'block';
   } catch (err) {
     console.error(err);
-    el.statusConfirmacao.textContent = 'Erro ao concluir: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.textContent = 'Erro ao enviar: ' + (err && err.message ? err.message : err);
     el.statusConfirmacao.className = 'status erro';
     RdoApi.logErro('finalizar_aprovacao', err && err.message ? err.message : String(err), { token });
   } finally {

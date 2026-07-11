@@ -244,8 +244,21 @@ const RdoApi = (function () {
     return await resp.json();
   }
 
-  function finalizarAprovacao({ token, xlsxBase64, pdfBase64, fileName }) {
-    return postJson_({ action: 'finalizarAprovacao', token, xlsxBase64, pdfBase64, fileName });
+  // Conclui a aprovação (assinatura por toque + registro de auditoria) e
+  // manda o RDO final direto (FN + Contratante) na resposta desta mesma
+  // chamada - ver finalizarAprovacao_ no Code.gs.
+  function finalizarAprovacao({ token, xlsxBase64, pdfBase64, fileName, assinaturaNome, assinaturaImagemBase64, cpf, ipCliente, userAgent }) {
+    return postJson_({ action: 'finalizarAprovacao', token, xlsxBase64, pdfBase64, fileName, assinaturaNome, assinaturaImagemBase64, cpf, ipCliente, userAgent });
+  }
+
+  // Cadastro do responsável da Contratante (CPF/Nome/Função/Empresa,
+  // 11/07) - ver www/aprovacao.html.
+  function buscarCliente(cpf, nome) {
+    return postJson_({ action: 'buscarCliente', cpf, nome });
+  }
+
+  function cadastrarCliente({ cpf, nome, funcao, empresa }) {
+    return postJson_({ action: 'cadastrarCliente', cpf, nome, funcao, empresa });
   }
 
   // Login dos usuários da Contratada (11/07) - ver CHAVE_SESSAO_USUARIO em app.js.
@@ -291,6 +304,6 @@ const RdoApi = (function () {
   return {
     getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO,
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
-    login, salvarAssinaturaUsuario
+    buscarCliente, cadastrarCliente, login, salvarAssinaturaUsuario
   };
 })();
