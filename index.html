@@ -198,12 +198,10 @@
   </section>
 
   <section class="cartao">
-    <h2>Assinatura do Contratante (opcional)</h2>
+    <h2>Assinatura do Contratante</h2>
+    <p class="orcamento-info">Se o representante do Contratante estiver na obra agora, ele assina aqui embaixo. Se não estiver, marque "Contratante irá verificar o RDO em seu E-mail" no cartão abaixo, ao lado do botão de pré-visualizar - um dos dois é obrigatório.</p>
     <label for="campo-nome-assinante">Nome de quem está assinando</label>
     <input type="text" id="campo-nome-assinante" placeholder="Nome completo">
-    <label for="campo-email-contratante">E-mail do responsável da Contratante (opcional)</label>
-    <input type="email" id="campo-email-contratante" placeholder="email@exemplo.com" inputmode="email" autocomplete="off">
-    <p class="orcamento-info">Esse e-mail recebe uma cópia (CC) do RDO enviado.</p>
     <label>Assine abaixo com o dedo</label>
     <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
     <div class="linha-botoes-assinatura">
@@ -214,6 +212,12 @@
       <input type="checkbox" id="campo-concordo">
       Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
     </label>
+  </section>
+
+  <section class="cartao">
+    <label for="campo-email-contratante">E-mail do responsável da Contratante</label>
+    <input type="email" id="campo-email-contratante" placeholder="email@exemplo.com" inputmode="email" autocomplete="off">
+    <p class="orcamento-info">Usado como cópia (CC) se o Contratante assinar na hora, ou como destino do link de aprovação se marcar a caixa abaixo.</p>
     <label class="linha-checkbox">
       <input type="checkbox" id="campo-aprovacao-contratante">
       Contratante irá verificar o RDO em seu E-mail
@@ -223,9 +227,6 @@
       atividades da Contratante e assinar. O RDO final só é enviado (pra você
       e pro Contratante) depois que ele concluir por lá.
     </p>
-  </section>
-
-  <section class="cartao">
     <button type="button" id="btn-gerar" class="botao-principal">Pré-visualizar RDO</button>
     <div id="status-envio" class="status" aria-live="polite"></div>
   </section>

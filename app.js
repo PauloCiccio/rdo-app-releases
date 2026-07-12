@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.7.0';
+const VERSAO_APP = 'BETA 0.7.1';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -1436,15 +1436,29 @@ function validar() {
   if (!state.assinaturaContratadaNome.trim() || !state.assinaturaContratadaImagemBase64) {
     return 'Sessão de login perdida - recarregue a página e entre de novo.';
   }
-  const tentandoAssinar = state.assinaturaNome.trim() || assinaturaContratante.estado.temAssinatura;
-  if (tentandoAssinar && !state.assinaturaConcordo) {
-    return 'Marque a caixa de concordância do Contratante (ou limpe o nome/assinatura se ele não vai assinar agora).';
+  // Confirmação do Contratante virou OBRIGATÓRIA (pedido do Paulo,
+  // 12/07): ou ele assina na hora (nome + assinatura + declaração de
+  // representante), ou o RDO vai pra aprovação por e-mail (checkbox
+  // "Contratante irá verificar o RDO em seu E-mail", que já exige o
+  // e-mail preenchido pra poder marcar - ver listener de
+  // aprovacaoContratante). Antes dava pra pular os dois e mandar o RDO
+  // sem nenhuma confirmação do Contratante.
+  const nomePreenchido = Boolean(state.assinaturaNome.trim());
+  const assinaturaDesenhada = assinaturaContratante.estado.temAssinatura;
+  const assinouNaHora = nomePreenchido && assinaturaDesenhada && state.assinaturaConcordo;
+
+  if (!assinouNaHora && !state.aprovacaoContratante) {
+    if (nomePreenchido || assinaturaDesenhada || state.assinaturaConcordo) {
+      return 'Complete a assinatura do Contratante (nome + assinatura + declaração de concordância) ou marque "Contratante irá verificar o RDO em seu E-mail".';
+    }
+    return 'O Contratante precisa assinar aqui mesmo, ou marque "Contratante irá verificar o RDO em seu E-mail".';
   }
   if (state.emailContratante && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.emailContratante)) {
     return 'E-mail do responsável da Contratante parece inválido.';
   }
   // Se o RDO vai pra aprovação por e-mail, o e-mail do responsável é
-  // obrigatório (é pra lá que o link de aprovação é enviado).
+  // obrigatório (é pra lá que o link de aprovação é enviado) - já
+  // bloqueado na hora de marcar a caixa, checagem aqui é só reforço.
   if (state.aprovacaoContratante && !state.emailContratante.trim()) {
     return 'Preencha o e-mail do responsável da Contratante pra mandar pra aprovação.';
   }
