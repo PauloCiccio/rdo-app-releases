@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.7.5';
+const VERSAO_APP = 'BETA 0.7.6';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,6 @@ const el = {
   btnGerar: document.getElementById('btn-gerar'),
   status: document.getElementById('status-envio'),
   cartaoPreview: document.getElementById('cartao-preview'),
-  btnBaixarPdf: document.getElementById('btn-baixar-pdf'),
   wrapVisualizadorApp: document.getElementById('wrap-visualizador-app'),
   visualizadorApp: document.getElementById('visualizador-app'),
   btnZoomMaisApp: document.getElementById('btn-zoom-mais-app'),
@@ -386,6 +385,28 @@ function aplicarMascaraHorario_(valor) {
   return hh + ':' + mm;
 }
 
+// Completa com zero ao SAIR do campo (blur, pedido do Paulo 12/07) -
+// "08" vira "08:00" (hora já tem 2 dígitos, só falta minuto - zero
+// completa DEPOIS, é "00"); "08:4" vira "08:40" (dígito do minuto já
+// digitado é a DEZENA - "4" significa "40 minutos", não "04" - por isso
+// completa DEPOIS do dígito digitado, não antes). Campo vazio continua
+// vazio (não força hora nenhuma se a pessoa não quis preencher).
+function completarHorarioNoBlur_(valor) {
+  const digitos = (valor || '').replace(/\D/g, '').slice(0, 4);
+  if (!digitos) return '';
+  let hh, mm;
+  if (digitos.length <= 2) {
+    hh = digitos.padStart(2, '0');
+    mm = '00';
+  } else {
+    hh = digitos.slice(0, 2);
+    mm = digitos.slice(2).padEnd(2, '0');
+  }
+  if (Number(hh) > 23) hh = '23';
+  if (Number(mm) > 59) mm = '59';
+  return hh + ':' + mm;
+}
+
 function renderizarListaAtividades(cfg) {
   const { itens, container, elOrcamento, btnAdd, capacidade } = cfg;
   container.innerHTML = '';
@@ -426,8 +447,16 @@ function renderizarListaAtividades(cfg) {
       e.target.value = aplicarMascaraHorario_(e.target.value);
       item.inicio = e.target.value;
     });
+    linha.querySelector('.input-inicio').addEventListener('blur', e => {
+      e.target.value = completarHorarioNoBlur_(e.target.value);
+      item.inicio = e.target.value;
+    });
     linha.querySelector('.input-fim').addEventListener('input', e => {
       e.target.value = aplicarMascaraHorario_(e.target.value);
+      item.fim = e.target.value;
+    });
+    linha.querySelector('.input-fim').addEventListener('blur', e => {
+      e.target.value = completarHorarioNoBlur_(e.target.value);
       item.fim = e.target.value;
     });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
@@ -1562,12 +1591,14 @@ async function compartilharPdf_(base64, fileName) {
   }
 }
 
-let previewPdfBase64 = null;
+let previewPdfBase64 = null; // guardado só pra "Compartilhar" depois de um envio direto - ver btnConfirmarEnvio
 let previewFileName = null;
-let previewXlsxBase64 = null;
-let previewNumeroAtual = null; // guardado pra poder regerar a prévia com marca d'água (ver btnBaixarPdf)
+let previewNumeroAtual = null; // preservado entre atualizações da MESMA prévia (não reserva número de novo a cada edição)
+let atualizandoPreview_ = false; // evita duas atualizações da prévia rodando ao mesmo tempo (edições rápidas em sequência)
+let debouncePreviewTimer_ = null;
 
 function fecharPreview_() {
+  clearTimeout(debouncePreviewTimer_);
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
@@ -1636,8 +1667,7 @@ async function resetarParaProximoRdo_() {
   el.avisoAprovacaoContratante.style.display = 'none';
 
   // Prévia exibida (se houver) era do RDO anterior - esconde pra não
-  // mostrar um documento errado se o usuário abrir "Exibir Prévia" nesse
-  // meio tempo sem gerar um RDO novo primeiro.
+  // mostrar um documento errado até a pessoa gerar um RDO novo.
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
 
@@ -1652,85 +1682,95 @@ async function resetarParaProximoRdo_() {
   }
 }
 
+// Pré-visualização (12/07) - fundida num passo só (pedido do Paulo:
+// "não quero isso, fica redundante" sobre o antigo botão separado
+// "Exibir Prévia"). Clicar em "Pré-visualizar RDO" já MOSTRA a prévia
+// embutida (com zoom) + o botão de enviar, sem precisar de um segundo
+// clique. Gera com `apenasPreview:true` (marca d'água) - o xlsx/pdf de
+// verdade (sem marca d'água) só é gerado na hora real do envio (ver
+// btnConfirmarEnvio), sempre a partir do state MAIS ATUAL - não reaproveita
+// nada gerado aqui, evitando mandar uma versão desatualizada se a pessoa
+// editar algo entre pré-visualizar e confirmar.
+async function atualizarPreviewInline_() {
+  if (el.cartaoPreview.style.display !== 'block') return; // só atualiza se a prévia já estiver aberta
+  if (atualizandoPreview_) return; // já tem uma atualização rodando, não empilha outra
+  const erro = validar();
+  if (erro) {
+    el.statusConfirmacao.textContent = 'Corrija antes de continuar: ' + erro;
+    el.statusConfirmacao.className = 'status erro';
+    return;
+  }
+  atualizandoPreview_ = true;
+  try {
+    el.statusConfirmacao.textContent = 'Atualizando prévia...';
+    el.statusConfirmacao.className = 'status';
+    state.assinaturaImagemBase64 = assinaturaContratante.estado.temAssinatura
+      ? el.canvasAssinatura.toDataURL('image/png').split(',')[1]
+      : null;
+
+    const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
+    previewNumeroAtual = numero;
+
+    const { base64: xlsxPreviewBase64, fileName: fileNamePreview, avisos } = await RdoExcel.gerarWorkbook(state, numero, { apenasPreview: true });
+    const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
+    if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+
+    el.visualizadorApp.src = respLink.pdfUrl;
+    el.wrapVisualizadorApp.style.display = 'block';
+
+    el.btnConfirmarEnvio.textContent = state.aprovacaoContratante
+      ? 'ENVIAR À CONTRATANTE PARA APROVAÇÃO FINAL'
+      : 'Confirmar e Enviar por E-mail';
+
+    if (avisos && avisos.length) {
+      el.statusConfirmacao.textContent = 'Atenção: ' + avisos.join(' ');
+      el.statusConfirmacao.className = 'status erro';
+    } else {
+      el.statusConfirmacao.textContent = '';
+    }
+  } catch (err) {
+    console.error(err);
+    el.statusConfirmacao.textContent = 'Erro ao atualizar a prévia: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.className = 'status erro';
+    RdoApi.logErro('atualizar_preview', err && err.message ? err.message : String(err), { contratante: state.contratante, obra: state.obra });
+  } finally {
+    atualizandoPreview_ = false;
+  }
+}
+
+// Editar qualquer coisa no formulário DEPOIS de abrir a prévia agenda uma
+// atualização automática (pedido do Paulo, 12/07: "deveria recarregar a
+// prévia sozinho"). Debounce de ~1,2s pra não regerar a cada tecla -
+// espera uma pausa na digitação antes de gerar de novo.
+function agendarAtualizacaoPreview_() {
+  if (el.cartaoPreview.style.display !== 'block') return;
+  clearTimeout(debouncePreviewTimer_);
+  debouncePreviewTimer_ = setTimeout(atualizarPreviewInline_, 1200);
+}
+
 el.btnGerar.addEventListener('click', async () => {
   const erro = validar();
   if (erro) { mostrarStatus(erro, 'erro'); return; }
 
   el.btnGerar.disabled = true;
   el.btnCompartilhar.style.display = 'none';
-  try {
-    state.assinaturaImagemBase64 = assinaturaContratante.estado.temAssinatura
-      ? el.canvasAssinatura.toDataURL('image/png').split(',')[1]
-      : null;
-    // state.assinaturaContratadaNome/ImagemBase64 já vêm prontos da sessão
-    // de login (ver aplicarSessaoNoFormulario_) - não precisa capturar de
-    // canvas nenhum aqui.
-
-    mostrarStatus('Reservando número do RDO (prévia)...');
-    const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
-
-    mostrarStatus('Gerando planilha...');
-    const { base64, fileName, avisos } = await RdoExcel.gerarWorkbook(state, numero);
-
-    mostrarStatus('Gerando PDF pra prévia...');
-    const resp = await RdoApi.previsualizarRDO({ xlsxBase64: base64, fileName });
-
-    previewPdfBase64 = resp.pdfBase64;
-    previewFileName = fileName.replace(/\.xlsx$/i, '.pdf');
-    previewXlsxBase64 = base64;
-    previewNumeroAtual = numero;
-
-    let mensagem = 'RDO gerado. Toque em "Baixar PDF pra conferir" antes de enviar.';
-    if (avisos && avisos.length) mensagem += '\nAtenção: ' + avisos.join(' ');
-    mostrarStatus('');
-    el.statusConfirmacao.textContent = mensagem;
-    el.statusConfirmacao.className = 'status' + (avisos && avisos.length ? ' erro' : '');
-    // Botão final muda de rótulo quando o RDO vai pra aprovação da
-    // Contratante em vez de ser enviado direto (pedido do Paulo, 11/07).
-    el.btnConfirmarEnvio.textContent = state.aprovacaoContratante
-      ? 'ENVIAR À CONTRATANTE PARA APROVAÇÃO FINAL'
-      : 'Confirmar e Enviar por E-mail';
-    el.cartaoPreview.style.display = 'block';
-    el.cartaoPreview.scrollIntoView({ behavior: 'smooth' });
-  } catch (err) {
-    console.error(err);
-    mostrarStatus('Erro ao gerar a prévia do RDO: ' + err.message, 'erro');
-    RdoApi.logErro('gerar_rdo', err && err.message ? err.message : String(err), { contratante: state.contratante, obra: state.obra });
-  } finally {
-    el.btnGerar.disabled = false;
-  }
+  mostrarStatus('');
+  el.cartaoPreview.style.display = 'block';
+  el.cartaoPreview.scrollIntoView({ behavior: 'smooth' });
+  await atualizarPreviewInline_();
+  el.btnGerar.disabled = false;
 });
 
-// "Visualizar PDF" (antes de enviar) virou DOWNLOAD de verdade com marca
-// d'água "PRÉ-VISUALIZAÇÃO" carimbada no documento (pedido do Paulo,
-// 11/07 tarde: "isso buga demais" abrir num visualizador inline - e o
-// documento pré-visualizado NUNCA pode ser confundido com o RDO final de
-// verdade). Gera uma cópia SEPARADA (com `apenasPreview: true`) só pra
-// esse download - o xlsx/pdf usado de verdade no envio (previewXlsxBase64/
-// previewPdfBase64, sem marca d'água) não muda.
-// "Exibir Prévia" (11/07 noite, voltou atrás do download - Paulo
-// preferiu ver na hora, com zoom, igual já mostra pro cliente) - gera
-// uma cópia SEPARADA com marca d'água (apenasPreview:true) e mostra
-// embutida via iframe (Drive), não baixa mais nada.
-el.btnBaixarPdf.addEventListener('click', async () => {
-  el.btnBaixarPdf.disabled = true;
-  try {
-    el.statusConfirmacao.textContent = 'Gerando prévia (com marca d\'água)...';
-    el.statusConfirmacao.className = 'status';
-    const { base64: xlsxPreviewBase64, fileName: fileNamePreview } = await RdoExcel.gerarWorkbook(state, previewNumeroAtual, { apenasPreview: true });
-    const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
-    if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
-    el.visualizadorApp.src = respLink.pdfUrl;
-    el.wrapVisualizadorApp.style.display = 'block';
-    el.statusConfirmacao.textContent = '';
-  } catch (err) {
-    console.error(err);
-    el.statusConfirmacao.textContent = 'Erro ao gerar a prévia: ' + err.message;
-    el.statusConfirmacao.className = 'status erro';
-    RdoApi.logErro('visualizar_pdf', err && err.message ? err.message : String(err));
-  } finally {
-    el.btnBaixarPdf.disabled = false;
-  }
+// Escuta qualquer edição no formulário (delegado, um listener só) pra
+// agendar a atualização automática - ignora interações DENTRO do próprio
+// card de prévia (zoom, confirmar, cancelar já têm handler próprio) e o
+// clique no botão "Pré-visualizar" (que já atualiza na hora, não precisa
+// agendar de novo por cima).
+['input', 'change', 'click'].forEach(evento => {
+  el.formRdo.addEventListener(evento, (e) => {
+    if (e.target.closest('#cartao-preview') || e.target.id === 'btn-gerar') return;
+    agendarAtualizacaoPreview_();
+  });
 });
 
 el.btnCancelarPreview.addEventListener('click', () => {
@@ -1741,6 +1781,18 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
   el.btnConfirmarEnvio.disabled = true;
   try {
     let resp;
+    clearTimeout(debouncePreviewTimer_); // não deixa uma auto-atualização pendente disparar por cima do envio
+
+    // Gera o xlsx/PDF de verdade (SEM marca d'água) na hora, a partir do
+    // state ATUAL - nunca reaproveita o que foi gerado só pra exibir a
+    // prévia (evita mandar uma versão desatualizada se a pessoa editou
+    // algo entre pré-visualizar e confirmar, ver atualizarPreviewInline_).
+    el.statusConfirmacao.textContent = 'Gerando RDO final...';
+    el.statusConfirmacao.className = 'status';
+    const { base64: xlsxFinalBase64, fileName: fileNameFinal } = await RdoExcel.gerarWorkbook(state, previewNumeroAtual);
+    const respPdfFinal = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxFinalBase64, fileName: fileNameFinal });
+    previewPdfBase64 = respPdfFinal.pdfBase64;
+    previewFileName = fileNameFinal.replace(/\.xlsx$/i, '.pdf');
 
     // Login de quem está gerando (11/07 tarde, tela de Perfil) - lido
     // fresco do localStorage (não confia numa variável do momento do
@@ -1761,9 +1813,9 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
         cliente: state.contratante,
         obra: state.obra,
         data: state.data,
-        xlsxBase64: previewXlsxBase64,
+        xlsxBase64: xlsxFinalBase64,
         pdfBase64: previewPdfBase64,
-        fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
+        fileName: fileNameFinal,
         stateJSON: JSON.stringify(state),
         emailResponsavel: state.emailContratante,
         login: loginAtual
@@ -1779,9 +1831,9 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
         cliente: state.contratante,
         obra: state.obra,
         data: state.data,
-        xlsxBase64: previewXlsxBase64,
+        xlsxBase64: xlsxFinalBase64,
         pdfBase64: previewPdfBase64,
-        fileName: previewFileName.replace(/\.pdf$/i, '.xlsx'),
+        fileName: fileNameFinal,
         emailContratante: state.emailContratante,
         login: loginAtual
       });
