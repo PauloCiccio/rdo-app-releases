@@ -16,6 +16,7 @@
 // módulos entre elas.
 
 const el = {
+  bannerOffline: document.getElementById('banner-offline'),
   carregando: document.getElementById('cartao-carregando'),
   erro: document.getElementById('cartao-erro'),
   mensagemErro: document.getElementById('mensagem-erro'),
@@ -74,6 +75,8 @@ const el = {
   cartaoPreviewFinal: document.getElementById('cartao-preview-final'),
   wrapVisualizadorFinal: document.getElementById('wrap-visualizador-final'),
   visualizadorFinal: document.getElementById('visualizador-final'),
+  visualizadorFinalOffline: document.getElementById('visualizador-final-offline'),
+  avisoPreviaOfflineFinal: document.getElementById('aviso-previa-offline-final'),
   btnZoomMaisFinal: document.getElementById('btn-zoom-mais-final'),
   btnZoomMenosFinal: document.getElementById('btn-zoom-menos-final'),
   btnConcluir: document.getElementById('btn-concluir'),
@@ -88,6 +91,15 @@ function mostrarErro_(msg) {
   el.erro.style.display = 'block';
   el.mensagemErro.textContent = msg;
 }
+
+// Banner de "sem conexão" (12/07, modo offline) - reage a RdoConectividade
+// (api.js). A página em si só abre com internet (precisa buscar o token),
+// mas o Contratante pode perder o sinal DEPOIS, no meio do preenchimento.
+function atualizarBannerConectividade_(online) {
+  el.bannerOffline.style.display = online ? 'none' : 'block';
+}
+atualizarBannerConectividade_(RdoConectividade.estaOnline());
+RdoConectividade.aoMudar(atualizarBannerConectividade_);
 
 function autoGrow(textarea) {
   textarea.style.height = 'auto';
@@ -351,19 +363,23 @@ fetch('https://api.ipify.org?format=json')
 // pinch-zoom da página toda. Função reutilizável - a página tem DOIS
 // visualizadores (PDF parcial em #cartao-info, PDF final em
 // #cartao-preview-final, ambos com zoom).
-function configurarZoomIframe_(iframe, btnMais, btnMenos) {
+// Aceita um elemento só ou uma lista (12/07: a prévia final offline usa uma
+// <img> separada do <iframe> de sempre, mas os MESMOS botões de zoom - só
+// uma das duas fica visível por vez).
+function configurarZoomIframe_(elementoOuLista, btnMais, btnMenos) {
   let zoomAtual = 100;
+  const lista = Array.isArray(elementoOuLista) ? elementoOuLista : [elementoOuLista];
   btnMais.addEventListener('click', () => {
     zoomAtual = Math.min(zoomAtual + 25, 250);
-    iframe.style.width = zoomAtual + '%';
+    lista.forEach(elemento => { elemento.style.width = zoomAtual + '%'; });
   });
   btnMenos.addEventListener('click', () => {
     zoomAtual = Math.max(zoomAtual - 25, 100);
-    iframe.style.width = zoomAtual + '%';
+    lista.forEach(elemento => { elemento.style.width = zoomAtual + '%'; });
   });
 }
 configurarZoomIframe_(el.visualizadorPdf, el.btnZoomMais, el.btnZoomMenos);
-configurarZoomIframe_(el.visualizadorFinal, el.btnZoomMaisFinal, el.btnZoomMenosFinal);
+configurarZoomIframe_([el.visualizadorFinal, el.visualizadorFinalOffline], el.btnZoomMaisFinal, el.btnZoomMenosFinal);
 
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token');
@@ -659,14 +675,31 @@ async function atualizarPreviewFinalInline_() {
   try {
     el.statusConfirmacao.textContent = 'Atualizando prévia...';
     el.statusConfirmacao.className = 'status';
-
     stateFinalAtual = montarStateFinal_();
-    const { base64: xlsxPreviaBase64, fileName: fileNamePrevia } = await RdoExcel.gerarWorkbook(stateFinalAtual, numero, { apenasPreview: true });
-    const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
-    if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
 
-    el.visualizadorFinal.src = respLink.pdfUrl;
-    el.wrapVisualizadorFinal.style.display = 'block';
+    if (RdoConectividade.estaOnline()) {
+      el.avisoPreviaOfflineFinal.style.display = 'none';
+      el.visualizadorFinalOffline.style.display = 'none';
+
+      const { base64: xlsxPreviaBase64, fileName: fileNamePrevia } = await RdoExcel.gerarWorkbook(stateFinalAtual, numero, { apenasPreview: true });
+      const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
+      if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+
+      el.visualizadorFinal.style.display = 'block';
+      el.visualizadorFinal.src = respLink.pdfUrl;
+      el.wrapVisualizadorFinal.style.display = 'block';
+    } else {
+      // Sem internet - mostra uma prévia ILUSTRATIVA (imagem do modelo com
+      // os dados sobrepostos, ver preview-offline.js). O RDO final de
+      // verdade só é gerado/enviado quando a conexão voltar.
+      el.visualizadorFinal.style.display = 'none';
+      const canvasTemp = document.createElement('canvas');
+      const dataUrl = await RdoPreviewOffline.renderizarPreviaOffline_(stateFinalAtual, numero, canvasTemp);
+      el.visualizadorFinalOffline.src = dataUrl;
+      el.visualizadorFinalOffline.style.display = 'block';
+      el.wrapVisualizadorFinal.style.display = 'block';
+      el.avisoPreviaOfflineFinal.style.display = 'block';
+    }
     el.statusConfirmacao.textContent = '';
   } catch (err) {
     console.error(err);

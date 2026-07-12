@@ -134,6 +134,52 @@ const VEICULOS_FALLBACK = [
   'Fiat Strada n° 01 PLACA - QUO7F78'
 ];
 
+// ---------------------------------------------------------------------------
+// Detecção de conectividade (12/07, base do modo offline) - navigator.onLine
+// funciona no WebView do Capacitor sem precisar de plugin novo, mas pode
+// ficar "preso" em true com Wi-Fi conectado sem internet de verdade - por
+// isso qualquer falha REAL de rede dentro de postJson_ (fetch rejeitado, não
+// uma resposta {ok:false} válida do backend) também marca offline até o
+// próximo evento 'online' do navegador ou uma chamada bem-sucedida de novo.
+// ---------------------------------------------------------------------------
+const RdoConectividade = (function () {
+  let offlineForcado = false;
+  const ouvintes = [];
+
+  function estaOnline() {
+    return navigator.onLine && !offlineForcado;
+  }
+
+  function notificar() {
+    ouvintes.forEach(fn => {
+      try { fn(estaOnline()); } catch (err) { console.warn('Erro num ouvinte de conectividade:', err); }
+    });
+  }
+
+  function marcarFalhaDeRede() {
+    if (!offlineForcado) {
+      offlineForcado = true;
+      notificar();
+    }
+  }
+
+  function marcarSucessoDeRede() {
+    if (offlineForcado) {
+      offlineForcado = false;
+      notificar();
+    }
+  }
+
+  window.addEventListener('online', () => { offlineForcado = false; notificar(); });
+  window.addEventListener('offline', () => notificar());
+
+  function aoMudar(fn) {
+    ouvintes.push(fn);
+  }
+
+  return { estaOnline, marcarFalhaDeRede, marcarSucessoDeRede, aoMudar };
+})();
+
 const RdoApi = (function () {
   const CACHE_KEY = 'rdo_obras_cache';
   const CACHE_KEY_EQUIPAMENTOS = 'rdo_equipamentos_cache';
@@ -147,6 +193,7 @@ const RdoApi = (function () {
       const resp = await fetch(APPS_SCRIPT_URL + '?action=obras');
       const json = await resp.json();
       if (!json.ok) throw new Error(json.erro || 'erro desconhecido');
+      RdoConectividade.marcarSucessoDeRede();
       if (!json.obras || json.obras.length === 0) {
         // servidor respondeu certo mas a aba "Obras" está vazia (provável
         // acidente de edição na planilha) - melhor usar o fallback embutido
@@ -157,6 +204,7 @@ const RdoApi = (function () {
       localStorage.setItem(CACHE_KEY, JSON.stringify(json.obras));
       return json.obras;
     } catch (err) {
+      RdoConectividade.marcarFalhaDeRede();
       console.warn('Falha ao buscar obras do servidor, usando cache local:', err);
       const cache = obrasDoCache_();
       if (cache) return cache;
@@ -185,6 +233,7 @@ const RdoApi = (function () {
       const resp = await fetch(APPS_SCRIPT_URL + '?action=' + action);
       const json = await resp.json();
       if (!json.ok) throw new Error(json.erro || 'erro desconhecido');
+      RdoConectividade.marcarSucessoDeRede();
       const lista = json.itens || [];
       if (lista.length === 0) {
         console.warn(`Servidor devolveu 0 itens pra ${action}, usando fallback embutido.`);
@@ -193,6 +242,7 @@ const RdoApi = (function () {
       localStorage.setItem(cacheKey, JSON.stringify(lista));
       return lista;
     } catch (err) {
+      RdoConectividade.marcarFalhaDeRede();
       console.warn(`Falha ao buscar ${action} do servidor, usando cache local:`, err);
       const cache = listaDoCache_(cacheKey);
       if (cache) return cache;
@@ -212,11 +262,20 @@ const RdoApi = (function () {
     if (!APPS_SCRIPT_URL) {
       throw new Error('APPS_SCRIPT_URL ainda não configurada (ver backend/README_SETUP.md)');
     }
-    const resp = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
+    let resp;
+    try {
+      resp = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      // fetch rejeitado (sem rede de verdade) - diferente de uma resposta
+      // {ok:false} do backend, que é um erro de aplicação, não de conexão.
+      RdoConectividade.marcarFalhaDeRede();
+      throw err;
+    }
+    RdoConectividade.marcarSucessoDeRede();
     const json = await resp.json();
     if (!json.ok) throw new Error(json.erro || 'erro desconhecido');
     return json;

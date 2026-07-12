@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.7.6';
+const VERSAO_APP = 'BETA 0.8.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -190,6 +190,11 @@ function autoGrow(textarea) {
 }
 
 const el = {
+  bannerOffline: document.getElementById('banner-offline'),
+  badgePendentes: document.getElementById('badge-pendentes-offline'),
+  cartaoConfirmacaoPendente: document.getElementById('cartao-confirmacao-pendente'),
+  textoConfirmacaoPendente: document.getElementById('texto-confirmacao-pendente'),
+  btnOkConfirmacaoPendente: document.getElementById('btn-ok-confirmacao-pendente'),
   contratante: document.getElementById('campo-contratante'),
   obra: document.getElementById('campo-obra'),
   servico: document.getElementById('campo-servico'),
@@ -237,6 +242,8 @@ const el = {
   cartaoPreview: document.getElementById('cartao-preview'),
   wrapVisualizadorApp: document.getElementById('wrap-visualizador-app'),
   visualizadorApp: document.getElementById('visualizador-app'),
+  visualizadorAppOffline: document.getElementById('visualizador-app-offline'),
+  avisoPreviaOffline: document.getElementById('aviso-previa-offline'),
   btnZoomMaisApp: document.getElementById('btn-zoom-mais-app'),
   btnZoomMenosApp: document.getElementById('btn-zoom-menos-app'),
   btnCompartilhar: document.getElementById('btn-compartilhar'),
@@ -276,6 +283,16 @@ const el = {
   perfilAprovados: document.getElementById('perfil-aprovados'),
   perfilSemAprovados: document.getElementById('perfil-sem-aprovados')
 };
+
+// ---------------------------------------------------------------------------
+// Banner de "sem conexão" (12/07, modo offline) - visível em qualquer tela
+// do app (login/formulário/perfil), reage a RdoConectividade (api.js).
+// ---------------------------------------------------------------------------
+function atualizarBannerConectividade_(online) {
+  el.bannerOffline.style.display = online ? 'none' : 'block';
+}
+atualizarBannerConectividade_(RdoConectividade.estaOnline());
+RdoConectividade.aoMudar(atualizarBannerConectividade_);
 
 // ---------------------------------------------------------------------------
 // Listas dinâmicas (Efetivo / Equipamentos e Veículos) - crescem uma linha
@@ -625,6 +642,135 @@ function carregarUltimaIdentificacao_() {
   } catch (err) {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Estado COMPLETO do RDO em andamento (12/07, base do modo offline) - ao
+// contrário de CHAVE_ULTIMA_IDENTIFICACAO (só convenções entre RDOs), essa
+// chave salva TUDO (Data, Tempo, Observações, Atividades com horários,
+// assinatura da Contratante em desenho) - existe pra não perder o
+// preenchimento se o app fechar/travar no meio (com ou sem internet).
+// Só é apagada depois de um envio CONFIRMADO (ver resetarParaProximoRdo_ e
+// a sincronização da fila offline).
+// ---------------------------------------------------------------------------
+const CHAVE_ESTADO_EM_ANDAMENTO = 'rdo_estado_em_andamento';
+let debounceEstadoEmAndamentoTimer_ = null;
+
+function salvarEstadoEmAndamento_() {
+  try {
+    localStorage.setItem(CHAVE_ESTADO_EM_ANDAMENTO, JSON.stringify({
+      state,
+      // state.assinaturaImagemBase64 só é preenchido na hora de GERAR (a
+      // partir do canvas) - pra não perder um desenho ainda não gerado,
+      // guarda o canvas da Contratante à parte aqui.
+      assinaturaContratanteBase64: assinaturaContratante.estado.temAssinatura
+        ? el.canvasAssinatura.toDataURL('image/png').split(',')[1]
+        : null
+    }));
+  } catch (err) {
+    console.warn('Falha ao salvar estado em andamento:', err);
+  }
+}
+
+function agendarSalvarEstadoEmAndamento_() {
+  clearTimeout(debounceEstadoEmAndamentoTimer_);
+  debounceEstadoEmAndamentoTimer_ = setTimeout(salvarEstadoEmAndamento_, 1000);
+}
+
+function apagarEstadoEmAndamento_() {
+  clearTimeout(debounceEstadoEmAndamentoTimer_);
+  localStorage.removeItem(CHAVE_ESTADO_EM_ANDAMENTO);
+}
+
+function carregarEstadoEmAndamento_() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_ESTADO_EM_ANDAMENTO);
+    return bruto ? JSON.parse(bruto) : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+['input', 'change', 'click'].forEach(evento => {
+  el.formRdo.addEventListener(evento, () => agendarSalvarEstadoEmAndamento_());
+});
+
+// Repopula a tela inteira a partir de um RDO em andamento salvo (app foi
+// fechado/travado no meio do preenchimento) - roda ANTES de
+// preencherUltimaIdentificacao_() no load; se não houver nada salvo aqui,
+// cai pro comportamento de sempre (só convenções da última identificação).
+// Reaproveita o mesmo cuidado já usado pra Efetivo/Equipamentos: substitui
+// o CONTEÚDO dos arrays do state sem trocar a referência (cfgAtivContratada/
+// cfgAtivContratante/cfgEfetivo/cfgEquipamentos guardam o mesmo array em
+// `itens` - reatribuir state.xxx quebraria essa referência).
+async function restaurarEstadoEmAndamento_() {
+  const salvo = carregarEstadoEmAndamento_();
+  if (!salvo || !salvo.state) return false;
+  const s = salvo.state;
+
+  state.contratante = s.contratante || '';
+  state.obra = s.obra || '';
+  state.servico = s.servico || '';
+  state.objetoContrato = s.objetoContrato || '';
+  state.local = s.local || '';
+  state.data = s.data || '';
+  state.observacoes = s.observacoes || '';
+  state.emailContratante = s.emailContratante || '';
+  state.tempo = s.tempo || state.tempo;
+  state.assinaturaNome = s.assinaturaNome || '';
+  state.assinaturaConcordo = Boolean(s.assinaturaConcordo);
+  state.aprovacaoContratante = Boolean(s.aprovacaoContratante);
+
+  state.efetivo.length = 0;
+  (s.efetivo || []).forEach(item => state.efetivo.push(item));
+  state.equipamentos.length = 0;
+  (s.equipamentos || []).forEach(item => state.equipamentos.push(item));
+  state.atividadesContratada.length = 0;
+  (s.atividadesContratada && s.atividadesContratada.length ? s.atividadesContratada : [{ inicio: '', fim: '', discriminacao: '' }]).forEach(item => state.atividadesContratada.push(item));
+  state.atividadesContratante.length = 0;
+  (s.atividadesContratante && s.atividadesContratante.length ? s.atividadesContratante : [{ inicio: '', fim: '', discriminacao: '' }]).forEach(item => state.atividadesContratante.push(item));
+
+  el.contratante.value = state.contratante;
+  el.obra.value = state.obra;
+  el.servico.value = state.servico;
+  el.objeto.value = state.objetoContrato;
+  el.trecho.value = state.local;
+  el.emailContratante.value = state.emailContratante;
+  el.data.value = state.data;
+  el.observacoes.value = state.observacoes;
+  autoGrow(el.observacoes);
+
+  document.querySelectorAll('.balao').forEach(botao => {
+    const marcado = Boolean(state.tempo[botao.dataset.tempo] && state.tempo[botao.dataset.tempo][botao.dataset.periodo]);
+    botao.classList.toggle('marcado', marcado);
+  });
+  document.querySelectorAll('.mm-chuva').forEach(input => {
+    input.value = (state.tempo.mm && state.tempo.mm[input.dataset.periodo]) || '';
+  });
+
+  renderizarListaQuantCrescente(cfgEfetivo);
+  renderizarListaQuantCrescente(cfgEquipamentos);
+  renderizarListaAtividades(cfgAtivContratada);
+  renderizarListaAtividades(cfgAtivContratante);
+
+  el.nomeAssinante.value = state.assinaturaNome;
+  el.concordo.checked = state.assinaturaConcordo;
+  el.aprovacaoContratante.checked = state.aprovacaoContratante;
+  el.avisoAprovacaoContratante.style.display = state.aprovacaoContratante ? 'block' : 'none';
+  if (salvo.assinaturaContratanteBase64) {
+    await assinaturaContratante.restaurar(salvo.assinaturaContratanteBase64);
+  }
+
+  if (state.contratante) {
+    const obras = [...new Set(obrasDisponiveis.filter(o => o.cliente === state.contratante).map(o => o.obra))].sort();
+    preencherDatalist(el.dlObra, obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
+  }
+  if (state.contratante && state.obra) {
+    atualizarServicosESugestoes();
+    await atualizarPreviewNumero();
+  }
+
+  return true;
 }
 
 // Botão "Limpar dados salvos" (pedido do Paulo, 10/07): apaga o cache de
@@ -1602,6 +1748,8 @@ function fecharPreview_() {
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
+  el.visualizadorAppOffline.src = '';
+  el.avisoPreviaOffline.style.display = 'none';
   el.statusConfirmacao.textContent = '';
   el.statusConfirmacao.className = 'status';
 }
@@ -1610,18 +1758,23 @@ function fecharPreview_() {
 // aprovacao.js/configurarZoomIframe_ - ver comentário lá pro histórico:
 // pinch-zoom nativo não dá pra restringir a um elemento, então aumenta a
 // LARGURA do iframe além de 100%, o Drive reflui o conteúdo de verdade).
-function configurarZoomIframe_(iframe, btnMais, btnMenos) {
+// Aceita um elemento só ou uma lista (12/07: a prévia offline usa uma <img>
+// separada do <iframe> de sempre, mas os MESMOS botões de zoom - só uma
+// das duas fica visível por vez, então aplicar a largura nas duas juntas
+// não tem efeito colateral).
+function configurarZoomIframe_(elementoOuLista, btnMais, btnMenos) {
   let zoomAtual = 100;
+  const lista = Array.isArray(elementoOuLista) ? elementoOuLista : [elementoOuLista];
   btnMais.addEventListener('click', () => {
     zoomAtual = Math.min(zoomAtual + 25, 250);
-    iframe.style.width = zoomAtual + '%';
+    lista.forEach(elemento => { elemento.style.width = zoomAtual + '%'; });
   });
   btnMenos.addEventListener('click', () => {
     zoomAtual = Math.max(zoomAtual - 25, 100);
-    iframe.style.width = zoomAtual + '%';
+    lista.forEach(elemento => { elemento.style.width = zoomAtual + '%'; });
   });
 }
-configurarZoomIframe_(el.visualizadorApp, el.btnZoomMaisApp, el.btnZoomMenosApp);
+configurarZoomIframe_([el.visualizadorApp, el.visualizadorAppOffline], el.btnZoomMaisApp, el.btnZoomMenosApp);
 
 // Depois de mandar o RDO (direto ou pra aprovação da Contratante), o
 // formulário volta pro estado "normal" de um RDO novo - pedido do Paulo
@@ -1666,10 +1819,16 @@ async function resetarParaProximoRdo_() {
   state.aprovacaoContratante = false;
   el.avisoAprovacaoContratante.style.display = 'none';
 
+  // RDO foi enviado de verdade - não tem mais o que restaurar de um "RDO em
+  // andamento" (ver CHAVE_ESTADO_EM_ANDAMENTO).
+  apagarEstadoEmAndamento_();
+
   // Prévia exibida (se houver) era do RDO anterior - esconde pra não
   // mostrar um documento errado até a pessoa gerar um RDO novo.
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
+  el.visualizadorAppOffline.src = '';
+  el.avisoPreviaOffline.style.display = 'none';
 
   // Contratante/Obra continuam preenchidos (mesma obra) - reserva o
   // PRÓXIMO número já de cara, senão a prévia ficava travada em "-" até
@@ -1708,26 +1867,47 @@ async function atualizarPreviewInline_() {
       ? el.canvasAssinatura.toDataURL('image/png').split(',')[1]
       : null;
 
-    const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
-    previewNumeroAtual = numero;
+    if (RdoConectividade.estaOnline()) {
+      el.avisoPreviaOffline.style.display = 'none';
+      el.visualizadorAppOffline.style.display = 'none';
 
-    const { base64: xlsxPreviewBase64, fileName: fileNamePreview, avisos } = await RdoExcel.gerarWorkbook(state, numero, { apenasPreview: true });
-    const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
-    if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+      const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
+      previewNumeroAtual = numero;
 
-    el.visualizadorApp.src = respLink.pdfUrl;
-    el.wrapVisualizadorApp.style.display = 'block';
+      const { base64: xlsxPreviewBase64, fileName: fileNamePreview, avisos } = await RdoExcel.gerarWorkbook(state, numero, { apenasPreview: true });
+      const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
+      if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+
+      el.visualizadorApp.style.display = 'block';
+      el.visualizadorApp.src = respLink.pdfUrl;
+      el.wrapVisualizadorApp.style.display = 'block';
+
+      if (avisos && avisos.length) {
+        el.statusConfirmacao.textContent = 'Atenção: ' + avisos.join(' ');
+        el.statusConfirmacao.className = 'status erro';
+      } else {
+        el.statusConfirmacao.textContent = '';
+      }
+    } else {
+      // Sem internet - não dá pra reservar o número de verdade nem gerar o
+      // PDF (os dois dependem do Apps Script). Mostra uma prévia
+      // ILUSTRATIVA (imagem do modelo com os dados sobrepostos, ver
+      // preview-offline.js) - o RDO de verdade só é numerado/gerado quando
+      // a conexão voltar (ver sincronizarFilaOffline_).
+      previewNumeroAtual = null;
+      el.visualizadorApp.style.display = 'none';
+      const canvasTemp = document.createElement('canvas');
+      const dataUrl = await RdoPreviewOffline.renderizarPreviaOffline_(state, null, canvasTemp);
+      el.visualizadorAppOffline.src = dataUrl;
+      el.visualizadorAppOffline.style.display = 'block';
+      el.wrapVisualizadorApp.style.display = 'block';
+      el.avisoPreviaOffline.style.display = 'block';
+      el.statusConfirmacao.textContent = '';
+    }
 
     el.btnConfirmarEnvio.textContent = state.aprovacaoContratante
       ? 'ENVIAR À CONTRATANTE PARA APROVAÇÃO FINAL'
       : 'Confirmar e Enviar por E-mail';
-
-    if (avisos && avisos.length) {
-      el.statusConfirmacao.textContent = 'Atenção: ' + avisos.join(' ');
-      el.statusConfirmacao.className = 'status erro';
-    } else {
-      el.statusConfirmacao.textContent = '';
-    }
   } catch (err) {
     console.error(err);
     el.statusConfirmacao.textContent = 'Erro ao atualizar a prévia: ' + (err && err.message ? err.message : err);
@@ -1777,66 +1957,202 @@ el.btnCancelarPreview.addEventListener('click', () => {
   fecharPreview_();
 });
 
+// Gera o xlsx/PDF de verdade (SEM marca d'água) e manda pro backend
+// (direto ou pra aprovação da Contratante) - extraído numa função só (12/07)
+// porque a fila de envio offline (sincronizarFilaOffline_) precisa fazer
+// EXATAMENTE os mesmos passos mais tarde, quando a conexão voltar, sem
+// duplicar a lógica. `numeroJaReservado` reaproveita o número já mostrado
+// na prévia (fluxo normal, online); se vier null (RDO que ficou na fila
+// offline, nunca teve prévia com número real), reserva um novo agora.
+async function enviarRdoAoBackend_(stateParaEnviar, loginParaEnviar, numeroJaReservado) {
+  const numero = numeroJaReservado != null
+    ? numeroJaReservado
+    : (await RdoApi.reservarNumero(stateParaEnviar.contratante, stateParaEnviar.obra)).numero;
+
+  const { base64: xlsxFinalBase64, fileName: fileNameFinal } = await RdoExcel.gerarWorkbook(stateParaEnviar, numero);
+  const respPdfFinal = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxFinalBase64, fileName: fileNameFinal });
+  const pdfBase64 = respPdfFinal.pdfBase64;
+
+  let resp;
+  if (stateParaEnviar.aprovacaoContratante) {
+    resp = await RdoApi.enviarParaAprovacao({
+      cliente: stateParaEnviar.contratante,
+      obra: stateParaEnviar.obra,
+      data: stateParaEnviar.data,
+      xlsxBase64: xlsxFinalBase64,
+      pdfBase64,
+      fileName: fileNameFinal,
+      stateJSON: JSON.stringify(stateParaEnviar),
+      emailResponsavel: stateParaEnviar.emailContratante,
+      login: loginParaEnviar
+    });
+  } else {
+    resp = await RdoApi.enviarRDO({
+      cliente: stateParaEnviar.contratante,
+      obra: stateParaEnviar.obra,
+      data: stateParaEnviar.data,
+      xlsxBase64: xlsxFinalBase64,
+      pdfBase64,
+      fileName: fileNameFinal,
+      emailContratante: stateParaEnviar.emailContratante,
+      login: loginParaEnviar
+    });
+  }
+  return { resp, numero, pdfBase64, fileNameFinal: fileNameFinal.replace(/\.xlsx$/i, '.pdf') };
+}
+
+// ---------------------------------------------------------------------------
+// Fila de envio offline (12/07) - "Confirmar e Enviar" sem internet não tem
+// como completar de verdade (reservarNumero/previsualizarRDO/enviarRDO
+// dependem do Apps Script), então guarda o RDO INTEIRO no aparelho como
+// "pendente" e libera a pessoa pra seguir preenchendo o próximo RDO -
+// sincronizarFilaOffline_ manda todos, na ordem, sozinho, assim que a
+// conexão voltar (evento 'online' ou no load do app, se já estiver online).
+// ---------------------------------------------------------------------------
+const CHAVE_FILA_PENDENTE = 'rdo_fila_pendente_envio';
+const CHAVE_FILA_CONFIRMACAO = 'rdo_fila_aguardando_confirmacao';
+let sincronizandoFila_ = false;
+
+function carregarFilaPendente_() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_FILA_PENDENTE);
+    return bruto ? JSON.parse(bruto) : [];
+  } catch (err) { return []; }
+}
+function salvarFilaPendente_(fila) {
+  localStorage.setItem(CHAVE_FILA_PENDENTE, JSON.stringify(fila));
+  atualizarBadgePendentes_();
+}
+function carregarFilaConfirmacao_() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_FILA_CONFIRMACAO);
+    return bruto ? JSON.parse(bruto) : [];
+  } catch (err) { return []; }
+}
+function salvarFilaConfirmacao_(fila) {
+  localStorage.setItem(CHAVE_FILA_CONFIRMACAO, JSON.stringify(fila));
+}
+
+function atualizarBadgePendentes_() {
+  const n = carregarFilaPendente_().length;
+  if (n > 0) {
+    el.badgePendentes.textContent = n === 1 ? '1 RDO aguardando conexão' : (n + ' RDOs aguardando conexão');
+    el.badgePendentes.style.display = 'inline-block';
+  } else {
+    el.badgePendentes.style.display = 'none';
+  }
+}
+
+// Mostra as confirmações de envio já concluídas (sincronizadas em segundo
+// plano, talvez com o app fechado/minimizado) UMA DE CADA VEZ - só libera a
+// próxima (ou fecha) quando a pessoa confirma que leu (pedido do Paulo,
+// 12/07: precisa clicar OK, não pode só sumir sozinho).
+function mostrarProximaConfirmacaoPendente_() {
+  const fila = carregarFilaConfirmacao_();
+  if (!fila.length) {
+    el.cartaoConfirmacaoPendente.style.display = 'none';
+    return;
+  }
+  const item = fila[0];
+  let texto = `RDO nº ${item.numero} da obra ${item.obra} (${item.cliente}) foi enviado com sucesso.`;
+  if (item.aprovacaoContratante) {
+    texto += item.emailResponsavel
+      ? ` Aguardando aprovação de ${item.emailResponsavel}.`
+      : ' Aguardando aprovação da Contratante.';
+  } else if (item.emailResponsavel) {
+    texto += ` Cópia enviada para ${item.emailResponsavel}.`;
+  }
+  el.textoConfirmacaoPendente.textContent = texto;
+  el.cartaoConfirmacaoPendente.style.display = 'flex';
+}
+
+el.btnOkConfirmacaoPendente.addEventListener('click', () => {
+  const fila = carregarFilaConfirmacao_();
+  fila.shift();
+  salvarFilaConfirmacao_(fila);
+  mostrarProximaConfirmacaoPendente_();
+});
+
+async function sincronizarFilaOffline_() {
+  if (sincronizandoFila_) return;
+  if (!RdoConectividade.estaOnline()) return;
+  let fila = carregarFilaPendente_();
+  if (!fila.length) return;
+  sincronizandoFila_ = true;
+  try {
+    while (fila.length) {
+      const item = fila[0];
+      try {
+        const { resp, numero } = await enviarRdoAoBackend_(item.state, item.login, null);
+        fila.shift();
+        salvarFilaPendente_(fila);
+
+        const confirmacoes = carregarFilaConfirmacao_();
+        confirmacoes.push({
+          numero,
+          obra: item.state.obra,
+          cliente: item.state.contratante,
+          aprovacaoContratante: Boolean(item.state.aprovacaoContratante),
+          emailResponsavel: item.state.emailContratante || ''
+        });
+        salvarFilaConfirmacao_(confirmacoes);
+      } catch (err) {
+        console.error('Falha ao sincronizar RDO pendente (tenta de novo quando a conexão voltar):', err);
+        RdoApi.logErro('sincronizar_fila_offline', err && err.message ? err.message : String(err), { obra: item.state.obra, cliente: item.state.contratante });
+        break; // não trava num loop - a próxima tentativa acontece no próximo evento 'online'
+      }
+      fila = carregarFilaPendente_();
+    }
+  } finally {
+    sincronizandoFila_ = false;
+    mostrarProximaConfirmacaoPendente_();
+  }
+}
+RdoConectividade.aoMudar(online => { if (online) sincronizarFilaOffline_(); });
+
 el.btnConfirmarEnvio.addEventListener('click', async () => {
   el.btnConfirmarEnvio.disabled = true;
   try {
-    let resp;
     clearTimeout(debouncePreviewTimer_); // não deixa uma auto-atualização pendente disparar por cima do envio
 
-    // Gera o xlsx/PDF de verdade (SEM marca d'água) na hora, a partir do
-    // state ATUAL - nunca reaproveita o que foi gerado só pra exibir a
-    // prévia (evita mandar uma versão desatualizada se a pessoa editou
-    // algo entre pré-visualizar e confirmar, ver atualizarPreviewInline_).
-    el.statusConfirmacao.textContent = 'Gerando RDO final...';
-    el.statusConfirmacao.className = 'status';
-    const { base64: xlsxFinalBase64, fileName: fileNameFinal } = await RdoExcel.gerarWorkbook(state, previewNumeroAtual);
-    const respPdfFinal = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxFinalBase64, fileName: fileNameFinal });
-    previewPdfBase64 = respPdfFinal.pdfBase64;
-    previewFileName = fileNameFinal.replace(/\.xlsx$/i, '.pdf');
-
-    // Login de quem está gerando (11/07 tarde, tela de Perfil) - lido
-    // fresco do localStorage (não confia numa variável do momento do
-    // carregamento da página, já que o login pode ter acontecido durante
-    // esta mesma sessão do navegador).
     const sessaoAtual = carregarSessaoUsuario_();
     const loginAtual = sessaoAtual ? sessaoAtual.login : '';
 
-    if (state.aprovacaoContratante) {
-      // Manda só pro Contratante revisar - o RDO final (com as atividades
-      // e assinatura da Contratante) só sai depois que ele concluir pelo
-      // link (ver www/aprovacao.html). O `state` inteiro vai junto (JSON)
-      // pra pagina de aprovação conseguir continuar o preenchimento com o
-      // que já foi feito aqui.
-      el.statusConfirmacao.textContent = 'Enviando pra aprovação da Contratante...';
-      el.statusConfirmacao.className = 'status';
-      resp = await RdoApi.enviarParaAprovacao({
-        cliente: state.contratante,
-        obra: state.obra,
-        data: state.data,
-        xlsxBase64: xlsxFinalBase64,
-        pdfBase64: previewPdfBase64,
-        fileName: fileNameFinal,
-        stateJSON: JSON.stringify(state),
-        emailResponsavel: state.emailContratante,
-        login: loginAtual
+    if (!RdoConectividade.estaOnline()) {
+      // Sem internet - guarda o RDO inteiro no aparelho como pendente
+      // (sincronizarFilaOffline_ manda de verdade quando a conexão
+      // voltar). Do ponto de vista de quem preenche, o trabalho aqui
+      // acabou - libera o formulário pro próximo RDO igual um envio normal.
+      const fila = carregarFilaPendente_();
+      fila.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2),
+        state: JSON.parse(JSON.stringify(state)),
+        login: loginAtual,
+        criadoEm: new Date().toISOString()
       });
+      salvarFilaPendente_(fila);
+
+      el.statusConfirmacao.textContent = 'Sem internet - RDO salvo no aparelho. Será enviado sozinho assim que a conexão voltar.';
+      el.statusConfirmacao.className = 'status sucesso';
+      await resetarParaProximoRdo_();
+      return;
+    }
+
+    el.statusConfirmacao.textContent = 'Gerando RDO final...';
+    el.statusConfirmacao.className = 'status';
+    // Gera a partir do state ATUAL - nunca reaproveita o que foi gerado só
+    // pra exibir a prévia (evita mandar uma versão desatualizada se a
+    // pessoa editou algo entre pré-visualizar e confirmar).
+    const { resp, pdfBase64, fileNameFinal } = await enviarRdoAoBackend_(state, loginAtual, previewNumeroAtual);
+    previewPdfBase64 = pdfBase64;
+    previewFileName = fileNameFinal;
+
+    if (state.aprovacaoContratante) {
       el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado pra aprovação da Contratante! ` +
         'O RDO final chega por e-mail (pra você e pra ela) assim que ela concluir pelo link.';
       el.statusConfirmacao.className = 'status sucesso';
       el.btnCompartilhar.style.display = 'none';
     } else {
-      el.statusConfirmacao.textContent = 'Enviando por e-mail...';
-      el.statusConfirmacao.className = 'status';
-      resp = await RdoApi.enviarRDO({
-        cliente: state.contratante,
-        obra: state.obra,
-        data: state.data,
-        xlsxBase64: xlsxFinalBase64,
-        pdfBase64: previewPdfBase64,
-        fileName: fileNameFinal,
-        emailContratante: state.emailContratante,
-        login: loginAtual
-      });
       el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado com sucesso!`;
       el.statusConfirmacao.className = 'status sucesso';
       el.btnCompartilhar.style.display = 'block';
@@ -1863,7 +2179,10 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
   }
 });
 
-carregarObras().then(preencherUltimaIdentificacao_);
+carregarObras().then(async () => {
+  const restaurouEmAndamento = await restaurarEstadoEmAndamento_();
+  if (!restaurouEmAndamento) await preencherUltimaIdentificacao_();
+});
 carregarEquipamentosVeiculos();
 
 const sessaoInicial = carregarSessaoUsuario_();
@@ -1872,3 +2191,11 @@ if (sessaoInicial && sessaoInicial.assinaturaBase64) {
 } else {
   mostrarTelaLogin_();
 }
+
+// Fila offline (12/07): mostra o que já tinha pendente/aguardando
+// confirmação de uma sessão anterior, e tenta sincronizar de cara se o
+// app já abrir com internet (não precisa esperar um evento 'online' -
+// não teria nenhum, já que nunca esteve offline NESTA sessão).
+atualizarBadgePendentes_();
+mostrarProximaConfirmacaoPendente_();
+sincronizarFilaOffline_();

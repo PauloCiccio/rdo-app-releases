@@ -22,9 +22,14 @@
     <button type="button" id="btn-verificar-atualizacao" class="link-atualizacao">Verificar atualizações</button>
     <span id="status-atualizacao" class="status-atualizacao"></span>
     <span id="usuario-logado" class="status-atualizacao" style="display:none;"></span>
+    <span id="badge-pendentes-offline" class="badge-pendentes-offline" style="display:none;"></span>
     <button type="button" id="btn-sair" class="link-atualizacao" style="display:none;">Sair</button>
   </div>
 </header>
+
+<div id="banner-offline" class="banner-offline" style="display:none;">
+  📴 Sem conexão - o RDO vai ficar salvo no aparelho e será enviado sozinho quando a internet voltar.
+</div>
 
 <section class="cartao" id="cartao-perfil" style="display:none;">
   <div class="cabecalho-secao">
@@ -240,7 +245,9 @@
         <button type="button" id="btn-zoom-mais-app" class="botao-mini">＋</button>
       </div>
       <iframe id="visualizador-app" class="iframe-visualizador-pdf"></iframe>
+      <img id="visualizador-app-offline" class="iframe-visualizador-pdf" style="display:none;" alt="Prévia offline (ilustrativa)">
     </div>
+    <p id="aviso-previa-offline" class="orcamento-info" style="display:none;">Sem internet agora - essa é uma prévia ILUSTRATIVA (não é o PDF oficial). O documento de verdade, com marca d'água, é gerado quando a conexão voltar.</p>
     <button type="button" id="btn-compartilhar" class="botao-secundario" style="display:none;">Compartilhar PDF</button>
     <button type="button" id="btn-confirmar-envio" class="botao-principal">Confirmar e Enviar por E-mail</button>
     <button type="button" id="btn-cancelar-preview" class="botao-secundario">Cancelar / Editar</button>
@@ -249,8 +256,17 @@
 
 </main>
 
+<div id="cartao-confirmacao-pendente" class="modal-confirmacao" style="display:none;">
+  <div class="modal-confirmacao-caixa">
+    <h2>RDO enviado!</h2>
+    <p id="texto-confirmacao-pendente"></p>
+    <button type="button" id="btn-ok-confirmacao-pendente" class="botao-principal">OK</button>
+  </div>
+</div>
+
 <script src="api.js"></script>
 <script src="excel-fill.js"></script>
+<script src="preview-offline.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
