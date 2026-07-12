@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.7.4';
+const VERSAO_APP = 'BETA 0.7.5';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -1748,19 +1748,6 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     // esta mesma sessão do navegador).
     const sessaoAtual = carregarSessaoUsuario_();
     const loginAtual = sessaoAtual ? sessaoAtual.login : '';
-
-    // DIAGNÓSTICO TEMPORÁRIO (12/07) - RDOs reais estão chegando com a
-    // coluna Login vazia na planilha, mesmo o código sempre tendo mandado
-    // esse campo. Loga o que o app calculou NA HORA (sem esperar erro
-    // nenhum) pra investigar via aba "Erros" - remover depois de achar a
-    // causa.
-    RdoApi.logErro('diagnostico_login', 'loginAtual=' + JSON.stringify(loginAtual), {
-      temSessao: Boolean(sessaoAtual),
-      sessaoLogin: sessaoAtual ? sessaoAtual.login : null,
-      sessaoNome: sessaoAtual ? sessaoAtual.nome : null,
-      versaoApp: VERSAO_APP,
-      aprovacaoContratante: state.aprovacaoContratante
-    });
 
     if (state.aprovacaoContratante) {
       // Manda só pro Contratante revisar - o RDO final (com as atividades

@@ -226,8 +226,8 @@ const RdoApi = (function () {
     return postJson_({ action: 'reservarNumero', cliente, obra });
   }
 
-  function enviarRDO({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante }) {
-    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante });
+  function enviarRDO({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, login }) {
+    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, login });
   }
 
   function previsualizarRDO({ xlsxBase64, fileName }) {
@@ -242,8 +242,8 @@ const RdoApi = (function () {
   }
 
   // Aprovação do Contratante por e-mail (11/07) - ver www/aprovacao.html.
-  function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel }) {
-    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel });
+  function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, login }) {
+    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, login });
   }
 
   async function buscarAprovacao(token) {
