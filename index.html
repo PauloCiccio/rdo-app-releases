@@ -86,155 +86,203 @@
 
 <main id="form-rdo" style="display:none;">
 
-  <section class="cartao">
-    <div class="cabecalho-secao">
-      <h2>Identificação</h2>
-      <button type="button" id="btn-limpar-identificacao" class="link-limpar-cache">Limpar dados salvos</button>
-    </div>
-
-    <label for="campo-contratante">Contratante</label>
-    <input type="text" id="campo-contratante" list="dl-contratante" placeholder="Selecione da lista ou digite" required autocomplete="off">
-    <datalist id="dl-contratante"></datalist>
-
-    <label for="campo-obra">Obra</label>
-    <input type="text" id="campo-obra" list="dl-obra" placeholder="Selecione da lista ou digite" required autocomplete="off">
-    <datalist id="dl-obra"></datalist>
-
-    <label for="campo-servico">Serviço</label>
-    <input type="text" id="campo-servico" list="dl-servico" placeholder="Selecione da lista ou digite (opcional)" autocomplete="off">
-    <datalist id="dl-servico"></datalist>
-
-    <label for="campo-objeto">Objeto do Contrato</label>
-    <input type="text" id="campo-objeto" placeholder="Preenchido automático, pode editar">
-
-    <label for="campo-trecho">Trecho / Local</label>
-    <input type="text" id="campo-trecho" placeholder="Preenchido automático, pode editar">
-
-    <div class="linha-2col">
-      <div>
-        <label for="campo-data">Data</label>
-        <input type="date" id="campo-data" required>
+  <details class="secao-formulario" open>
+    <summary>
+      <svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-7.58 7-12A7 7 0 0 0 5 10c0 4.42 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      <span class="numero-secao">1</span>
+      Identificação e Data
+      <svg class="seta-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    <div class="conteudo-secao">
+      <div style="text-align:right;">
+        <button type="button" id="btn-limpar-identificacao" class="link-limpar-cache">Limpar dados salvos</button>
       </div>
-      <div>
-        <label>RDO nº <span id="preview-numero" class="badge">-</span></label>
+
+      <label for="campo-contratante">Contratante</label>
+      <input type="text" id="campo-contratante" list="dl-contratante" placeholder="Selecione da lista ou digite" required autocomplete="off">
+      <datalist id="dl-contratante"></datalist>
+
+      <label for="campo-obra">Obra</label>
+      <input type="text" id="campo-obra" list="dl-obra" placeholder="Selecione da lista ou digite" required autocomplete="off">
+      <datalist id="dl-obra"></datalist>
+
+      <label for="campo-servico">Serviço</label>
+      <input type="text" id="campo-servico" list="dl-servico" placeholder="Selecione da lista ou digite (opcional)" autocomplete="off">
+      <datalist id="dl-servico"></datalist>
+
+      <label for="campo-objeto">Objeto do Contrato</label>
+      <input type="text" id="campo-objeto" placeholder="Preenchido automático, pode editar">
+
+      <label for="campo-trecho">Trecho / Local</label>
+      <input type="text" id="campo-trecho" placeholder="Preenchido automático, pode editar">
+
+      <div class="linha-2col">
+        <div>
+          <label for="campo-data">Data</label>
+          <input type="date" id="campo-data" required>
+        </div>
+        <div>
+          <label>RDO nº <span id="preview-numero" class="badge">-</span></label>
+        </div>
       </div>
     </div>
-  </section>
+  </details>
 
-  <section class="cartao">
-    <h2>Condições do Tempo</h2>
-    <table class="tabela-tempo">
-      <thead>
-        <tr><th></th><th>Manhã</th><th>Tarde</th><th>Noite</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th>Bom</th>
-          <td><button type="button" class="balao" data-tempo="bom" data-periodo="manha">X</button></td>
-          <td><button type="button" class="balao" data-tempo="bom" data-periodo="tarde">X</button></td>
-          <td><button type="button" class="balao" data-tempo="bom" data-periodo="noite">X</button></td>
-        </tr>
-        <tr>
-          <th>Chuva</th>
-          <td><button type="button" class="balao" data-tempo="chuva" data-periodo="manha">X</button></td>
-          <td><button type="button" class="balao" data-tempo="chuva" data-periodo="tarde">X</button></td>
-          <td><button type="button" class="balao" data-tempo="chuva" data-periodo="noite">X</button></td>
-        </tr>
-        <tr>
-          <th>mm</th>
-          <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="manha"></td>
-          <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="tarde"></td>
-          <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="noite"></td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section class="cartao">
-    <h2>Observações</h2>
-    <textarea id="campo-observacoes" rows="2" maxlength="500" placeholder="Observações do dia"></textarea>
-  </section>
-
-  <section class="cartao">
-    <h2>Efetivo (MOD)</h2>
-    <p class="orcamento-info">Espaço usado: <span id="orcamento-efetivo">0 / 12</span> linhas</p>
-    <div id="lista-efetivo" class="lista-quant"></div>
-    <datalist id="dl-mod"></datalist>
-    <button type="button" id="btn-add-efetivo" class="botao-secundario">+ Adicionar M.O.D.</button>
-  </section>
-
-  <section class="cartao">
-    <h2>Equipamentos e Veículos</h2>
-    <p class="orcamento-info">Espaço usado: <span id="orcamento-equipamentos">0 / 24</span> linhas</p>
-    <div id="lista-equipamentos" class="lista-quant"></div>
-    <datalist id="dl-equipamentos"></datalist>
-    <button type="button" id="btn-add-equipamentos" class="botao-secundario">+ Adicionar equipamento/veículo</button>
-  </section>
-
-  <section class="cartao">
-    <h2>Atividades - Contratada</h2>
-    <p class="orcamento-info">Espaço usado: <span id="orcamento-contratada">0 / 23</span> linhas</p>
-    <div id="lista-atividades-contratada" class="lista-atividades"></div>
-    <button type="button" id="btn-add-contratada" class="botao-secundario">+ Adicionar atividade</button>
-  </section>
-
-  <section class="cartao">
-    <h2>Atividades - Contratante</h2>
-    <p class="orcamento-info">Espaço usado: <span id="orcamento-contratante">0 / 10</span> linhas</p>
-    <div id="lista-atividades-contratante" class="lista-atividades"></div>
-    <button type="button" id="btn-add-contratante" class="botao-secundario">+ Adicionar atividade</button>
-  </section>
-
-  <section class="cartao">
-    <h2>Assinatura da Contratada</h2>
-    <p id="assinatura-contratada-info"></p>
-    <button type="button" id="btn-atualizar-assinatura-contratada" class="botao-secundario">Atualizar minha assinatura</button>
-
-    <div id="bloco-redesenhar-assinatura-contratada" style="display:none;">
-      <label>Assine abaixo com o dedo</label>
-      <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
-      <div class="linha-botoes-assinatura">
-        <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
-        <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">Destravar para assinar</button>
+  <details class="secao-formulario">
+    <summary>
+      <svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <span class="numero-secao">2</span>
+      Condições do Dia
+      <svg class="seta-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    <div class="conteudo-secao">
+      <div class="subsecao">
+        <h3>Condições do Tempo</h3>
+        <table class="tabela-tempo">
+          <thead>
+            <tr><th></th><th>Manhã</th><th>Tarde</th><th>Noite</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>Bom</th>
+              <td><button type="button" class="balao" data-tempo="bom" data-periodo="manha">X</button></td>
+              <td><button type="button" class="balao" data-tempo="bom" data-periodo="tarde">X</button></td>
+              <td><button type="button" class="balao" data-tempo="bom" data-periodo="noite">X</button></td>
+            </tr>
+            <tr>
+              <th>Chuva</th>
+              <td><button type="button" class="balao" data-tempo="chuva" data-periodo="manha">X</button></td>
+              <td><button type="button" class="balao" data-tempo="chuva" data-periodo="tarde">X</button></td>
+              <td><button type="button" class="balao" data-tempo="chuva" data-periodo="noite">X</button></td>
+            </tr>
+            <tr>
+              <th>mm</th>
+              <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="manha"></td>
+              <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="tarde"></td>
+              <td><input type="number" inputmode="numeric" min="0" step="0.1" class="mm-chuva" data-periodo="noite"></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <button type="button" id="btn-salvar-nova-assinatura-contratada" class="botao-principal">Salvar nova assinatura</button>
-      <div id="status-nova-assinatura-contratada" class="status" aria-live="polite"></div>
-    </div>
-  </section>
 
-  <section class="cartao">
-    <h2>Assinatura do Contratante</h2>
-    <p class="orcamento-info">Se o representante do Contratante estiver na obra agora, ele assina aqui embaixo. Se não estiver, marque "Contratante irá verificar o RDO em seu E-mail" no cartão abaixo, ao lado do botão de pré-visualizar - um dos dois é obrigatório.</p>
-    <label for="campo-nome-assinante">Nome de quem está assinando</label>
-    <input type="text" id="campo-nome-assinante" placeholder="Nome completo">
-    <label>Assine abaixo com o dedo</label>
-    <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
-    <div class="linha-botoes-assinatura">
-      <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
-      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">Destravar para assinar</button>
+      <div class="subsecao">
+        <h3>Observações</h3>
+        <textarea id="campo-observacoes" rows="2" maxlength="500" placeholder="Observações do dia"></textarea>
+      </div>
     </div>
-    <label class="linha-checkbox">
-      <input type="checkbox" id="campo-concordo">
-      Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
-    </label>
-  </section>
+  </details>
 
-  <section class="cartao">
-    <label for="campo-email-contratante">E-mail do responsável da Contratante</label>
-    <input type="email" id="campo-email-contratante" placeholder="email@exemplo.com" inputmode="email" autocomplete="off">
-    <p class="orcamento-info">Usado como cópia (CC) se o Contratante assinar na hora, ou como destino do link de aprovação se marcar a caixa abaixo.</p>
-    <label class="linha-checkbox">
-      <input type="checkbox" id="campo-aprovacao-contratante">
-      Contratante irá verificar o RDO em seu E-mail
-    </label>
-    <p class="orcamento-info" id="aviso-aprovacao-contratante" style="display:none;">
-      O Contratante vai receber um e-mail com o PDF e um link pra escrever as
-      atividades da Contratante e assinar. O RDO final só é enviado (pra você
-      e pro Contratante) depois que ele concluir por lá.
-    </p>
-    <button type="button" id="btn-gerar" class="botao-principal">Pré-visualizar RDO</button>
-    <div id="status-envio" class="status" aria-live="polite"></div>
-  </section>
+  <details class="secao-formulario">
+    <summary>
+      <svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M2 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/><circle cx="17" cy="9" r="2.3"/><path d="M22 21v-.8a4 4 0 0 0-3-3.87"/></svg>
+      <span class="numero-secao">3</span>
+      Efetivo e Equipamentos
+      <svg class="seta-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    <div class="conteudo-secao">
+      <div class="subsecao">
+        <h3>Efetivo (MOD)</h3>
+        <p class="orcamento-info">Espaço usado: <span id="orcamento-efetivo">0 / 12</span> linhas</p>
+        <div id="lista-efetivo" class="lista-quant"></div>
+        <datalist id="dl-mod"></datalist>
+        <button type="button" id="btn-add-efetivo" class="botao-secundario">+ Adicionar M.O.D.</button>
+      </div>
+
+      <div class="subsecao">
+        <h3>Equipamentos e Veículos</h3>
+        <p class="orcamento-info">Espaço usado: <span id="orcamento-equipamentos">0 / 24</span> linhas</p>
+        <div id="lista-equipamentos" class="lista-quant"></div>
+        <datalist id="dl-equipamentos"></datalist>
+        <button type="button" id="btn-add-equipamentos" class="botao-secundario">+ Adicionar equipamento/veículo</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="secao-formulario">
+    <summary>
+      <svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 13l2 2 4-4"/></svg>
+      <span class="numero-secao">4</span>
+      Atividades
+      <svg class="seta-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    <div class="conteudo-secao">
+      <div class="subsecao">
+        <h3>Atividades - Contratada</h3>
+        <p class="orcamento-info">Espaço usado: <span id="orcamento-contratada">0 / 23</span> linhas</p>
+        <div id="lista-atividades-contratada" class="lista-atividades"></div>
+        <button type="button" id="btn-add-contratada" class="botao-secundario">+ Adicionar atividade</button>
+      </div>
+
+      <div class="subsecao">
+        <h3>Atividades - Contratante</h3>
+        <p class="orcamento-info">Espaço usado: <span id="orcamento-contratante">0 / 10</span> linhas</p>
+        <div id="lista-atividades-contratante" class="lista-atividades"></div>
+        <button type="button" id="btn-add-contratante" class="botao-secundario">+ Adicionar atividade</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="secao-formulario">
+    <summary>
+      <svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"/><path d="M14.5 5.9l3.6 3.6 2-2a1.5 1.5 0 0 0 0-2.12l-1.48-1.48a1.5 1.5 0 0 0-2.12 0l-2 2z"/></svg>
+      <span class="numero-secao">5</span>
+      Assinaturas e Envio
+      <svg class="seta-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    <div class="conteudo-secao">
+      <div class="subsecao">
+        <h3>Assinatura da Contratada</h3>
+        <p id="assinatura-contratada-info"></p>
+        <button type="button" id="btn-atualizar-assinatura-contratada" class="botao-secundario">Atualizar minha assinatura</button>
+
+        <div id="bloco-redesenhar-assinatura-contratada" style="display:none;">
+          <label>Assine abaixo com o dedo</label>
+          <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
+          <div class="linha-botoes-assinatura">
+            <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
+            <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">Destravar para assinar</button>
+          </div>
+          <button type="button" id="btn-salvar-nova-assinatura-contratada" class="botao-principal">Salvar nova assinatura</button>
+          <div id="status-nova-assinatura-contratada" class="status" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="subsecao">
+        <h3>Assinatura do Contratante</h3>
+        <p class="orcamento-info">Se o representante do Contratante estiver na obra agora, ele assina aqui embaixo. Se não estiver, marque "Contratante irá verificar o RDO em seu E-mail" logo abaixo, ao lado do botão de pré-visualizar - um dos dois é obrigatório.</p>
+        <label for="campo-nome-assinante">Nome de quem está assinando</label>
+        <input type="text" id="campo-nome-assinante" placeholder="Nome completo">
+        <label>Assine abaixo com o dedo</label>
+        <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
+        <div class="linha-botoes-assinatura">
+          <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
+          <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">Destravar para assinar</button>
+        </div>
+        <label class="linha-checkbox">
+          <input type="checkbox" id="campo-concordo">
+          Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
+        </label>
+      </div>
+
+      <div class="subsecao">
+        <h3>E-mail e Envio</h3>
+        <label for="campo-email-contratante">E-mail do responsável da Contratante</label>
+        <input type="email" id="campo-email-contratante" placeholder="email@exemplo.com" inputmode="email" autocomplete="off">
+        <p class="orcamento-info">Usado como cópia (CC) se o Contratante assinar na hora, ou como destino do link de aprovação se marcar a caixa abaixo.</p>
+        <label class="linha-checkbox">
+          <input type="checkbox" id="campo-aprovacao-contratante">
+          Contratante irá verificar o RDO em seu E-mail
+        </label>
+        <p class="orcamento-info" id="aviso-aprovacao-contratante" style="display:none;">
+          O Contratante vai receber um e-mail com o PDF e um link pra escrever as
+          atividades da Contratante e assinar. O RDO final só é enviado (pra você
+          e pro Contratante) depois que ele concluir por lá.
+        </p>
+        <button type="button" id="btn-gerar" class="botao-principal">Pré-visualizar RDO</button>
+        <div id="status-envio" class="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </details>
 
   <section class="cartao" id="cartao-preview" style="display:none;">
     <h2>Pré-visualização</h2>

@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.8.1';
+const VERSAO_APP = 'BETA 0.9.0';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -692,7 +692,10 @@ function carregarEstadoEmAndamento_() {
 }
 
 ['input', 'change', 'click'].forEach(evento => {
-  el.formRdo.addEventListener(evento, () => agendarSalvarEstadoEmAndamento_());
+  el.formRdo.addEventListener(evento, (e) => {
+    if (e.target.closest('summary')) return; // abrir/fechar seção não edita nada
+    agendarSalvarEstadoEmAndamento_();
+  });
 });
 
 // Repopula a tela inteira a partir de um RDO em andamento salvo (app foi
@@ -1368,7 +1371,7 @@ function renderizarListaObrasPerfil_() {
     const botao = document.createElement('button');
     botao.type = 'button';
     botao.className = 'linha-obra-perfil';
-    botao.innerHTML = `<span class="nome-obra-perfil">${chave}</span><span class="contagem-obra-perfil">${partes.join(' · ')}</span>`;
+    botao.innerHTML = `<svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v15"/><path d="M14 21V10a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11"/><path d="M2 21h20M7 8h.01M7 12h.01M7 16h.01M17 13h.01M17 17h.01"/></svg><span class="texto-linha-obra"><span class="nome-obra-perfil">${chave}</span><span class="contagem-obra-perfil">${partes.join(' · ')}</span></span>`;
     botao.addEventListener('click', () => abrirDetalheObraPerfil_(chave));
     el.perfilObras.appendChild(botao);
   });
@@ -1394,9 +1397,9 @@ function abrirDetalheObraPerfil_(chave) {
 
 function montarLinhaAprovado_(item) {
   const linha = document.createElement('div');
-  linha.className = 'linha-rdo-perfil';
+  linha.className = 'linha-rdo-perfil aprovado';
   linha.innerHTML = `
-    <div class="info-rdo-perfil">RDO nº ${item.numero} - ${item.data || ''}</div>
+    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg><span>RDO nº ${item.numero} - ${item.data || ''}</span></div>
     <div class="botoes-rdo-perfil">
       <button type="button" class="botao-mini btn-ver-perfil">Visualizar PDF</button>
       <button type="button" class="botao-mini btn-compartilhar-perfil">Compartilhar</button>
@@ -1451,9 +1454,9 @@ function montarLinhaAprovado_(item) {
 
 function montarLinhaPendente_(item) {
   const linha = document.createElement('div');
-  linha.className = 'linha-rdo-perfil';
+  linha.className = 'linha-rdo-perfil pendente';
   linha.innerHTML = `
-    <div class="info-rdo-perfil">RDO nº ${item.numero} - ${item.data || ''} - aguardando aprovação de <strong class="email-pendente-perfil">${item.emailResponsavel}</strong></div>
+    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg><span>RDO nº ${item.numero} - ${item.data || ''} - aguardando aprovação de <strong class="email-pendente-perfil">${item.emailResponsavel}</strong></span></div>
     <div class="botoes-rdo-perfil">
       <button type="button" class="botao-mini btn-reenviar-perfil">Reenviar link por e-mail</button>
     </div>
@@ -1955,12 +1958,13 @@ el.btnGerar.addEventListener('click', async () => {
 
 // Escuta qualquer edição no formulário (delegado, um listener só) pra
 // agendar a atualização automática - ignora interações DENTRO do próprio
-// card de prévia (zoom, confirmar, cancelar já têm handler próprio) e o
+// card de prévia (zoom, confirmar, cancelar já têm handler próprio), o
 // clique no botão "Pré-visualizar" (que já atualiza na hora, não precisa
-// agendar de novo por cima).
+// agendar de novo por cima), e abrir/fechar uma seção retrátil
+// (`<summary>`, reforma visual 12/07) - isso não edita dado nenhum.
 ['input', 'change', 'click'].forEach(evento => {
   el.formRdo.addEventListener(evento, (e) => {
-    if (e.target.closest('#cartao-preview') || e.target.id === 'btn-gerar') return;
+    if (e.target.closest('#cartao-preview') || e.target.id === 'btn-gerar' || e.target.closest('summary')) return;
     agendarAtualizacaoPreview_();
   });
 });

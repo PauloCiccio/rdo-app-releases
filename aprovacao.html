@@ -32,7 +32,7 @@
   </section>
 
   <section class="cartao" id="cartao-identificacao" style="display:none;">
-    <h2>Identifique-se</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Identifique-se</h2>
     <p class="orcamento-info">Informe seu CPF e nome completo. Se for a primeira vez, vamos pedir mais alguns dados.</p>
     <label for="campo-cpf">CPF</label>
     <input type="text" id="campo-cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" autocomplete="off">
@@ -43,7 +43,7 @@
   </section>
 
   <section class="cartao" id="cartao-cadastro" style="display:none;">
-    <h2>Complete seu cadastro</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Complete seu cadastro</h2>
     <p class="orcamento-info">Primeira vez que você aprova um RDO da FN - esses dados ficam salvos, não precisa preencher de novo nas próximas obras.</p>
     <label for="campo-funcao">Função</label>
     <input type="text" id="campo-funcao" placeholder="Ex: Fiscal de obra, Engenheiro responsável" autocomplete="off">
@@ -54,7 +54,7 @@
   </section>
 
   <section class="cartao" id="cartao-confirmar-dados" style="display:none;">
-    <h2>Confirme seus dados</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Confirme seus dados</h2>
     <p class="orcamento-info">Esses são os dados que já temos salvos. Se você mudou de função ou de empresa, toque em "Editar".</p>
     <div id="confirmar-dados-texto">
       <p><strong>Função:</strong> <span id="confirmar-funcao-texto"></span></p>
@@ -73,7 +73,7 @@
   </section>
 
   <section class="cartao" id="cartao-info" style="display:none;">
-    <h2>Identificação</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-7.58 7-12A7 7 0 0 0 5 10c0 4.42 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>Identificação</h2>
     <p><strong>RDO nº:</strong> <span id="info-numero"></span></p>
     <p><strong>Obra:</strong> <span id="info-obra"></span></p>
     <p><strong>Contratante:</strong> <span id="info-cliente"></span></p>
@@ -90,14 +90,14 @@
   </section>
 
   <section class="cartao" id="cartao-form" style="display:none;">
-    <h2>Atividades - Contratante</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 13l2 2 4-4"/></svg>Atividades - Contratante</h2>
     <div id="lista-atividades-contratante" class="lista-atividades"></div>
     <button type="button" id="btn-add-contratante" class="botao-secundario">+ Adicionar atividade</button>
     <p class="orcamento-info" id="orcamento-contratante">0 / 10</p>
   </section>
 
   <section class="cartao" id="cartao-assinatura" style="display:none;">
-    <h2>Assinatura</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"/><path d="M14.5 5.9l3.6 3.6 2-2a1.5 1.5 0 0 0 0-2.12l-1.48-1.48a1.5 1.5 0 0 0-2.12 0l-2 2z"/></svg>Assinatura</h2>
     <p class="orcamento-info">Assinando como: <strong id="assinatura-nome-exibicao"></strong></p>
     <label>Assine abaixo com o dedo</label>
     <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
@@ -117,7 +117,7 @@
   </section>
 
   <section class="cartao" id="cartao-preview-final" style="display:none;">
-    <h2>Pré-visualização</h2>
+    <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg>Pré-visualização</h2>
     <p>Confira o RDO abaixo (vem com marca d'água "PRÉ-VISUALIZAÇÃO", só o envio final sai sem ela). Editar qualquer coisa depois atualiza a prévia sozinho.</p>
     <div id="wrap-visualizador-final" class="wrap-visualizador-pdf" style="display:none;">
       <div class="botoes-zoom-pdf">

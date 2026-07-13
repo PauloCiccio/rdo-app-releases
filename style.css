@@ -1,11 +1,41 @@
+/* ---------------------------------------------------------------------------
+   Sistema de cores (12/07, reforma visual) - baseado na marca de verdade da
+   FN Engenharia: vinho/marsala (`--vinho`, tirado da barra de contato do
+   site oficial e do tom da bola da logo) como cor PRINCIPAL, dourado/âmbar
+   (`--dourado`, tirado da barra de menu do site) só como DESTAQUE PONTUAL
+   (badge, estado ativo/selecionado, ícone) - nunca como fundo grande de
+   tela, pra manter sóbrio (pedido do Paulo).
+   --------------------------------------------------------------------------- */
 :root {
-  --azul: #1f4e79;
-  --azul-claro: #e8f0f7;
-  --cinza: #555;
-  --borda: #d0d5dc;
-  --vermelho: #c0392b;
-  --verde: #2e7d32;
-  --fundo: #f4f6f8;
+  --vinho: #6B322F;
+  --vinho-escuro: #4A2321;
+  --vinho-claro: #F3E9E8;
+  --dourado: #F7B206;
+  --dourado-claro: #FDF3D9;
+  --dourado-escuro: #8A6205;
+
+  --texto: #232323;
+  --texto-suave: #6b6260;
+  --borda: #E4DBDA;
+  --fundo: #F7F5F4;
+  --branco: #FFFFFF;
+
+  --sucesso: #2e7d32;
+  --sucesso-claro: #e8f5e9;
+  --erro: #c0392b;
+  --erro-claro: #fbeae8;
+  --alerta: #B26A00;
+  --alerta-claro: #FCEFD9;
+
+  --desabilitado-bg: #ECE7E6;
+  --desabilitado-texto: #A69D9B;
+
+  --raio-sm: 6px;
+  --raio-md: 8px;
+  --raio-lg: 12px;
+
+  --sombra-cartao: 0 1px 3px rgba(35,20,18,.09), 0 1px 2px rgba(35,20,18,.05);
+  --sombra-flutuante: 0 8px 30px rgba(35,20,18,.28);
 }
 
 * { box-sizing: border-box; }
@@ -14,7 +44,7 @@ body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--fundo);
-  color: #222;
+  color: var(--texto);
   padding-bottom: 40px;
 }
 
@@ -22,7 +52,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--azul);
+  background: var(--vinho);
   color: #fff;
   padding: 14px 16px;
 }
@@ -42,6 +72,21 @@ body {
   opacity: .8;
   white-space: nowrap;
 }
+
+/* Botões de texto (topo/atualização, limpar cache, corrigir e-mail) -
+   mesma classe visual pras 3 variações que existiam antes com CSS
+   duplicado; cada uma só ajusta cor/alinhamento quando precisa. */
+.botao-texto {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.botao-texto:disabled { opacity: .5; cursor: not-allowed; text-decoration: none; }
+
 .link-atualizacao {
   background: none;
   border: none;
@@ -69,16 +114,26 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 .cartao {
   background: #fff;
   border: 1px solid var(--borda);
-  border-radius: 10px;
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
   padding: 14px;
   margin-bottom: 14px;
 }
 .cartao h2 {
   font-size: 15px;
   margin: 0 0 10px;
-  color: var(--azul);
+  color: var(--vinho);
   border-bottom: 1px solid var(--borda);
   padding-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cartao h2 .icone-secao {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--vinho);
 }
 .cabecalho-secao {
   display: flex;
@@ -93,7 +148,7 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
   background: none;
   border: none;
   padding: 0 0 6px;
-  color: var(--cinza);
+  color: var(--texto-suave);
   font-size: 11px;
   text-decoration: underline;
   cursor: pointer;
@@ -104,7 +159,7 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 label {
   display: block;
   font-size: 12px;
-  color: var(--cinza);
+  color: var(--texto-suave);
   margin: 10px 0 4px;
 }
 select, input[type="text"], input[type="date"], input[type="time"], input[type="number"], input[type="password"], input[type="email"], textarea {
@@ -112,12 +167,12 @@ select, input[type="text"], input[type="date"], input[type="time"], input[type="
   min-width: 0;
   padding: 9px 10px;
   border: 1px solid var(--borda);
-  border-radius: 6px;
+  border-radius: var(--raio-sm);
   font-size: 15px;
   background: #fff;
-  color: #222;
+  color: var(--texto);
 }
-select:disabled { background: #eee; color: #999; }
+select:disabled { background: var(--desabilitado-bg); color: var(--desabilitado-texto); }
 textarea { resize: vertical; overflow: hidden; }
 
 .linha-2col { display: flex; gap: 12px; }
@@ -125,17 +180,17 @@ textarea { resize: vertical; overflow: hidden; }
 
 .badge {
   display: inline-block;
-  background: var(--azul-claro);
-  color: var(--azul);
+  background: var(--dourado);
+  color: var(--vinho-escuro);
   font-weight: bold;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--raio-sm);
   font-size: 14px;
 }
 
 .tabela-tempo { width: 100%; border-collapse: collapse; text-align: center; }
 .tabela-tempo th, .tabela-tempo td { padding: 6px; }
-.tabela-tempo thead th { font-size: 12px; color: var(--cinza); font-weight: normal; }
+.tabela-tempo thead th { font-size: 12px; color: var(--texto-suave); font-weight: normal; }
 .tabela-tempo tbody th { text-align: left; font-size: 13px; }
 .tabela-tempo .mm-chuva { text-align: center; padding: 6px; }
 
@@ -151,9 +206,9 @@ textarea { resize: vertical; overflow: hidden; }
   cursor: pointer;
 }
 .balao.marcado {
-  color: #fff;
-  border-color: var(--azul);
-  background: var(--azul);
+  color: var(--vinho-escuro);
+  border-color: var(--dourado);
+  background: var(--dourado);
 }
 
 .linha-quant {
@@ -168,7 +223,7 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-quant .btn-remover-quant {
   background: none;
   border: none;
-  color: var(--vermelho);
+  color: var(--erro);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -178,9 +233,10 @@ textarea { resize: vertical; overflow: hidden; }
 
 .linha-atividade {
   border: 1px solid var(--borda);
-  border-radius: 8px;
+  border-radius: var(--raio-md);
   padding: 10px;
   margin-bottom: 10px;
+  background: #fff;
 }
 .linha-atividade .cabecalho-atividade {
   display: flex;
@@ -189,7 +245,7 @@ textarea { resize: vertical; overflow: hidden; }
   margin-bottom: 8px;
 }
 .linha-atividade .numero-item {
-  background: var(--azul);
+  background: var(--vinho);
   color: #fff;
   border-radius: 50%;
   width: 24px;
@@ -200,7 +256,7 @@ textarea { resize: vertical; overflow: hidden; }
   font-size: 12px;
   flex-shrink: 0;
 }
-.linha-atividade .rotulo-atividade { font-size: 13px; color: var(--cinza); }
+.linha-atividade .rotulo-atividade { font-size: 13px; color: var(--texto-suave); }
 .linha-atividade .linha-horarios {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -221,7 +277,7 @@ textarea { resize: vertical; overflow: hidden; }
   height: 160px;
   background: #fff;
   border: 1px dashed var(--borda);
-  border-radius: 8px;
+  border-radius: var(--raio-md);
   touch-action: none;
   margin-top: 4px;
 }
@@ -258,16 +314,16 @@ textarea { resize: vertical; overflow: hidden; }
   gap: 8px;
   margin-top: 12px;
   font-size: 13px;
-  color: #222;
+  color: var(--texto);
 }
 .linha-checkbox input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
 
 .orcamento-info {
   font-size: 12px;
-  color: var(--cinza);
+  color: var(--texto-suave);
   margin: -4px 0 10px;
 }
-.orcamento-info.cheio { color: var(--vermelho); font-weight: bold; }
+.orcamento-info.cheio { color: var(--erro); font-weight: bold; }
 
 .linha-botoes-assinatura {
   display: flex;
@@ -275,18 +331,18 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .linha-botoes-assinatura .botao-secundario { margin-top: 0; }
 .btn-travar.travado {
-  background: var(--vermelho);
+  background: var(--erro);
   color: #fff;
-  border-color: var(--vermelho);
+  border-color: var(--erro);
 }
 
 .botao-secundario {
   width: 100%;
   padding: 10px;
-  background: var(--azul-claro);
-  color: var(--azul);
-  border: 1px dashed var(--azul);
-  border-radius: 8px;
+  background: var(--vinho-claro);
+  color: var(--vinho);
+  border: 1px dashed var(--vinho);
+  border-radius: var(--raio-md);
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
@@ -297,7 +353,7 @@ textarea { resize: vertical; overflow: hidden; }
   margin-left: auto;
   background: none;
   border: none;
-  color: var(--vermelho);
+  color: var(--erro);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -305,12 +361,12 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .linha-atividade .linhas-estimadas {
   font-size: 11px;
-  color: var(--cinza);
+  color: var(--texto-suave);
   text-align: right;
   margin-top: 2px;
 }
 .linha-atividade .linhas-estimadas.estimativa-bloqueada {
-  color: var(--vermelho);
+  color: var(--erro);
   font-weight: bold;
   text-align: left;
 }
@@ -318,24 +374,26 @@ textarea { resize: vertical; overflow: hidden; }
 .botao-principal {
   width: 100%;
   padding: 14px;
-  background: var(--azul);
+  background: var(--vinho);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--raio-md);
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
 }
-.botao-principal:disabled { background: #9db3c6; cursor: not-allowed; }
+.botao-principal:disabled { background: var(--desabilitado-bg); color: var(--desabilitado-texto); cursor: not-allowed; }
+.botao-principal:not(:disabled):active { background: var(--vinho-escuro); }
 
 .status { margin-top: 10px; font-size: 14px; white-space: pre-line; }
-.status.erro { color: var(--vermelho); }
+.status.erro { color: var(--erro); }
+.status.sucesso { color: var(--sucesso); }
 
 .banner-offline {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #7a4a00;
+  background: var(--alerta);
   color: #fff;
   padding: 8px 14px;
   font-size: 13px;
@@ -347,7 +405,7 @@ textarea { resize: vertical; overflow: hidden; }
   margin-left: 8px;
   padding: 2px 9px;
   border-radius: 10px;
-  background: #7a4a00;
+  background: var(--alerta);
   color: #fff;
   font-size: 12px;
 }
@@ -356,7 +414,7 @@ textarea { resize: vertical; overflow: hidden; }
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, .55);
+  background: rgba(35, 20, 18, .55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -364,19 +422,94 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .modal-confirmacao-caixa {
   background: #fff;
-  border-radius: 10px;
+  border-radius: var(--raio-lg);
   padding: 20px;
   max-width: 420px;
   width: 100%;
-  box-shadow: 0 8px 30px rgba(0,0,0,.3);
+  box-shadow: var(--sombra-flutuante);
 }
-.modal-confirmacao-caixa h2 { margin-top: 0; }
-.status.sucesso { color: var(--verde); }
+.modal-confirmacao-caixa h2 { margin-top: 0; color: var(--vinho); }
 
-/* Tela de Perfil (11/07 tarde) - RDOs agrupados por obra, ver telaPerfil_ em app.js */
+/* ---------------------------------------------------------------------------
+   Seções retráteis do formulário principal (12/07, reforma visual) -
+   `<details>/<summary>` nativos do HTML: abrir/fechar de graça, sem JS
+   novo, acessível por padrão. Substituem a rolagem única de 10+ cartões
+   empilhados por ~5 blocos por etapa (ver index.html). O `<details>` em si
+   NÃO tem a aparência de `.cartao` (sem sombra própria) - quem cria a
+   "caixa" visual é o `<summary>` (sempre visível, cabeçalho clicável) +
+   o conteúdo interno, que continua sendo os mesmos `.cartao` de sempre.
+   --------------------------------------------------------------------------- */
+.secao-formulario {
+  background: #fff;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.secao-formulario > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: bold;
+  color: var(--vinho);
+  font-size: 15px;
+  user-select: none;
+}
+.secao-formulario > summary::-webkit-details-marker { display: none; }
+.secao-formulario > summary .icone-secao {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--vinho);
+}
+.secao-formulario > summary .numero-secao {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--vinho-claro);
+  color: var(--vinho);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.secao-formulario > summary .seta-secao {
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--texto-suave);
+  transition: transform .15s ease;
+}
+.secao-formulario[open] > summary .seta-secao { transform: rotate(180deg); }
+.secao-formulario[open] > summary {
+  border-bottom: 1px solid var(--borda);
+}
+.secao-formulario .conteudo-secao {
+  padding: 14px;
+}
+.secao-formulario .conteudo-secao > .subsecao + .subsecao {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--borda);
+}
+.subsecao > h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--texto-suave);
+  margin: 0 0 10px;
+}
+
+/* Tela de Perfil - RDOs agrupados por obra, ver telaPerfil_ em app.js */
 .subtitulo-perfil {
   font-size: 13px;
-  color: var(--cinza);
+  color: var(--texto-suave);
   margin: 14px 0 6px;
   text-transform: uppercase;
   letter-spacing: .03em;
@@ -384,54 +517,84 @@ textarea { resize: vertical; overflow: hidden; }
 .grupo-obra-perfil {
   font-size: 14px;
   font-weight: bold;
-  color: var(--azul);
+  color: var(--vinho);
   margin: 10px 0 6px;
   border-bottom: 1px solid var(--borda);
   padding-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.grupo-obra-perfil .icone-linha { width: 16px; height: 16px; flex-shrink: 0; color: var(--vinho); }
 .linha-obra-perfil {
   width: 100%;
   text-align: left;
   border: 1px solid var(--borda);
-  border-radius: 8px;
+  border-radius: var(--raio-md);
+  box-shadow: var(--sombra-cartao);
   padding: 10px 12px;
   margin-bottom: 8px;
   background: #fff;
   cursor: pointer;
   font-size: 14px;
-  color: #222;
+  color: var(--texto);
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.linha-obra-perfil .nome-obra-perfil { font-weight: bold; color: var(--azul); display: block; }
-.linha-obra-perfil .contagem-obra-perfil { font-size: 12px; color: var(--cinza); }
+.linha-obra-perfil .icone-linha {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--vinho);
+  background: var(--vinho-claro);
+  border-radius: 50%;
+  padding: 5px;
+}
+.linha-obra-perfil .texto-linha-obra { flex: 1; min-width: 0; }
+.linha-obra-perfil .nome-obra-perfil { font-weight: bold; color: var(--vinho); display: block; }
+.linha-obra-perfil .contagem-obra-perfil { font-size: 12px; color: var(--texto-suave); }
 .linha-rdo-perfil {
   border: 1px solid var(--borda);
-  border-radius: 8px;
+  border-radius: var(--raio-md);
+  box-shadow: var(--sombra-cartao);
   padding: 8px 10px;
   margin-bottom: 8px;
   font-size: 13px;
+  background: #fff;
 }
-.linha-rdo-perfil .info-rdo-perfil { margin-bottom: 6px; }
+.linha-rdo-perfil .info-rdo-perfil {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.linha-rdo-perfil .icone-linha { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+.linha-rdo-perfil.pendente .icone-linha { color: var(--alerta); }
+.linha-rdo-perfil.aprovado .icone-linha { color: var(--sucesso); }
 .linha-rdo-perfil .botoes-rdo-perfil {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
+.botao-icone,
 .botao-mini {
   padding: 6px 10px;
   font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--azul);
-  background: var(--azul-claro);
-  color: var(--azul);
+  border-radius: var(--raio-sm);
+  border: 1px solid var(--vinho);
+  background: var(--vinho-claro);
+  color: var(--vinho);
   font-weight: bold;
   cursor: pointer;
   margin: 0;
 }
+.botao-icone:disabled,
 .botao-mini:disabled { opacity: .5; cursor: not-allowed; }
 .link-corrigir-email {
   background: none;
   border: none;
-  color: var(--cinza);
+  color: var(--texto-suave);
   font-size: 11px;
   text-decoration: underline;
   cursor: pointer;
@@ -456,7 +619,7 @@ textarea { resize: vertical; overflow: hidden; }
   overflow: auto;
   max-height: 75vh;
   border: 1px solid var(--borda);
-  border-radius: 8px;
+  border-radius: var(--raio-md);
   position: relative;
 }
 .botoes-zoom-pdf {
