@@ -10,20 +10,10 @@
 <body>
 
 <header class="topo">
-  <button type="button" id="btn-abrir-perfil" class="botao-logo" title="Meu perfil">
-    <img src="assets/logo_fn_bola.png" alt="Meu perfil" class="logo">
-  </button>
+  <img src="assets/logo_fn_bola.png" alt="FN Engenharia" class="logo">
   <div>
     <h1>Relatório Diário de Obra</h1>
     <p class="subtitulo">FN Engenharia</p>
-  </div>
-  <div class="versao-bloco">
-    <span id="versao-app" class="versao-app"></span>
-    <button type="button" id="btn-verificar-atualizacao" class="link-atualizacao">Verificar atualizações</button>
-    <span id="status-atualizacao" class="status-atualizacao"></span>
-    <span id="usuario-logado" class="status-atualizacao" style="display:none;"></span>
-    <span id="badge-pendentes-offline" class="badge-pendentes-offline" style="display:none;"></span>
-    <button type="button" id="btn-sair" class="link-atualizacao" style="display:none;">Sair</button>
   </div>
 </header>
 
@@ -32,11 +22,28 @@
 </div>
 
 <section class="cartao" id="cartao-perfil" style="display:none;">
-  <div class="cabecalho-secao">
-    <h2>Meu Perfil</h2>
-    <button type="button" id="btn-fechar-perfil" class="link-limpar-cache">Fechar</button>
+  <div class="perfil-cabecalho">
+    <div class="perfil-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+    </div>
+    <p class="perfil-nome" id="perfil-nome-usuario"></p>
   </div>
-  <p class="orcamento-info" id="perfil-nome-usuario"></p>
+
+  <div class="perfil-resumo" id="perfil-resumo" style="display:none;">
+    <div class="resumo-item">
+      <span class="resumo-numero" id="resumo-total">0</span>
+      <span class="resumo-rotulo">RDOs enviados</span>
+    </div>
+    <div class="resumo-item alerta">
+      <span class="resumo-numero" id="resumo-pendentes">0</span>
+      <span class="resumo-rotulo">Aguardando aprovação</span>
+    </div>
+    <div class="resumo-item sucesso">
+      <span class="resumo-numero" id="resumo-aprovados">0</span>
+      <span class="resumo-rotulo">Aprovados</span>
+    </div>
+  </div>
+
   <div id="perfil-carregando" class="status">Carregando seus RDOs...</div>
   <div id="perfil-erro" class="status erro" style="display:none;"></div>
 
@@ -59,7 +66,26 @@
     <div id="perfil-aprovados"></div>
     <p class="orcamento-info" id="perfil-sem-aprovados" style="display:none;">Nenhum RDO aprovado ainda nesta obra.</p>
   </div>
+
+  <div class="perfil-rodape">
+    <span id="versao-app" class="versao-app-perfil"></span>
+    <button type="button" id="btn-verificar-atualizacao" class="botao-texto botao-texto-vinho">Verificar atualizações</button>
+    <span id="status-atualizacao" class="status-atualizacao-perfil"></span>
+    <button type="button" id="btn-sair" class="botao-texto botao-texto-erro" style="display:none;">Sair</button>
+  </div>
 </section>
+
+<nav class="barra-abas" id="barra-abas" style="display:none;">
+  <button type="button" id="aba-rdo" class="item-aba ativo">
+    <svg class="icone-aba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 13l2 2 4-4"/></svg>
+    <span>RDO</span>
+  </button>
+  <button type="button" id="aba-perfil" class="item-aba">
+    <svg class="icone-aba" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+    <span>Perfil</span>
+    <span id="badge-pendentes-offline" class="badge-aba" style="display:none;"></span>
+  </button>
+</nav>
 
 <section class="cartao" id="cartao-login">
   <h2>Login</h2>

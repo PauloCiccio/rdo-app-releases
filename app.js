@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.9.0';
+const VERSAO_APP = 'BETA 0.9.1';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -252,8 +252,10 @@ const el = {
   statusConfirmacao: document.getElementById('status-confirmacao'),
 
   formRdo: document.getElementById('form-rdo'),
-  usuarioLogado: document.getElementById('usuario-logado'),
   btnSair: document.getElementById('btn-sair'),
+  barraAbas: document.getElementById('barra-abas'),
+  abaRdo: document.getElementById('aba-rdo'),
+  abaPerfil: document.getElementById('aba-perfil'),
   cartaoLogin: document.getElementById('cartao-login'),
   loginUsuario: document.getElementById('campo-login-usuario'),
   senhaUsuario: document.getElementById('campo-senha-usuario'),
@@ -266,9 +268,11 @@ const el = {
   btnSalvarPrimeiraAssinatura: document.getElementById('btn-salvar-primeira-assinatura'),
   statusPrimeiraAssinatura: document.getElementById('status-primeira-assinatura'),
 
-  btnAbrirPerfil: document.getElementById('btn-abrir-perfil'),
   cartaoPerfil: document.getElementById('cartao-perfil'),
-  btnFecharPerfil: document.getElementById('btn-fechar-perfil'),
+  perfilResumo: document.getElementById('perfil-resumo'),
+  resumoTotal: document.getElementById('resumo-total'),
+  resumoPendentes: document.getElementById('resumo-pendentes'),
+  resumoAprovados: document.getElementById('resumo-aprovados'),
   perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
   perfilCarregando: document.getElementById('perfil-carregando'),
   perfilErro: document.getElementById('perfil-erro'),
@@ -859,20 +863,29 @@ function aplicarSessaoNoFormulario_(sessao) {
   state.assinaturaContratadaNome = sessao.nome;
   state.assinaturaContratadaImagemBase64 = sessao.assinaturaBase64;
   el.assinaturaContratadaInfo.textContent = 'Assinando como: ' + sessao.nome;
-  el.usuarioLogado.textContent = 'Olá, ' + sessao.nome;
-  el.usuarioLogado.style.display = 'inline';
   el.btnSair.style.display = 'inline';
   el.cartaoLogin.style.display = 'none';
   el.cartaoPrimeiraAssinatura.style.display = 'none';
-  el.formRdo.style.display = 'block';
+  el.barraAbas.style.display = 'flex';
+  mostrarAba_('rdo');
 }
 
 function mostrarTelaLogin_() {
   el.cartaoLogin.style.display = 'block';
   el.cartaoPrimeiraAssinatura.style.display = 'none';
   el.formRdo.style.display = 'none';
-  el.usuarioLogado.style.display = 'none';
+  el.cartaoPerfil.style.display = 'none';
+  el.barraAbas.style.display = 'none';
   el.btnSair.style.display = 'none';
+}
+
+function mostrarAba_(aba) {
+  const ehRdo = aba === 'rdo';
+  el.formRdo.style.display = ehRdo ? 'block' : 'none';
+  el.cartaoPerfil.style.display = ehRdo ? 'none' : 'block';
+  el.abaRdo.classList.toggle('ativo', ehRdo);
+  el.abaPerfil.classList.toggle('ativo', !ehRdo);
+  if (!ehRdo) carregarPerfil_();
 }
 
 // ---------------------------------------------------------------------------
@@ -1540,6 +1553,12 @@ async function carregarPerfil_() {
     if (!resp.ok) throw new Error(resp.erro || 'Não consegui carregar seus RDOs.');
 
     perfilDadosAtuais = { aprovados: resp.aprovados, pendentes: resp.pendentes };
+    const totalPendentes = resp.pendentes.length;
+    const totalAprovados = resp.aprovados.length;
+    el.resumoTotal.textContent = String(totalPendentes + totalAprovados);
+    el.resumoPendentes.textContent = String(totalPendentes);
+    el.resumoAprovados.textContent = String(totalAprovados);
+    el.perfilResumo.style.display = (totalPendentes + totalAprovados) > 0 ? 'flex' : 'none';
     el.perfilCarregando.style.display = 'none';
     el.perfilListaObras.style.display = 'block';
     renderizarListaObrasPerfil_();
@@ -1552,17 +1571,8 @@ async function carregarPerfil_() {
   }
 }
 
-el.btnAbrirPerfil.addEventListener('click', () => {
-  if (!carregarSessaoUsuario_()) return; // sem sessão (tela de login) - ícone não faz nada
-  el.formRdo.style.display = 'none';
-  el.cartaoPerfil.style.display = 'block';
-  carregarPerfil_();
-});
-
-el.btnFecharPerfil.addEventListener('click', () => {
-  el.cartaoPerfil.style.display = 'none';
-  el.formRdo.style.display = 'block';
-});
+el.abaRdo.addEventListener('click', () => mostrarAba_('rdo'));
+el.abaPerfil.addEventListener('click', () => mostrarAba_('perfil'));
 
 el.btnVoltarObras.addEventListener('click', () => {
   el.perfilDetalheObra.style.display = 'none';
@@ -2067,7 +2077,8 @@ function salvarFilaConfirmacao_(fila) {
 function atualizarBadgePendentes_() {
   const n = carregarFilaPendente_().length;
   if (n > 0) {
-    el.badgePendentes.textContent = n === 1 ? '1 RDO aguardando conexão' : (n + ' RDOs aguardando conexão');
+    el.badgePendentes.textContent = String(n);
+    el.badgePendentes.title = n === 1 ? '1 RDO aguardando conexão' : (n + ' RDOs aguardando conexão');
     el.badgePendentes.style.display = 'inline-block';
   } else {
     el.badgePendentes.style.display = 'none';

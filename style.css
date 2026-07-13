@@ -45,7 +45,7 @@ body {
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--fundo);
   color: var(--texto);
-  padding-bottom: 40px;
+  padding-bottom: 84px;
 }
 
 .topo {
@@ -57,57 +57,26 @@ body {
   padding: 14px 16px;
 }
 .topo .logo { width: 44px; height: 44px; object-fit: contain; border-radius: 50%; background: #fff; padding: 3px; }
-.botao-logo { background: none; border: none; padding: 0; cursor: pointer; line-height: 0; flex-shrink: 0; }
 .topo h1 { font-size: 17px; margin: 0; }
-.versao-bloco {
-  margin-left: auto;
-  align-self: flex-start;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-.versao-app {
-  font-size: 11px;
-  opacity: .8;
-  white-space: nowrap;
-}
+.topo .subtitulo { font-size: 12px; margin: 2px 0 0; opacity: .85; }
 
-/* Botões de texto (topo/atualização, limpar cache, corrigir e-mail) -
-   mesma classe visual pras 3 variações que existiam antes com CSS
-   duplicado; cada uma só ajusta cor/alinhamento quando precisa. */
+/* Botões de texto (verificar atualização, limpar cache, corrigir e-mail) -
+   mesma classe base pras variações que existiam antes com CSS duplicado;
+   cada uma só ajusta a cor quando precisa (`-vinho`/`-erro`/sem
+   modificador = `--texto-suave`, uso mais neutro tipo "limpar cache"). */
 .botao-texto {
   background: none;
   border: none;
   padding: 0;
+  color: var(--texto-suave);
   font-size: 11px;
   text-decoration: underline;
   cursor: pointer;
   white-space: nowrap;
 }
 .botao-texto:disabled { opacity: .5; cursor: not-allowed; text-decoration: none; }
-
-.link-atualizacao {
-  background: none;
-  border: none;
-  padding: 0;
-  color: #fff;
-  opacity: .85;
-  font-size: 10px;
-  text-decoration: underline;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.link-atualizacao:disabled { opacity: .5; cursor: not-allowed; }
-.status-atualizacao {
-  font-size: 10px;
-  opacity: .9;
-  white-space: nowrap;
-  max-width: 160px;
-  text-align: right;
-  white-space: normal;
-}
-.topo .subtitulo { font-size: 12px; margin: 2px 0 0; opacity: .85; }
+.botao-texto-vinho { color: var(--vinho); }
+.botao-texto-erro { color: var(--erro); }
 
 main { max-width: 720px; margin: 0 auto; padding: 12px; }
 
@@ -400,15 +369,107 @@ textarea { resize: vertical; overflow: hidden; }
   text-align: center;
 }
 
-.badge-pendentes-offline {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 9px;
-  border-radius: 10px;
+/* ---------------------------------------------------------------------------
+   Barra de navegação inferior (12/07) - 2 abas fixas (RDO/Perfil), padrão
+   de app estabelecido (WhatsApp/Instagram/bancos) - substitui o ícone da
+   logo clicável (o Paulo achou pouco intuitivo, nada sugeria que aquele
+   círculo era um botão de navegação).
+   --------------------------------------------------------------------------- */
+.barra-abas {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 15;
+  display: flex;
+  background: #fff;
+  border-top: 1px solid var(--borda);
+  box-shadow: 0 -2px 8px rgba(35,20,18,.08);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.item-aba {
+  flex: 1;
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px 10px;
+  font-size: 12px;
+  color: var(--texto-suave);
+  cursor: pointer;
+  position: relative;
+}
+.item-aba .icone-aba { width: 22px; height: 22px; }
+.item-aba.ativo { color: var(--vinho); font-weight: bold; }
+.badge-aba {
+  position: absolute;
+  top: 4px;
+  right: 22%;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: var(--alerta);
   color: #fff;
-  font-size: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 16px;
+  text-align: center;
 }
+
+/* Cabeçalho/resumo/rodapé do Meu Perfil (12/07) - "Perfil" virou também o
+   lugar de infos de conta/app (versão, atualizar, sair), migradas do
+   cabeçalho principal (que ficou só com logo+título, mais harmônico). */
+.perfil-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.perfil-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--vinho-claro);
+  color: var(--vinho);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.perfil-avatar svg { width: 24px; height: 24px; }
+.perfil-nome { font-size: 16px; font-weight: bold; color: var(--texto); margin: 0; }
+
+.perfil-resumo {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.resumo-item {
+  flex: 1;
+  text-align: center;
+  background: var(--fundo);
+  border-radius: var(--raio-md);
+  padding: 10px 4px;
+}
+.resumo-numero { display: block; font-size: 20px; font-weight: bold; color: var(--vinho); }
+.resumo-item.alerta .resumo-numero { color: var(--alerta); }
+.resumo-item.sucesso .resumo-numero { color: var(--sucesso); }
+.resumo-rotulo { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 2px; }
+
+.perfil-rodape {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--borda);
+}
+.versao-app-perfil { font-size: 11px; color: var(--texto-suave); }
+.status-atualizacao-perfil { font-size: 11px; color: var(--texto-suave); }
 
 .modal-confirmacao {
   position: fixed;
