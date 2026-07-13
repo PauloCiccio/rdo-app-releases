@@ -329,8 +329,8 @@ const RdoApi = (function () {
     return postJson_({ action: 'buscarNomeCliente', cpf });
   }
 
-  function cadastrarCliente({ cpf, nome, funcao, empresa }) {
-    return postJson_({ action: 'cadastrarCliente', cpf, nome, funcao, empresa });
+  function cadastrarCliente({ cpf, nome, funcao, empresa, assinaturaBase64 }) {
+    return postJson_({ action: 'cadastrarCliente', cpf, nome, funcao, empresa, assinaturaBase64 });
   }
 
   // Login dos usuários da Contratada (11/07) - ver CHAVE_SESSAO_USUARIO em app.js.

@@ -649,7 +649,12 @@ textarea { resize: vertical; overflow: hidden; }
   font-weight: bold;
   cursor: pointer;
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+.botao-icone svg,
+.botao-mini svg { width: 16px; height: 16px; }
 .botao-icone:disabled,
 .botao-mini:disabled { opacity: .5; cursor: not-allowed; }
 .link-corrigir-email {

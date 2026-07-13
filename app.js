@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.9.1';
+const VERSAO_APP = 'BETA 0.9.2';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -246,6 +246,7 @@ const el = {
   btnAbrirPreviaOffline: document.getElementById('btn-abrir-previa-offline'),
   btnZoomMaisApp: document.getElementById('btn-zoom-mais-app'),
   btnZoomMenosApp: document.getElementById('btn-zoom-menos-app'),
+  btnAtualizarPreviaApp: document.getElementById('btn-atualizar-previa-app'),
   btnCompartilhar: document.getElementById('btn-compartilhar'),
   btnConfirmarEnvio: document.getElementById('btn-confirmar-envio'),
   btnCancelarPreview: document.getElementById('btn-cancelar-preview'),
@@ -399,9 +400,18 @@ function atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd) {
 function aplicarMascaraHorario_(valor) {
   const digitos = (valor || '').replace(/\D/g, '').slice(0, 4);
   if (digitos.length <= 2) return digitos;
-  let hh = digitos.slice(0, 2);
-  let mm = digitos.slice(2);
-  if (Number(hh) > 23) hh = '23';
+  let hh, mm;
+  if (digitos.length === 3 && Number(digitos.slice(0, 2)) > 23) {
+    // 3 dígitos com hora de 2 dígitos inválida (ex: "853") - reinterpreta
+    // como hora de 1 dígito + minuto de 2 dígitos ("8" + "53" = "08:53"),
+    // em vez de estourar/clampar uma hora que a pessoa não quis dizer.
+    hh = digitos.slice(0, 1).padStart(2, '0');
+    mm = digitos.slice(1);
+  } else {
+    hh = digitos.slice(0, 2);
+    mm = digitos.slice(2);
+    if (Number(hh) > 23) hh = '23';
+  }
   if (mm.length === 2 && Number(mm) > 59) mm = '59';
   return hh + ':' + mm;
 }
@@ -699,6 +709,24 @@ function carregarEstadoEmAndamento_() {
   el.formRdo.addEventListener(evento, (e) => {
     if (e.target.closest('summary')) return; // abrir/fechar seção não edita nada
     agendarSalvarEstadoEmAndamento_();
+  });
+});
+
+// Acordeão de verdade (pedido do Paulo, 12/07 tarde): ao clicar num passo
+// pra ABRIR, os outros 4 minimizam sozinhos - só reage a CLIQUE de verdade
+// no <summary> (não a `d.open = true` programático, usado pelos testes
+// Playwright pra abrir tudo de uma vez e continuar preenchendo vários
+// passos na mesma suíte).
+document.querySelectorAll('.secao-formulario > summary').forEach(summary => {
+  summary.addEventListener('click', () => {
+    const secaoClicada = summary.parentElement;
+    setTimeout(() => {
+      if (secaoClicada.open) {
+        document.querySelectorAll('.secao-formulario').forEach(secao => {
+          if (secao !== secaoClicada) secao.open = false;
+        });
+      }
+    }, 0);
   });
 });
 
@@ -1754,14 +1782,12 @@ let previewPdfBase64 = null; // guardado só pra "Compartilhar" depois de um env
 let previewFileName = null;
 let previewNumeroAtual = null; // preservado entre atualizações da MESMA prévia (não reserva número de novo a cada edição)
 let atualizandoPreview_ = false; // evita duas atualizações da prévia rodando ao mesmo tempo (edições rápidas em sequência)
-let debouncePreviewTimer_ = null;
 // PDF ilustrativo gerado offline (ver preview-offline.js) - guardado aqui
 // pra "Abrir prévia em PDF" reaproveitar sem gerar de novo a cada toque.
 let previewPdfOfflineAtual = null;
 let previewPdfOfflineFileNameAtual = null;
 
 function fecharPreview_() {
-  clearTimeout(debouncePreviewTimer_);
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
@@ -1881,6 +1907,10 @@ async function atualizarPreviewInline_() {
     return;
   }
   atualizandoPreview_ = true;
+  // Enquanto a prévia ainda está sendo gerada (delay real de rede/backend),
+  // "Confirmar e Enviar" fica bloqueado - pedido do Paulo (12/07 tarde):
+  // evita mandar o RDO antes de conferir a prévia de verdade na tela.
+  el.btnConfirmarEnvio.disabled = true;
   try {
     el.statusConfirmacao.textContent = 'Atualizando prévia...';
     el.statusConfirmacao.className = 'status';
@@ -1940,17 +1970,8 @@ async function atualizarPreviewInline_() {
     RdoApi.logErro('atualizar_preview', err && err.message ? err.message : String(err), { contratante: state.contratante, obra: state.obra });
   } finally {
     atualizandoPreview_ = false;
+    el.btnConfirmarEnvio.disabled = false;
   }
-}
-
-// Editar qualquer coisa no formulário DEPOIS de abrir a prévia agenda uma
-// atualização automática (pedido do Paulo, 12/07: "deveria recarregar a
-// prévia sozinho"). Debounce de ~1,2s pra não regerar a cada tecla -
-// espera uma pausa na digitação antes de gerar de novo.
-function agendarAtualizacaoPreview_() {
-  if (el.cartaoPreview.style.display !== 'block') return;
-  clearTimeout(debouncePreviewTimer_);
-  debouncePreviewTimer_ = setTimeout(atualizarPreviewInline_, 1200);
 }
 
 el.btnGerar.addEventListener('click', async () => {
@@ -1958,6 +1979,7 @@ el.btnGerar.addEventListener('click', async () => {
   if (erro) { mostrarStatus(erro, 'erro'); return; }
 
   el.btnGerar.disabled = true;
+  el.btnConfirmarEnvio.disabled = true;
   el.btnCompartilhar.style.display = 'none';
   mostrarStatus('');
   el.cartaoPreview.style.display = 'block';
@@ -1966,17 +1988,13 @@ el.btnGerar.addEventListener('click', async () => {
   el.btnGerar.disabled = false;
 });
 
-// Escuta qualquer edição no formulário (delegado, um listener só) pra
-// agendar a atualização automática - ignora interações DENTRO do próprio
-// card de prévia (zoom, confirmar, cancelar já têm handler próprio), o
-// clique no botão "Pré-visualizar" (que já atualiza na hora, não precisa
-// agendar de novo por cima), e abrir/fechar uma seção retrátil
-// (`<summary>`, reforma visual 12/07) - isso não edita dado nenhum.
-['input', 'change', 'click'].forEach(evento => {
-  el.formRdo.addEventListener(evento, (e) => {
-    if (e.target.closest('#cartao-preview') || e.target.id === 'btn-gerar' || e.target.closest('summary')) return;
-    agendarAtualizacaoPreview_();
-  });
+// Atualização da prévia virou manual (pedido do Paulo, 13/07: o auto-
+// refresh a cada edição tinha um delay grande demais) - botão de setas em
+// círculo do lado do zoom, mesmo visual já conhecido de "atualizar".
+el.btnAtualizarPreviaApp.addEventListener('click', async () => {
+  el.btnAtualizarPreviaApp.disabled = true;
+  await atualizarPreviewInline_();
+  el.btnAtualizarPreviaApp.disabled = false;
 });
 
 el.btnCancelarPreview.addEventListener('click', () => {
@@ -2155,8 +2173,6 @@ RdoConectividade.aoMudar(online => { if (online) sincronizarFilaOffline_(); });
 el.btnConfirmarEnvio.addEventListener('click', async () => {
   el.btnConfirmarEnvio.disabled = true;
   try {
-    clearTimeout(debouncePreviewTimer_); // não deixa uma auto-atualização pendente disparar por cima do envio
-
     const sessaoAtual = carregarSessaoUsuario_();
     const loginAtual = sessaoAtual ? sessaoAtual.login : '';
 

@@ -30,6 +30,9 @@ const el = {
   cartaoCadastro: document.getElementById('cartao-cadastro'),
   funcao: document.getElementById('campo-funcao'),
   empresa: document.getElementById('campo-empresa'),
+  canvasAssinaturaCadastro: document.getElementById('canvas-assinatura-cadastro'),
+  btnLimparAssinaturaCadastro: document.getElementById('btn-limpar-assinatura-cadastro'),
+  btnTravarAssinaturaCadastro: document.getElementById('btn-travar-assinatura-cadastro'),
   btnSalvarCadastro: document.getElementById('btn-salvar-cadastro'),
   statusCadastro: document.getElementById('status-cadastro'),
 
@@ -79,6 +82,7 @@ const el = {
   btnAbrirPreviaOfflineFinal: document.getElementById('btn-abrir-previa-offline-final'),
   btnZoomMaisFinal: document.getElementById('btn-zoom-mais-final'),
   btnZoomMenosFinal: document.getElementById('btn-zoom-menos-final'),
+  btnAtualizarPreviaFinal: document.getElementById('btn-atualizar-previa-final'),
   btnConcluir: document.getElementById('btn-concluir'),
   btnEditar: document.getElementById('btn-editar'),
   statusConfirmacao: document.getElementById('status-confirmacao'),
@@ -162,9 +166,18 @@ function aplicarMascaraCpf_(valor) {
 function aplicarMascaraHorario_(valor) {
   const digitos = (valor || '').replace(/\D/g, '').slice(0, 4);
   if (digitos.length <= 2) return digitos;
-  let hh = digitos.slice(0, 2);
-  let mm = digitos.slice(2);
-  if (Number(hh) > 23) hh = '23';
+  let hh, mm;
+  if (digitos.length === 3 && Number(digitos.slice(0, 2)) > 23) {
+    // 3 dígitos com hora de 2 dígitos inválida (ex: "853") - reinterpreta
+    // como hora de 1 dígito + minuto de 2 dígitos ("8" + "53" = "08:53"),
+    // em vez de estourar/clampar uma hora que a pessoa não quis dizer.
+    hh = digitos.slice(0, 1).padStart(2, '0');
+    mm = digitos.slice(1);
+  } else {
+    hh = digitos.slice(0, 2);
+    mm = digitos.slice(2);
+    if (Number(hh) > 23) hh = '23';
+  }
   if (mm.length === 2 && Number(mm) > 59) mm = '59';
   return hh + ':' + mm;
 }
@@ -320,6 +333,21 @@ function configurarCanvasAssinatura_(canvas) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       estado.temAssinatura = false;
     },
+    // Redesenha uma assinatura já salva (cópia de app.js, ver comentário lá) -
+    // usado pra lembrar a assinatura do Contratante de uma obra pra outra.
+    // Continua TRAVADO por padrão mesmo restaurada.
+    restaurar(base64Png) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          estado.temAssinatura = true;
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = 'data:image/png;base64,' + base64Png;
+      });
+    },
     alternarTravamento() {
       estado.travada = !estado.travada;
       canvas.style.touchAction = estado.travada ? 'pan-y' : 'none';
@@ -341,6 +369,12 @@ function configurarBotaoTravar_(botao, assinatura) {
 const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
 el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
 configurarBotaoTravar_(el.btnTravarAssinatura, assinaturaContratante);
+
+// Canvas do CADASTRO (13/07) - obrigatório só na primeira vez, ver
+// btnSalvarCadastro.
+const assinaturaCadastro = configurarCanvasAssinatura_(el.canvasAssinaturaCadastro);
+el.btnLimparAssinaturaCadastro.addEventListener('click', () => assinaturaCadastro.limpar());
+configurarBotaoTravar_(el.btnTravarAssinaturaCadastro, assinaturaCadastro);
 
 // IP do cliente (só pra registro de auditoria, ver finalizarAprovacao_ no
 // Code.gs) - reportado pelo PRÓPRIO navegador via serviço público
@@ -390,6 +424,11 @@ let cpfAtual = null;
 let nomeAtual = null;
 let funcaoAtual = null;
 let empresaAtual = null;
+// Assinatura salva no cadastro (13/07) - lembrada de uma obra pra outra,
+// mesmo padrão já usado pra Contratada no app principal: pré-preenche o
+// canvas de "Assinatura" (travado por padrão) na hora de assinar o RDO -
+// só quem quiser assinar diferente precisa destravar e redesenhar.
+let assinaturaContratanteSalva = null;
 
 const atividadesContratante = [{ inicio: '', fim: '', discriminacao: '' }];
 const cfgAtivContratante = {
@@ -525,6 +564,7 @@ el.btnContinuarIdentificacao.addEventListener('click', async () => {
     if (resp.encontrado) {
       funcaoAtual = resp.funcao;
       empresaAtual = resp.empresa;
+      assinaturaContratanteSalva = resp.assinaturaBase64 || null;
       el.cartaoIdentificacao.style.display = 'none';
       el.confirmarFuncaoTexto.textContent = funcaoAtual;
       el.confirmarEmpresaTexto.textContent = empresaAtual;
@@ -600,12 +640,18 @@ el.btnSalvarCadastro.addEventListener('click', async () => {
     el.statusCadastro.className = 'status erro';
     return;
   }
+  if (!assinaturaCadastro.estado.temAssinatura) {
+    el.statusCadastro.textContent = 'Desenhe sua assinatura antes de continuar.';
+    el.statusCadastro.className = 'status erro';
+    return;
+  }
 
   el.btnSalvarCadastro.disabled = true;
   try {
     el.statusCadastro.textContent = 'Salvando...';
     el.statusCadastro.className = 'status';
-    const resp = await RdoApi.cadastrarCliente({ cpf: cpfAtual, nome: nomeAtual, funcao, empresa });
+    const assinaturaBase64 = el.canvasAssinaturaCadastro.toDataURL('image/png').split(',')[1];
+    const resp = await RdoApi.cadastrarCliente({ cpf: cpfAtual, nome: nomeAtual, funcao, empresa, assinaturaBase64 });
     if (!resp.ok) {
       el.statusCadastro.textContent = resp.erro || 'Não consegui salvar o cadastro.';
       el.statusCadastro.className = 'status erro';
@@ -614,6 +660,7 @@ el.btnSalvarCadastro.addEventListener('click', async () => {
 
     funcaoAtual = funcao;
     empresaAtual = empresa;
+    assinaturaContratanteSalva = assinaturaBase64;
     el.cartaoCadastro.style.display = 'none';
     liberarFormularioPrincipal_();
   } catch (err) {
@@ -625,7 +672,7 @@ el.btnSalvarCadastro.addEventListener('click', async () => {
   }
 });
 
-function liberarFormularioPrincipal_() {
+async function liberarFormularioPrincipal_() {
   el.infoIdentificado.textContent = `${nomeAtual} (${funcaoAtual} - ${empresaAtual})`;
   el.assinaturaNomeExibicao.textContent = nomeAtual;
   el.info.style.display = 'block';
@@ -633,20 +680,26 @@ function liberarFormularioPrincipal_() {
   el.cartaoAssinatura.style.display = 'block';
   el.cartaoEnviar.style.display = 'block';
   renderizarListaAtividades(cfgAtivContratante);
+
+  // Lembra a assinatura salva (13/07) - pré-preenche o canvas, travado por
+  // padrão (mesmo padrão já usado pra Contratada no app principal) - só
+  // quem quiser assinar diferente precisa destravar e redesenhar.
+  if (assinaturaContratanteSalva) {
+    await assinaturaContratante.restaurar(assinaturaContratanteSalva);
+  }
 }
 
 // Pré-visualização (12/07) - fundida num passo só (mesmo pedido do
 // Paulo aplicado no app principal: "não quero isso, fica redundante"
 // sobre o antigo botão separado "Exibir Prévia RDO Final"). Clicar em
 // "Pré-visualizar RDO" já MOSTRA a prévia embutida (com zoom) + o botão
-// de concluir. Editar qualquer coisa depois (atividades, assinatura)
-// agenda uma atualização automática (debounce). O xlsx/pdf de verdade
-// (sem marca d'água) só é gerado na hora real de concluir (ver
+// de concluir. Atualização é manual (botão de setas em círculo, 13/07 -
+// o auto-refresh a cada edição tinha um delay grande demais). O xlsx/pdf
+// de verdade (sem marca d'água) só é gerado na hora real de concluir (ver
 // btnConcluir), sempre a partir do estado MAIS ATUAL - nunca reaproveita
 // o que foi gerado só pra exibir a prévia.
 let stateFinalAtual = null;
 let atualizandoPreviewFinal_ = false;
-let debouncePreviewFinalTimer_ = null;
 // PDF ilustrativo gerado offline (ver preview-offline.js) - guardado aqui
 // pra "Abrir prévia em PDF" reaproveitar sem gerar de novo a cada toque.
 let previewPdfOfflineFinalAtual = null;
@@ -688,6 +741,10 @@ async function atualizarPreviewFinalInline_() {
     return;
   }
   atualizandoPreviewFinal_ = true;
+  // Enquanto a prévia ainda está sendo gerada (delay real de rede/backend),
+  // "Concluir" fica bloqueado - evita mandar o RDO antes de conferir a
+  // prévia de verdade na tela (mesmo padrão do app principal).
+  el.btnConcluir.disabled = true;
   try {
     el.statusConfirmacao.textContent = 'Atualizando prévia...';
     el.statusConfirmacao.className = 'status';
@@ -725,13 +782,8 @@ async function atualizarPreviewFinalInline_() {
     RdoApi.logErro('previsualizar_aprovacao', err && err.message ? err.message : String(err), { token });
   } finally {
     atualizandoPreviewFinal_ = false;
+    el.btnConcluir.disabled = false;
   }
-}
-
-function agendarAtualizacaoPreviewFinal_() {
-  if (el.cartaoPreviewFinal.style.display !== 'block') return;
-  clearTimeout(debouncePreviewFinalTimer_);
-  debouncePreviewFinalTimer_ = setTimeout(atualizarPreviewFinalInline_, 1200);
 }
 
 el.btnPrevisualizar.addEventListener('click', async () => {
@@ -748,26 +800,20 @@ el.btnPrevisualizar.addEventListener('click', async () => {
   el.statusEnvio.textContent = '';
 
   el.btnPrevisualizar.disabled = true;
+  el.btnConcluir.disabled = true;
   el.cartaoPreviewFinal.style.display = 'block';
   el.cartaoPreviewFinal.scrollIntoView({ behavior: 'smooth' });
   await atualizarPreviewFinalInline_();
   el.btnPrevisualizar.disabled = false;
 });
 
-// Escuta qualquer edição na página (delegado) pra agendar a atualização
-// automática - ignora interações dentro do próprio card de prévia final
-// (zoom/concluir/editar já têm handler próprio), dentro do card do PDF
-// parcial (#cartao-info, só informativo, nada editável ali) e o clique no
-// botão "Pré-visualizar" (que já atualiza na hora).
-['input', 'change', 'click'].forEach(evento => {
-  document.getElementById('conteudo').addEventListener(evento, (e) => {
-    if (e.target.closest('#cartao-preview-final') || e.target.closest('#cartao-info') || e.target.id === 'btn-previsualizar') return;
-    agendarAtualizacaoPreviewFinal_();
-  });
+el.btnAtualizarPreviaFinal.addEventListener('click', async () => {
+  el.btnAtualizarPreviaFinal.disabled = true;
+  await atualizarPreviewFinalInline_();
+  el.btnAtualizarPreviaFinal.disabled = false;
 });
 
 el.btnEditar.addEventListener('click', () => {
-  clearTimeout(debouncePreviewFinalTimer_);
   el.cartaoPreviewFinal.style.display = 'none';
   el.statusConfirmacao.textContent = '';
 });
@@ -787,7 +833,6 @@ el.btnAbrirPreviaOfflineFinal.addEventListener('click', () => {
 el.btnConcluir.addEventListener('click', async () => {
   el.btnConcluir.disabled = true;
   try {
-    clearTimeout(debouncePreviewFinalTimer_);
     el.statusConfirmacao.textContent = 'Gerando RDO final...';
     el.statusConfirmacao.className = 'status';
 

@@ -49,6 +49,12 @@
     <input type="text" id="campo-funcao" placeholder="Ex: Fiscal de obra, Engenheiro responsável" autocomplete="off">
     <label for="campo-empresa">Responsável por qual empresa</label>
     <input type="text" id="campo-empresa" placeholder="Nome da empresa" autocomplete="off">
+    <label>Assine abaixo com o dedo (fica salva pra você não precisar assinar de novo nas próximas obras)</label>
+    <canvas id="canvas-assinatura-cadastro" class="canvas-assinatura" width="600" height="200"></canvas>
+    <div class="linha-botoes-assinatura">
+      <button type="button" id="btn-limpar-assinatura-cadastro" class="botao-secundario">Limpar assinatura</button>
+      <button type="button" id="btn-travar-assinatura-cadastro" class="botao-secundario btn-travar travado">Destravar para assinar</button>
+    </div>
     <button type="button" id="btn-salvar-cadastro" class="botao-principal">Salvar e continuar</button>
     <div id="status-cadastro" class="status" aria-live="polite"></div>
   </section>
@@ -118,9 +124,12 @@
 
   <section class="cartao" id="cartao-preview-final" style="display:none;">
     <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/></svg>Pré-visualização</h2>
-    <p>Confira o RDO abaixo (vem com marca d'água "PRÉ-VISUALIZAÇÃO", só o envio final sai sem ela). Editar qualquer coisa depois atualiza a prévia sozinho.</p>
+    <p>Confira o RDO abaixo (vem com marca d'água "PRÉ-VISUALIZAÇÃO", só o envio final sai sem ela). Editou algo? Toque em "Atualizar prévia" pra ver a versão mais recente.</p>
     <div id="wrap-visualizador-final" class="wrap-visualizador-pdf" style="display:none;">
       <div class="botoes-zoom-pdf">
+        <button type="button" id="btn-atualizar-previa-final" class="botao-mini" title="Atualizar prévia">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+        </button>
         <button type="button" id="btn-zoom-menos-final" class="botao-mini">－</button>
         <button type="button" id="btn-zoom-mais-final" class="botao-mini">＋</button>
       </div>
