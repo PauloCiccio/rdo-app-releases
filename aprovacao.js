@@ -75,8 +75,8 @@ const el = {
   cartaoPreviewFinal: document.getElementById('cartao-preview-final'),
   wrapVisualizadorFinal: document.getElementById('wrap-visualizador-final'),
   visualizadorFinal: document.getElementById('visualizador-final'),
-  visualizadorFinalOffline: document.getElementById('visualizador-final-offline'),
   avisoPreviaOfflineFinal: document.getElementById('aviso-previa-offline-final'),
+  btnAbrirPreviaOfflineFinal: document.getElementById('btn-abrir-previa-offline-final'),
   btnZoomMaisFinal: document.getElementById('btn-zoom-mais-final'),
   btnZoomMenosFinal: document.getElementById('btn-zoom-menos-final'),
   btnConcluir: document.getElementById('btn-concluir'),
@@ -379,7 +379,7 @@ function configurarZoomIframe_(elementoOuLista, btnMais, btnMenos) {
   });
 }
 configurarZoomIframe_(el.visualizadorPdf, el.btnZoomMais, el.btnZoomMenos);
-configurarZoomIframe_([el.visualizadorFinal, el.visualizadorFinalOffline], el.btnZoomMaisFinal, el.btnZoomMenosFinal);
+configurarZoomIframe_(el.visualizadorFinal, el.btnZoomMaisFinal, el.btnZoomMenosFinal);
 
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token');
@@ -647,6 +647,22 @@ function liberarFormularioPrincipal_() {
 let stateFinalAtual = null;
 let atualizandoPreviewFinal_ = false;
 let debouncePreviewFinalTimer_ = null;
+// PDF ilustrativo gerado offline (ver preview-offline.js) - guardado aqui
+// pra "Abrir prévia em PDF" reaproveitar sem gerar de novo a cada toque.
+let previewPdfOfflineFinalAtual = null;
+let previewPdfOfflineFinalFileNameAtual = null;
+
+// Abre um PDF (base64) numa aba nova - página pública, sempre no
+// navegador (nunca dentro do app Capacitor), então não precisa do
+// Filesystem/FileOpener nativo usado em app.js/abrirPdfParaVisualizar_.
+function abrirPdfNoBrowser_(base64, fileName) {
+  const bytes = atob(base64);
+  const array = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) array[i] = bytes.charCodeAt(i);
+  const blob = new Blob([array], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+}
 
 function montarStateFinal_() {
   const assinaturaImagemBase64 = el.canvasAssinatura.toDataURL('image/png').split(',')[1];
@@ -679,7 +695,7 @@ async function atualizarPreviewFinalInline_() {
 
     if (RdoConectividade.estaOnline()) {
       el.avisoPreviaOfflineFinal.style.display = 'none';
-      el.visualizadorFinalOffline.style.display = 'none';
+      el.btnAbrirPreviaOfflineFinal.style.display = 'none';
 
       const { base64: xlsxPreviaBase64, fileName: fileNamePrevia } = await RdoExcel.gerarWorkbook(stateFinalAtual, numero, { apenasPreview: true });
       const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
@@ -689,16 +705,17 @@ async function atualizarPreviewFinalInline_() {
       el.visualizadorFinal.src = respLink.pdfUrl;
       el.wrapVisualizadorFinal.style.display = 'block';
     } else {
-      // Sem internet - mostra uma prévia ILUSTRATIVA (imagem do modelo com
-      // os dados sobrepostos, ver preview-offline.js). O RDO final de
-      // verdade só é gerado/enviado quando a conexão voltar.
+      // Sem internet - gera um PDF ILUSTRATIVO de verdade (texto nítido,
+      // layout aproximado - ver preview-offline.js) 100% no navegador via
+      // jsPDF, guardado pronto pra abrir a qualquer momento. O RDO final
+      // de verdade só é gerado/enviado quando a conexão voltar.
       el.visualizadorFinal.style.display = 'none';
-      const canvasTemp = document.createElement('canvas');
-      const dataUrl = await RdoPreviewOffline.renderizarPreviaOffline_(stateFinalAtual, numero, canvasTemp);
-      el.visualizadorFinalOffline.src = dataUrl;
-      el.visualizadorFinalOffline.style.display = 'block';
-      el.wrapVisualizadorFinal.style.display = 'block';
+      el.wrapVisualizadorFinal.style.display = 'none';
+      const { base64: pdfBase64Offline, fileName: fileNameOffline } = await RdoPreviewOffline.gerarPdfOffline_(stateFinalAtual, numero);
+      previewPdfOfflineFinalAtual = pdfBase64Offline;
+      previewPdfOfflineFinalFileNameAtual = fileNameOffline;
       el.avisoPreviaOfflineFinal.style.display = 'block';
+      el.btnAbrirPreviaOfflineFinal.style.display = 'block';
     }
     el.statusConfirmacao.textContent = '';
   } catch (err) {
@@ -753,6 +770,18 @@ el.btnEditar.addEventListener('click', () => {
   clearTimeout(debouncePreviewFinalTimer_);
   el.cartaoPreviewFinal.style.display = 'none';
   el.statusConfirmacao.textContent = '';
+});
+
+el.btnAbrirPreviaOfflineFinal.addEventListener('click', () => {
+  if (!previewPdfOfflineFinalAtual) return;
+  try {
+    abrirPdfNoBrowser_(previewPdfOfflineFinalAtual, previewPdfOfflineFinalFileNameAtual);
+  } catch (err) {
+    console.error(err);
+    el.statusConfirmacao.textContent = 'Erro ao abrir a prévia: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.className = 'status erro';
+    RdoApi.logErro('abrir_previa_offline_aprovacao', err && err.message ? err.message : String(err), { token });
+  }
 });
 
 el.btnConcluir.addEventListener('click', async () => {

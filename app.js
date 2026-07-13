@@ -6,7 +6,7 @@
 // cada release (o mesmo valor deve ser espelhado em APP_VERSAO_ATUAL no
 // Code.gs, que é o que a atualização automática usa pra saber se tem
 // versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.8.0';
+const VERSAO_APP = 'BETA 0.8.1';
 document.getElementById('versao-app').textContent = VERSAO_APP;
 
 // ---------------------------------------------------------------------------
@@ -242,8 +242,8 @@ const el = {
   cartaoPreview: document.getElementById('cartao-preview'),
   wrapVisualizadorApp: document.getElementById('wrap-visualizador-app'),
   visualizadorApp: document.getElementById('visualizador-app'),
-  visualizadorAppOffline: document.getElementById('visualizador-app-offline'),
   avisoPreviaOffline: document.getElementById('aviso-previa-offline'),
+  btnAbrirPreviaOffline: document.getElementById('btn-abrir-previa-offline'),
   btnZoomMaisApp: document.getElementById('btn-zoom-mais-app'),
   btnZoomMenosApp: document.getElementById('btn-zoom-menos-app'),
   btnCompartilhar: document.getElementById('btn-compartilhar'),
@@ -1742,14 +1742,20 @@ let previewFileName = null;
 let previewNumeroAtual = null; // preservado entre atualizações da MESMA prévia (não reserva número de novo a cada edição)
 let atualizandoPreview_ = false; // evita duas atualizações da prévia rodando ao mesmo tempo (edições rápidas em sequência)
 let debouncePreviewTimer_ = null;
+// PDF ilustrativo gerado offline (ver preview-offline.js) - guardado aqui
+// pra "Abrir prévia em PDF" reaproveitar sem gerar de novo a cada toque.
+let previewPdfOfflineAtual = null;
+let previewPdfOfflineFileNameAtual = null;
 
 function fecharPreview_() {
   clearTimeout(debouncePreviewTimer_);
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
-  el.visualizadorAppOffline.src = '';
   el.avisoPreviaOffline.style.display = 'none';
+  el.btnAbrirPreviaOffline.style.display = 'none';
+  previewPdfOfflineAtual = null;
+  previewPdfOfflineFileNameAtual = null;
   el.statusConfirmacao.textContent = '';
   el.statusConfirmacao.className = 'status';
 }
@@ -1774,7 +1780,7 @@ function configurarZoomIframe_(elementoOuLista, btnMais, btnMenos) {
     lista.forEach(elemento => { elemento.style.width = zoomAtual + '%'; });
   });
 }
-configurarZoomIframe_([el.visualizadorApp, el.visualizadorAppOffline], el.btnZoomMaisApp, el.btnZoomMenosApp);
+configurarZoomIframe_(el.visualizadorApp, el.btnZoomMaisApp, el.btnZoomMenosApp);
 
 // Depois de mandar o RDO (direto ou pra aprovação da Contratante), o
 // formulário volta pro estado "normal" de um RDO novo - pedido do Paulo
@@ -1827,8 +1833,10 @@ async function resetarParaProximoRdo_() {
   // mostrar um documento errado até a pessoa gerar um RDO novo.
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
-  el.visualizadorAppOffline.src = '';
   el.avisoPreviaOffline.style.display = 'none';
+  el.btnAbrirPreviaOffline.style.display = 'none';
+  previewPdfOfflineAtual = null;
+  previewPdfOfflineFileNameAtual = null;
 
   // Contratante/Obra continuam preenchidos (mesma obra) - reserva o
   // PRÓXIMO número já de cara, senão a prévia ficava travada em "-" até
@@ -1869,7 +1877,7 @@ async function atualizarPreviewInline_() {
 
     if (RdoConectividade.estaOnline()) {
       el.avisoPreviaOffline.style.display = 'none';
-      el.visualizadorAppOffline.style.display = 'none';
+      el.btnAbrirPreviaOffline.style.display = 'none';
 
       const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra);
       previewNumeroAtual = numero;
@@ -1890,18 +1898,22 @@ async function atualizarPreviewInline_() {
       }
     } else {
       // Sem internet - não dá pra reservar o número de verdade nem gerar o
-      // PDF (os dois dependem do Apps Script). Mostra uma prévia
-      // ILUSTRATIVA (imagem do modelo com os dados sobrepostos, ver
-      // preview-offline.js) - o RDO de verdade só é numerado/gerado quando
-      // a conexão voltar (ver sincronizarFilaOffline_).
+      // PDF oficial (os dois dependem do Apps Script). Gera um PDF
+      // ILUSTRATIVO de verdade (texto nítido, layout aproximado - ver
+      // preview-offline.js) 100% no aparelho via jsPDF - fica guardado
+      // pronto pra abrir a qualquer momento (botão "Abrir prévia em PDF"),
+      // sem precisar reabrir sozinho a cada edição (regenerar em segundo
+      // plano já deixa pronto pro próximo toque). O RDO de verdade só é
+      // numerado/gerado quando a conexão voltar (ver
+      // sincronizarFilaOffline_).
       previewNumeroAtual = null;
       el.visualizadorApp.style.display = 'none';
-      const canvasTemp = document.createElement('canvas');
-      const dataUrl = await RdoPreviewOffline.renderizarPreviaOffline_(state, null, canvasTemp);
-      el.visualizadorAppOffline.src = dataUrl;
-      el.visualizadorAppOffline.style.display = 'block';
-      el.wrapVisualizadorApp.style.display = 'block';
+      el.wrapVisualizadorApp.style.display = 'none';
+      const { base64: pdfBase64Offline, fileName: fileNameOffline } = await RdoPreviewOffline.gerarPdfOffline_(state, null);
+      previewPdfOfflineAtual = pdfBase64Offline;
+      previewPdfOfflineFileNameAtual = fileNameOffline;
       el.avisoPreviaOffline.style.display = 'block';
+      el.btnAbrirPreviaOffline.style.display = 'block';
       el.statusConfirmacao.textContent = '';
     }
 
@@ -1955,6 +1967,21 @@ el.btnGerar.addEventListener('click', async () => {
 
 el.btnCancelarPreview.addEventListener('click', () => {
   fecharPreview_();
+});
+
+el.btnAbrirPreviaOffline.addEventListener('click', async () => {
+  if (!previewPdfOfflineAtual) return;
+  el.btnAbrirPreviaOffline.disabled = true;
+  try {
+    await abrirPdfParaVisualizar_(previewPdfOfflineAtual, previewPdfOfflineFileNameAtual);
+  } catch (err) {
+    console.error(err);
+    el.statusConfirmacao.textContent = 'Erro ao abrir a prévia: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.className = 'status erro';
+    RdoApi.logErro('abrir_previa_offline', err && err.message ? err.message : String(err));
+  } finally {
+    el.btnAbrirPreviaOffline.disabled = false;
+  }
 });
 
 // Gera o xlsx/PDF de verdade (SEM marca d'água) e manda pro backend

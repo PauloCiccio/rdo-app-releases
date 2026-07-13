@@ -125,9 +125,9 @@
         <button type="button" id="btn-zoom-mais-final" class="botao-mini">＋</button>
       </div>
       <iframe id="visualizador-final" class="iframe-visualizador-pdf"></iframe>
-      <img id="visualizador-final-offline" class="iframe-visualizador-pdf" style="display:none;" alt="Prévia offline (ilustrativa)">
     </div>
-    <p id="aviso-previa-offline-final" class="orcamento-info" style="display:none;">Sem internet agora - essa é uma prévia ILUSTRATIVA (não é o PDF oficial). O documento de verdade, com marca d'água, é gerado quando a conexão voltar.</p>
+    <p id="aviso-previa-offline-final" class="orcamento-info" style="display:none;">Sem internet agora - gerei um PDF ILUSTRATIVO (layout aproximado, não é o oficial). O documento de verdade, com marca d'água, é gerado quando a conexão voltar.</p>
+    <button type="button" id="btn-abrir-previa-offline-final" class="botao-secundario" style="display:none;">📄 Abrir prévia em PDF</button>
     <button type="button" id="btn-concluir" class="botao-principal">Concluir e Enviar RDO Final</button>
     <button type="button" id="btn-editar" class="botao-secundario">Cancelar / Editar</button>
     <div id="status-confirmacao" class="status" aria-live="polite"></div>
@@ -141,6 +141,7 @@
 
 <script src="excel-fill.js"></script>
 <script src="api.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
 <script src="preview-offline.js"></script>
 <script src="aprovacao.js"></script>
 </body>
