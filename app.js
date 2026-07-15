@@ -2084,11 +2084,19 @@ let atualizandoPreview_ = false; // evita duas atualizações da prévia rodando
 // pra "Abrir prévia em PDF" reaproveitar sem gerar de novo a cada toque.
 let previewPdfOfflineAtual = null;
 let previewPdfOfflineFileNameAtual = null;
+// URL local (Blob) do PDF mostrado no iframe da prévia online - revogada a
+// cada nova prévia gerada e ao fechar o cartão, pra não acumular memória
+// numa sessão com várias atualizações seguidas.
+let previewObjectUrlAtual_ = null;
 
 function fecharPreview_() {
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
+  if (previewObjectUrlAtual_) {
+    URL.revokeObjectURL(previewObjectUrlAtual_);
+    previewObjectUrlAtual_ = null;
+  }
   el.avisoPreviaOffline.style.display = 'none';
   el.btnAbrirPreviaOffline.style.display = 'none';
   previewPdfOfflineAtual = null;
@@ -2254,11 +2262,18 @@ async function atualizarPreviewInline_() {
       previewNumeroAtual = numero;
 
       const { base64: xlsxPreviewBase64, fileName: fileNamePreview, avisos } = await RdoExcel.gerarWorkbook(state, numero, { apenasPreview: true });
-      const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
-      if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
+      // previsualizarRDO (não gerarLinkPreview) - devolve o PDF pronto em
+      // base64 em vez de salvar no Drive e apontar pro visualizador do
+      // Google, que é pesado pra carregar num iframe (era o gargalo real
+      // da prévia). Um Blob local abre na hora, sem depender do Drive.
+      const respPreview = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
+      if (!respPreview.ok) throw new Error(respPreview.erro || 'Não consegui gerar a prévia.');
+
+      if (previewObjectUrlAtual_) URL.revokeObjectURL(previewObjectUrlAtual_);
+      previewObjectUrlAtual_ = URL.createObjectURL(base64ParaBlob_(respPreview.pdfBase64, 'application/pdf'));
 
       el.visualizadorApp.style.display = 'block';
-      el.visualizadorApp.src = respLink.pdfUrl;
+      el.visualizadorApp.src = previewObjectUrlAtual_;
       el.wrapVisualizadorApp.style.display = 'block';
 
       if (avisos && avisos.length) {
