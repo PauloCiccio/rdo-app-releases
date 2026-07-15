@@ -44,6 +44,14 @@
     </div>
   </div>
 
+  <div id="cartao-aprovacoes-internas" style="display:none;">
+    <h3 class="subtitulo-perfil">RDOs para revisar
+      <span id="badge-aprovacoes-internas" class="badge-aba badge-inline" style="display:none;"></span>
+    </h3>
+    <div id="lista-aprovacoes-internas"></div>
+    <p class="orcamento-info" id="aprovacoes-internas-sem-itens" style="display:none;">Nenhum RDO aguardando revisão.</p>
+  </div>
+
   <div id="perfil-carregando" class="status">Carregando seus RDOs...</div>
   <div id="perfil-erro" class="status erro" style="display:none;"></div>
 
@@ -89,25 +97,22 @@
 
 <section class="cartao" id="cartao-login">
   <h2>Login</h2>
-  <label for="campo-login-usuario">Usuário</label>
-  <input type="text" id="campo-login-usuario" autocomplete="username" autocapitalize="off" autocorrect="off">
-  <label for="campo-senha-usuario">Senha</label>
-  <input type="password" id="campo-senha-usuario" autocomplete="current-password">
-  <button type="button" id="btn-entrar" class="botao-principal">Entrar</button>
-  <div id="status-login" class="status" aria-live="polite"></div>
-</section>
-
-<section class="cartao" id="cartao-primeira-assinatura" style="display:none;">
-  <h2>Cadastre sua assinatura</h2>
-  <p class="orcamento-info">Primeira vez que você entra - sua assinatura fica salva no servidor e não precisa ser desenhada de novo nos próximos RDOs.</p>
-  <label>Assine abaixo com o dedo</label>
-  <canvas id="canvas-assinatura-primeiro-login" class="canvas-assinatura" width="600" height="200"></canvas>
-  <div class="linha-botoes-assinatura">
-    <button type="button" id="btn-limpar-assinatura-primeiro-login" class="botao-secundario">Limpar assinatura</button>
-    <button type="button" id="btn-travar-assinatura-primeiro-login" class="botao-secundario btn-travar travado">Destravar para assinar</button>
+  <div id="bloco-login-normal">
+    <label for="campo-login-usuario">Usuário</label>
+    <input type="text" id="campo-login-usuario" autocomplete="username" autocapitalize="off" autocorrect="off">
+    <label for="campo-senha-usuario">Senha</label>
+    <input type="password" id="campo-senha-usuario" autocomplete="current-password">
+    <button type="button" id="btn-entrar" class="botao-principal">Entrar</button>
   </div>
-  <button type="button" id="btn-salvar-primeira-assinatura" class="botao-principal">Salvar assinatura e continuar</button>
-  <div id="status-primeira-assinatura" class="status" aria-live="polite"></div>
+  <div id="bloco-trocar-senha" style="display:none;">
+    <p>Por segurança, defina uma senha nova antes de continuar (só precisa fazer isso uma vez).</p>
+    <label for="campo-nova-senha">Nova senha (mínimo 8 caracteres)</label>
+    <input type="password" id="campo-nova-senha" autocomplete="new-password">
+    <label for="campo-nova-senha-confirmar">Confirme a nova senha</label>
+    <input type="password" id="campo-nova-senha-confirmar" autocomplete="new-password">
+    <button type="button" id="btn-trocar-senha" class="botao-principal">Definir nova senha e entrar</button>
+  </div>
+  <div id="status-login" class="status" aria-live="polite"></div>
 </section>
 
 <main id="form-rdo" style="display:none;">
@@ -141,6 +146,9 @@
 
       <label for="campo-trecho">Trecho / Local</label>
       <input type="text" id="campo-trecho" placeholder="Preenchido automático, pode editar">
+
+      <label for="campo-os">OS</label>
+      <input type="text" id="campo-os" placeholder="Preenchido automático, pode editar">
 
       <div class="linha-2col">
         <div>
@@ -232,23 +240,23 @@
       <svg class="seta-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </summary>
     <div class="conteudo-secao">
-      <div class="subsecao">
+      <div class="subsecao subsecao-atividades subsecao-atividades-contratada">
         <h3>Atividades - Contratada</h3>
         <p class="orcamento-info">Espaço usado: <span id="orcamento-contratada">0 / 23</span> linhas</p>
         <div id="lista-atividades-contratada" class="lista-atividades"></div>
         <button type="button" id="btn-add-contratada" class="botao-secundario">+ Adicionar atividade</button>
       </div>
 
-      <div class="subsecao">
+      <div class="subsecao subsecao-atividades subsecao-atividades-contratante" id="subsecao-atividades-contratante">
         <h3>Atividades - Contratante</h3>
         <p class="orcamento-info">Espaço usado: <span id="orcamento-contratante">0 / 10</span> linhas</p>
         <div id="lista-atividades-contratante" class="lista-atividades"></div>
-        <button type="button" id="btn-add-contratante" class="botao-secundario">+ Adicionar atividade</button>
+        <button type="button" id="btn-add-contratante" class="botao-secundario botao-balao-bloqueado">+ Adicionar atividades do Contratante</button>
       </div>
     </div>
   </details>
 
-  <details class="secao-formulario">
+  <details class="secao-formulario" id="secao-assinaturas-envio">
     <summary>
       <svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"/><path d="M14.5 5.9l3.6 3.6 2-2a1.5 1.5 0 0 0 0-2.12l-1.48-1.48a1.5 1.5 0 0 0-2.12 0l-2 2z"/></svg>
       <span class="numero-secao">5</span>
@@ -257,52 +265,28 @@
     </summary>
     <div class="conteudo-secao">
       <div class="subsecao">
-        <h3>Assinatura da Contratada</h3>
+        <h3>Elaborador</h3>
         <p id="assinatura-contratada-info"></p>
-        <button type="button" id="btn-atualizar-assinatura-contratada" class="botao-secundario">Atualizar minha assinatura</button>
-
-        <div id="bloco-redesenhar-assinatura-contratada" style="display:none;">
-          <label>Assine abaixo com o dedo</label>
-          <canvas id="canvas-assinatura-contratada" class="canvas-assinatura" width="600" height="200"></canvas>
-          <div class="linha-botoes-assinatura">
-            <button type="button" id="btn-limpar-assinatura-contratada" class="botao-secundario">Limpar assinatura</button>
-            <button type="button" id="btn-travar-assinatura-contratada" class="botao-secundario btn-travar travado">Destravar para assinar</button>
-          </div>
-          <button type="button" id="btn-salvar-nova-assinatura-contratada" class="botao-principal">Salvar nova assinatura</button>
-          <div id="status-nova-assinatura-contratada" class="status" aria-live="polite"></div>
-        </div>
-      </div>
-
-      <div class="subsecao">
-        <h3>Assinatura do Contratante</h3>
-        <p class="orcamento-info">Se o representante do Contratante estiver na obra agora, ele assina aqui embaixo. Se não estiver, marque "Contratante irá verificar o RDO em seu E-mail" logo abaixo, ao lado do botão de pré-visualizar - um dos dois é obrigatório.</p>
-        <label for="campo-nome-assinante">Nome de quem está assinando</label>
-        <input type="text" id="campo-nome-assinante" placeholder="Nome completo">
-        <label>Assine abaixo com o dedo</label>
-        <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
-        <div class="linha-botoes-assinatura">
-          <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
-          <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">Destravar para assinar</button>
-        </div>
-        <label class="linha-checkbox">
-          <input type="checkbox" id="campo-concordo">
-          Declaro que sou representante do Contratante e concordo com as informações registradas neste RDO
-        </label>
       </div>
 
       <div class="subsecao">
         <h3>E-mail e Envio</h3>
-        <label for="campo-email-contratante">E-mail do responsável da Contratante</label>
-        <input type="email" id="campo-email-contratante" placeholder="email@exemplo.com" inputmode="email" autocomplete="off">
-        <p class="orcamento-info">Usado como cópia (CC) se o Contratante assinar na hora, ou como destino do link de aprovação se marcar a caixa abaixo.</p>
-        <label class="linha-checkbox">
-          <input type="checkbox" id="campo-aprovacao-contratante">
-          Contratante irá verificar o RDO em seu E-mail
-        </label>
-        <p class="orcamento-info" id="aviso-aprovacao-contratante" style="display:none;">
-          O Contratante vai receber um e-mail com o PDF e um link pra escrever as
-          atividades da Contratante e assinar. O RDO final só é enviado (pra você
-          e pro Contratante) depois que ele concluir por lá.
+        <div id="bloco-email-contratante-envio">
+          <label for="campo-email-contratante">E-mail do responsável da Contratante</label>
+          <input type="email" id="campo-email-contratante" placeholder="email@exemplo.com" inputmode="email" autocomplete="off">
+          <p class="orcamento-info" id="info-email-contratante-envio">
+            O Contratante vai receber um e-mail com o PDF e um link pra escrever as
+            atividades dele e assinar. O RDO final só é enviado (pra você e pro
+            Contratante) depois que ele concluir por lá.
+          </p>
+          <button type="button" id="btn-sem-aprovacao-contratante" class="balao-opcao">
+            Gerar RDO sem assinatura da Contratante
+          </button>
+          <p class="orcamento-info" id="aviso-sem-aprovacao-contratante" style="display:none;"></p>
+        </div>
+        <p class="orcamento-info" id="aviso-elaborador-aprovacao-interna" style="display:none;">
+          Como você é elaborador, este RDO fica salvo aguardando um administrador
+          revisar e enviar pro Contratante - ele não vai direto pro cliente.
         </p>
         <button type="button" id="btn-gerar" class="botao-principal">Pré-visualizar RDO</button>
         <div id="status-envio" class="status" aria-live="polite"></div>

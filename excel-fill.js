@@ -21,12 +21,18 @@ const RdoExcel = (function () {
   // DUAS linhas dentro da mesma célula (o modelo já veio com wrapText
   // ligado e a linha alta o bastante pra 2 linhas de texto - ver
   // gerarWorkbook).
+  // Modelo trocado de novo em 13/07/2026 (Paulo ajustou o layout - ver
+  // project_rdo_app release da troca de modelo): nº/Rev./Página separaram
+  // rótulo (linha 3, texto estático do modelo, intocado pelo código) de
+  // valor (linha 4/5, mescla própria) - antes rótulo+valor viviam na
+  // MESMA célula mesclada de 3 linhas.
   const CELULAS = {
-    numero: 'L3',      // mescla L3:Q5 (3 linhas) - valign CENTER pra alinhar visualmente com a linha 4
-    rev: 'R3',         // mescla R3:T5, mesma lógica
-    pagina: 'U3',      // mescla U3:V5, mesma lógica
+    numero: 'L4',      // mescla L4:Q5 - só o número, rótulo "RDO - Nº.:" fica em L3 (estático)
+    rev: 'R4',         // mescla R4:T5, mesma lógica - rótulo em R3
+    pagina: 'U4',      // mescla U4:V5, mesma lógica - rótulo em U3
     contratante: 'A6', // "CONTRATANTE:\n" + valor
     obra: 'L6',        // "OBRA: \n" + valor
+    os: 'U6',          // "OS:\n" + valor (rótulo em cima, valor embaixo - mesmo padrão de OBRA/LOCAL; corrigido 15/07/2026, estava lado a lado)
     objeto: 'A7',      // "OBJETO DO CONTRATO:\n" + valor
     local: 'L7',       // "LOCAL: \n" + valor
     data: 'A8'         // "Data:        " + valor (inline, mescla A8:G9)
@@ -53,10 +59,10 @@ const RdoExcel = (function () {
   // (decisão do Paulo).
   const LINHAS_QUANT = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
   const LINHA_TOTAIS = 28;
-  const LINHA_ATIV_CONTRATADA_INICIO = 30; // até 52 no modelo (23 linhas)
-  const LINHA_ATIV_CONTRATANTE_INICIO = 53; // até 62 no modelo (10 linhas)
-  const CAPACIDADE_CONTRATADA = 23; // em "linhas" de ALTURA_POR_LINHA_PT
-  const CAPACIDADE_CONTRATANTE = 10;
+  const LINHA_ATIV_CONTRATADA_INICIO = 30; // até 56 no modelo (27 linhas) - modelo novo de 13/07/2026
+  const LINHA_ATIV_CONTRATANTE_INICIO = 57; // até 69 no modelo (13 linhas) - modelo novo de 14/07/2026 (encolheu de 16 pra 13: a área de assinatura em texto ocupa mais linhas que os antigos blocos de imagem)
+  const CAPACIDADE_CONTRATADA = 27; // em "linhas" de ALTURA_POR_LINHA_PT
+  const CAPACIDADE_CONTRATANTE = 13;
 
   // heurístico de nº de caracteres que cabem numa linha do bloco E:V
   // (Arial 10). Calibrado primeiro via AutoFit numa coluna de teste
@@ -86,6 +92,18 @@ const RdoExcel = (function () {
   function formatarDataBR_(isoYyyyMmDd) {
     const [ano, mes, dia] = isoYyyyMmDd.split('-');
     return `${dia}/${mes}/${ano}`;
+  }
+
+  // Data/hora da assinatura em texto (14/07/2026) - escrita como STRING já
+  // formatada (não Date+numFmt) pra evitar qualquer ambiguidade de timezone/
+  // locale do Excel, mesmo raciocínio já usado pra "Data: "+formatarDataBR_.
+  // dataHoraIso vem de `new Date().toISOString()` capturado no MOMENTO do
+  // clique de salvar/enviar, no fuso do próprio navegador de quem assinou.
+  function formatarDataHoraBR_(dataHoraIso) {
+    if (!dataHoraIso) return '';
+    const d = new Date(dataHoraIso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
 
   function diaSemanaJs_(isoYyyyMmDd) {
@@ -122,7 +140,7 @@ const RdoExcel = (function () {
   // wrapText ligado).
   function preencherObservacoes_(sh, texto) {
     const cell = sh.getCell('L9');
-    cell.value = (texto || '').trim();
+    cell.value = sanitizarTextoLivre_((texto || '').trim());
     cell.alignment = Object.assign({}, cell.alignment, { wrapText: true, vertical: 'top' });
 
     const nLinhas = Math.max(4, Math.ceil((texto || '').length / CHARS_POR_LINHA_OBSERVACOES));
@@ -162,6 +180,39 @@ const RdoExcel = (function () {
     return t.toUpperCase();
   }
 
+  // Iniciais de autoria por atividade (15/07/2026, pedido do Paulo) - ex:
+  // "Paulo Mauricio Cascão Castro Ciccio" -> "P.M.C.C.C". Uma letra por
+  // PALAVRA do nome completo (nome vem da coluna C "Nome" da aba Usuarios,
+  // já salvo por extenso em `item.autor`/`item.editorAutor` - a conversão
+  // pra iniciais só acontece AQUI, na hora de gerar o PDF/xlsx, nunca é
+  // gravada como tal no state, mesmo padrão já usado pra "Data:"/"OS:").
+  function iniciaisNome_(nomeCompleto) {
+    return (nomeCompleto || '').trim().split(/\s+/).filter(Boolean)
+      .map(palavra => palavra[0].toUpperCase()).join('.');
+  }
+
+  // Neutraliza interpretação de fórmula em texto livre de usuário antes de
+  // escrever numa célula. cell.value com uma string comum no ExcelJS grava
+  // texto de verdade (não gera um elemento <f> de fórmula), então abrir o
+  // .xlsx puro no Excel não executaria nada - mas o backend converte o
+  // xlsx em PDF importando-o pro Google Sheets primeiro
+  // (Drive.Files.create com mimeType GOOGLE_SHEETS, ver
+  // converterXlsxParaPdf_ no Code.gs), e o importador de planilhas do
+  // Sheets é conhecido por reinterpretar como fórmula um valor que comece
+  // com =/+/-/@, mesmo vindo de uma célula tipada como string no xlsx
+  // original - conversão que roda automaticamente em toda submissão de
+  // RDO. Prefixar com apóstrofo é a mitigação padrão contra esse tipo de
+  // injeção (mesma usada contra CSV/Formula Injection) - efeito colateral
+  // aceitável: se o Sheets não remover o apóstrofo na importação, ele
+  // aparece como caractere literal no texto final. Não é preciso aplicar
+  // em células que já têm um rótulo fixo concatenado na frente (ex.
+  // "CONTRATANTE:\n" + valor) - o valor da célula como um todo nunca
+  // começa com o caractere de risco nesses casos.
+  function sanitizarTextoLivre_(texto) {
+    const t = String(texto || '');
+    return /^[=+\-@]/.test(t.trim()) ? "'" + t : t;
+  }
+
   // Efetivo (MOD) / Equipamentos e Veículos: 12 linhas físicas
   // COMPARTILHADAS (19-30) entre as colunas lado a lado. Equipamentos e
   // Veículos viraram uma lista ÚNICA no formulário (10/07) - os primeiros
@@ -182,17 +233,20 @@ const RdoExcel = (function () {
       const descVeicAbrev = abreviarDescricaoEquipamento_(itemVeic.descricao);
 
       const cellMod = sh.getCell(`B${r}`);
-      cellMod.value = itemMod.descricao || '';
+      cellMod.value = sanitizarTextoLivre_(itemMod.descricao || '');
       cellMod.alignment = Object.assign({}, cellMod.alignment, { wrapText: true });
-      sh.getCell(`F${r}`).value = itemMod.quant !== '' && itemMod.quant != null ? Number(itemMod.quant) : null;
+      // Quant vai na coluna G - B:F é uma única mescla (rótulo), escrever
+      // em F (célula secundária da mescla) redireciona pro "mestre" B e
+      // apaga a descrição (bug real, 15/07/2026).
+      sh.getCell(`G${r}`).value = itemMod.quant !== '' && itemMod.quant != null ? Number(itemMod.quant) : null;
 
       const cellEquip = sh.getCell(`H${r}`);
-      cellEquip.value = descEquipAbrev;
+      cellEquip.value = sanitizarTextoLivre_(descEquipAbrev);
       cellEquip.alignment = Object.assign({}, cellEquip.alignment, { wrapText: true });
       sh.getCell(`N${r}`).value = itemEquip.quant !== '' && itemEquip.quant != null ? Number(itemEquip.quant) : null;
 
       const cellVeic = sh.getCell(`P${r}`);
-      cellVeic.value = descVeicAbrev;
+      cellVeic.value = sanitizarTextoLivre_(descVeicAbrev);
       cellVeic.alignment = Object.assign({}, cellVeic.alignment, { wrapText: true });
       sh.getCell(`V${r}`).value = itemVeic.quant !== '' && itemVeic.quant != null ? Number(itemVeic.quant) : null;
 
@@ -262,6 +316,15 @@ const RdoExcel = (function () {
   // chegar aqui (botão "+ Adicionar" desabilitado e digitação bloqueada
   // no limite), então na prática `itensDescartados` não deveria mais
   // acontecer, é só uma rede de segurança.
+  // Iniciais de autoria (15/07/2026, pedido do Paulo) - toda atividade da
+  // CONTRATADA com `item.autor` preenchido ganha as iniciais de quem
+  // escreveu ao final, entre colchetes - "[P.M.C.C.C]", SEMPRE (não só
+  // quando passou por revisão interna, ao contrário do "(Nome)" antigo).
+  // Se um admin_master editar uma linha já autorada de outra pessoa
+  // (`item.editorAutor`, ver renderizarListaAtividades em app.js), soma um
+  // 2º grupo de iniciais: "[P.M.C.C.C] ; [F.L.M]". Bloco CONTRATANTE nunca
+  // tem `item.autor` preenchido (vem exclusivamente do link), então nunca
+  // ganha sufixo nenhum aqui - não precisa de parâmetro pra desligar.
   function preencherAtividades_(sh, linhaInicio, capacidadeSlots, itens) {
     const naoVazios = itens.filter(item => (item.discriminacao || '').trim() || item.inicio || item.fim);
 
@@ -270,7 +333,13 @@ const RdoExcel = (function () {
     let itensColocados = 0;
 
     for (const item of naoVazios) {
-      const texto = (item.discriminacao || '').trim();
+      let texto = (item.discriminacao || '').trim();
+      if (item.autor) {
+        texto += ' [' + iniciaisNome_(item.autor) + ']';
+        if (item.editorAutor && item.editorAutor !== item.autor) {
+          texto += ' ; [' + iniciaisNome_(item.editorAutor) + ']';
+        }
+      }
       const nLinhas = estimarLinhasAtividade(texto);
       if (slotsUsados + nLinhas > capacidadeSlots) {
         // não coube mais - para aqui (mantém a ordem cronológica das
@@ -278,9 +347,18 @@ const RdoExcel = (function () {
         break;
       }
 
-      if (item.inicio) sh.getCell(`C${linhaAtual}`).value = item.inicio;
-      if (item.fim) sh.getCell(`D${linhaAtual}`).value = item.fim;
-      sh.getCell(`E${linhaAtual}`).value = texto;
+      // Item com discriminação mas sem horário preenchido (14/07/2026,
+      // pedido do Paulo) mostra um traço em vez de deixar a célula em
+      // branco - deixa claro que o campo foi visto e ficou mesmo vazio.
+      sh.getCell(`C${linhaAtual}`).value = item.inicio || '-';
+      sh.getCell(`D${linhaAtual}`).value = item.fim || '-';
+      sh.getCell(`E${linhaAtual}`).value = sanitizarTextoLivre_(texto);
+      // Bug real corrigido (14/07/2026): as últimas linhas de cada bloco
+      // (55/56 na Contratada, 69 na Contratante) vêm OCULTAS por padrão no
+      // modelo (reserva de overflow, mesmo padrão de sempre) - sem forçar
+      // `hidden = false` aqui, um item que realmente caísse nelas ficava
+      // com o VALOR gravado mas invisível (linha continuava escondida).
+      sh.getRow(linhaAtual).hidden = false;
       sh.getRow(linhaAtual).height = ALTURA_POR_LINHA_PT * nLinhas;
 
       slotsUsados += nLinhas;
@@ -308,57 +386,45 @@ const RdoExcel = (function () {
     return { itensColocados, itensDescartados: naoVazios.length - itensColocados, slotsUsados, capacidadeSlots };
   }
 
-  // Área "Responsável da Contratada" (A63:J66, mescla única de 4 linhas) -
-  // espelha inserirAssinatura_ (Contratante), só que o rótulo já é fixo (o
-  // texto real do modelo é lido direto da célula, não hardcoded aqui). O
-  // rótulo vem TOP-aligned no modelo original (CENTER) - forçado aqui pra
-  // 'top' porque a imagem da assinatura ocupa o resto do bloco (3 das 4
-  // linhas) logo abaixo; com CENTER a imagem ficava sobreposta em cima do
-  // texto (confirmado visualmente - "Re[assinatura]ccio" cortando o nome
-  // ao meio). Calibrado por teste visual (PNG) depois do remapeamento de
-  // 10/07 tarde - ver memória feedback_exceljs_template_fill.
-  function inserirAssinaturaContratada_(workbook, sh, nome, base64Png) {
-    const nomeLimpo = (nome || '').trim();
-    if (!nomeLimpo && !base64Png) return;
-
-    const cell = sh.getCell('A63');
-    const rotuloBase = String(cell.value || '').trim() || 'Responsável da Contratada';
-    cell.value = nomeLimpo ? `${rotuloBase}: ${nomeLimpo}` : rotuloBase;
-    // Rótulo agora fica embaixo do bloco (linha 66), não em cima (linha 63)
-    // - pedido do Paulo, 11/07. Imagem sobe pra ocupar o espaço ACIMA do
-    // rótulo (linhas 63-65) em vez de abaixo dele.
-    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'bottom' });
-
-    if (base64Png) {
-      const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
-      sh.addImage(imageId, {
-        // linha 63.1 (0-based) = Excel linha 64 - pedido do Paulo, 11/07:
-        // a assinatura precisa ficar entre as linhas 64/65 (estava
-        // começando um pouco alto demais, colada na linha 63).
-        tl: { col: 3.4, row: 63.1 },
-        ext: { width: 140, height: 34 }
-      });
-    }
+  // Modelo novo de 13/07/2026: área de assinatura virou 3 blocos lado a
+  // lado nas linhas 71-74 (antes eram imagem desenhada nas linhas 73-76) -
+  // ver [[project_rdo_app]] release de 14/07/2026. Ninguém mais desenha
+  // assinatura em lugar nenhum (nem Elaborador/Aprovador nem Contratante) -
+  // virou uma tabela de TEXTO com cabeçalho fixo do modelo (linha 71:
+  // Função/Responsável/Assinado por/Data da assinatura) e 3 linhas de dados
+  // (72 Elaborador, 73 Aprovador, 74 Contratante), cada uma com 3 células
+  // a preencher: Função (A), Assinado por/Nome (K, com shrinkToFit pra
+  // nomes longos não estourarem a coluna estreita) e Data/hora (R, texto já
+  // formatado dd/mm/aaaa hh:mm:ss). A célula de rótulo do "Responsável"
+  // (F72/F73/F74 - "Elaborador"/"Aprovador"/"Contratante") já é fixa no
+  // modelo, nunca escrita pelo código.
+  function preencherLinhaAssinatura_(sh, linha, funcao, nome, dataHoraIso) {
+    sh.getCell('A' + linha).value = sanitizarTextoLivre_((funcao || '').trim());
+    const celNome = sh.getCell('K' + linha);
+    celNome.value = sanitizarTextoLivre_((nome || '').trim());
+    celNome.alignment = Object.assign({}, celNome.alignment, { shrinkToFit: true });
+    sh.getCell('R' + linha).value = formatarDataHoraBR_(dataHoraIso);
   }
 
-  // Área "Responsável da Contratante" (K63:V66, mescla única de 4 linhas).
-  function inserirAssinatura_(workbook, sh, nome, base64Png) {
-    const nomeLimpo = (nome || '').trim();
-    if (!nomeLimpo && !base64Png) return;
+  function inserirElaborador_(sh, funcao, nome, dataHoraIso) {
+    preencherLinhaAssinatura_(sh, 72, funcao, nome, dataHoraIso);
+  }
 
-    const cell = sh.getCell('K63');
-    const rotuloBase = String(cell.value || '').trim() || 'Responsável da Contratante';
-    cell.value = nomeLimpo ? `${rotuloBase}: ${nomeLimpo}` : rotuloBase;
-    // Mesmo ajuste do bloco da Contratada acima (rótulo embaixo, linha 66).
-    cell.alignment = Object.assign({}, cell.alignment, { vertical: 'bottom' });
-
-    if (base64Png) {
-      const imageId = workbook.addImage({ base64: base64Png, extension: 'png' });
-      sh.addImage(imageId, {
-        tl: { col: 15.7, row: 63.1 },
-        ext: { width: 140, height: 34 }
-      });
+  // Só preenchido quando o RDO passou por revisão de um administrador (ver
+  // fluxo de aprovação interna) - Função/Nome já salvos do login de quem
+  // revisou. Quando não há Aprovador (RDO enviado direto por quem já é
+  // admin/admin_master, sem revisão de terceiros), a linha 73 inteira fica
+  // OCULTA - o próprio autor já é autoridade suficiente pelo conteúdo.
+  function inserirAprovador_(sh, funcao, nome, dataHoraIso, mostrar) {
+    if (!mostrar) {
+      sh.getRow(73).hidden = true;
+      return;
     }
+    preencherLinhaAssinatura_(sh, 73, funcao, nome, dataHoraIso);
+  }
+
+  function inserirContratante_(sh, funcao, nome, dataHoraIso) {
+    preencherLinhaAssinatura_(sh, 74, funcao, nome, dataHoraIso);
   }
 
   async function carregarTemplate_() {
@@ -415,18 +481,22 @@ const RdoExcel = (function () {
     const workbook = await carregarTemplate_();
     const sh = workbook.getWorksheet('RDO');
 
-    // RDO nº/Rev./Página ficam numa mescla de 3 linhas (X3:Y5) - vertical
-    // CENTER pra o texto (uma linha só) cair visualmente alinhado com a
-    // linha 4 do meio, em vez de colado no topo (pedido do Paulo, 10/07
-    // tarde).
+    // RDO nº/Rev./Página: rótulo já é texto estático do modelo (linha 3),
+    // aqui só escreve o VALOR na mescla de baixo (linha 4/5) - modelo novo
+    // de 13/07/2026 separou rótulo de valor (antes ficavam juntos na
+    // mesma célula, "RDO - Nº.: " + numero).
     const celCentralizada = (endereco, texto) => {
       const cell = sh.getCell(endereco);
       cell.value = texto;
-      cell.alignment = Object.assign({}, cell.alignment, { vertical: 'middle' });
+      // Corrigido 14/07: a função já se chamava "centralizada" mas só
+      // setava o alinhamento VERTICAL - o valor (nº/Rev./Página) ficava
+      // encostado à esquerda da célula em vez de centralizado de verdade
+      // (pedido do Paulo: "alinhe no meio da linha").
+      cell.alignment = Object.assign({}, cell.alignment, { vertical: 'middle', horizontal: 'center' });
     };
-    celCentralizada(CELULAS.numero, 'RDO - Nº.: ' + numero);
-    celCentralizada(CELULAS.rev, 'Rev.: 0');
-    celCentralizada(CELULAS.pagina, 'Página.: 1/1'); // RDO sempre cabe em 1 página (área de impressão fixa) - paginação automática abandonada em 11/07
+    celCentralizada(CELULAS.numero, String(numero));
+    celCentralizada(CELULAS.rev, '0');
+    celCentralizada(CELULAS.pagina, '1/1'); // RDO sempre cabe em 1 página (área de impressão fixa) - paginação automática abandonada em 11/07
 
     // Contratante/Obra/Objeto do Contrato/Local: rótulo na 1ª linha, valor
     // na 2ª (mesma célula, quebra de linha manual) - pedido do Paulo
@@ -435,6 +505,7 @@ const RdoExcel = (function () {
     // 33.75pt, o dobro do normal) pra caber as 2 linhas.
     sh.getCell(CELULAS.contratante).value = 'CONTRATANTE:\n' + state.contratante;
     sh.getCell(CELULAS.obra).value = 'OBRA:\n' + state.obra;
+    sh.getCell(CELULAS.os).value = 'OS:\n' + (state.os || '');
     sh.getCell(CELULAS.objeto).value = 'OBJETO DO CONTRATO:\n' + state.objetoContrato;
     sh.getCell(CELULAS.local).value = 'LOCAL:\n' + state.local;
     sh.getCell(CELULAS.data).value = 'Data: ' + formatarDataBR_(state.data);
@@ -447,11 +518,18 @@ const RdoExcel = (function () {
     preencherEfetivoEquipVeiculos_(sh, state.efetivo, state.equipamentos);
     preencherTotais_(sh, state.efetivo, state.equipamentos);
 
+    // Linha do Aprovador só faz sentido quando o RDO passou pela revisão
+    // interna (existe um Aprovador de verdade) - um RDO de autor único
+    // (admin/admin_master enviando direto) nunca mostra a linha 73 (fica
+    // oculta). Sufixação de iniciais nas atividades é independente disso
+    // (ver preencherAtividades_) - sempre aparece quando há `item.autor`.
+    const mostrarAprovador = Boolean(state.assinaturaAprovadorNome && state.assinaturaAprovadorNome.trim());
     const resContratada = preencherAtividades_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, state.atividadesContratada);
     const resContratante = preencherAtividades_(sh, LINHA_ATIV_CONTRATANTE_INICIO, CAPACIDADE_CONTRATANTE, state.atividadesContratante);
 
-    inserirAssinaturaContratada_(workbook, sh, state.assinaturaContratadaNome, state.assinaturaContratadaImagemBase64);
-    inserirAssinatura_(workbook, sh, state.assinaturaNome, state.assinaturaImagemBase64);
+    inserirElaborador_(sh, state.assinaturaContratadaFuncao, state.assinaturaContratadaNome, state.assinaturaContratadaDataHora);
+    inserirAprovador_(sh, state.assinaturaAprovadorFuncao, state.assinaturaAprovadorNome, state.assinaturaAprovadorDataHora, mostrarAprovador);
+    inserirContratante_(sh, state.assinaturaFuncao, state.assinaturaNome, state.assinaturaDataHora);
 
     if (opts && opts.apenasPreview) {
       await inserirMarcaDaguaPreview_(workbook, sh);
@@ -460,8 +538,11 @@ const RdoExcel = (function () {
     const buffer = await workbook.xlsx.writeBuffer();
     const { base64, blob } = await bufferParaBase64_(buffer);
 
-    const numeroFormatado = String(numero).padStart(3, '0');
-    const fileName = `RDO_${numeroFormatado}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
+    // Numeração nova (14/07/2026) já vem no formato "OS-AAAAMMDD" (com
+    // sufixo "-2"/"-3" se houver mais de 1 no mesmo dia, ver
+    // montarNumeroRdo_ no Code.gs) - não precisa mais de padStart, era só
+    // pro contador sequencial antigo (ex: "1" -> "001").
+    const fileName = `RDO_${numero}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
 
     const avisos = [];
     if (resContratada.itensDescartados > 0) {

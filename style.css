@@ -207,6 +207,12 @@ textarea { resize: vertical; overflow: hidden; }
   margin-bottom: 10px;
   background: #fff;
 }
+/* Revisão de aprovação interna (14/07) - linha já escrita pelo elaborador
+   (ou por uma revisão anterior), travada pra um administrador comum. */
+.linha-atividade-travada {
+  background: var(--fundo);
+  opacity: 0.75;
+}
 .linha-atividade .cabecalho-atividade {
   display: flex;
   align-items: center;
@@ -240,38 +246,6 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-atividade label { margin: 0 0 4px; }
 .linha-atividade textarea { min-height: 40px; }
 
-.canvas-assinatura {
-  display: block;
-  width: 100%;
-  height: 160px;
-  background: #fff;
-  border: 1px dashed var(--borda);
-  border-radius: var(--raio-md);
-  touch-action: none;
-  margin-top: 4px;
-}
-
-/* Marca d'água da FN só no canvas da Contratada (é a assinatura da
-   própria empresa) - fica só no CSS de fundo do elemento, nunca entra no
-   PNG exportado (canvas.toDataURL() só captura o que foi desenhado no
-   buffer do canvas, não o background CSS por trás dele). */
-#canvas-assinatura-contratada {
-  background-image: url('assets/logo_marca_dagua.png');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 110px;
-}
-
-/* Marca d'água do Contratante (imagem genérica de "cliente/fiscal de
-   obra" escolhida pelo Paulo, 10/07) no canvas da Contratante - mesma
-   lógica da marca d'água da FN acima. */
-#canvas-assinatura {
-  background-image: url('assets/logo_marca_dagua_contratante.png');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 110px;
-}
-
 .botao-secundario,
 .botao-principal {
   margin-bottom: 8px;
@@ -294,16 +268,17 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .orcamento-info.cheio { color: var(--erro); font-weight: bold; }
 
-.linha-botoes-assinatura {
-  display: flex;
-  gap: 8px;
-}
-.linha-botoes-assinatura .botao-secundario { margin-top: 0; }
-.btn-travar.travado {
-  background: var(--erro);
-  color: #fff;
-  border-color: var(--erro);
-}
+/* Texto explicativo logo depois de um <input> (não uma lista/botão, que já
+   têm espaço próprio) - a margem negativa padrão de .orcamento-info acima
+   "atropela" a caixa do campo, sem respiro nenhum entre a borda e o texto
+   (reportado pelo Paulo, 15/07/2026). */
+#info-email-contratante-envio { margin-top: 8px; }
+
+/* Mesmo problema do acima, agora entre o balão "Gerar RDO sem assinatura
+   da Contratante" e o texto de compromisso que aparece quando ele é
+   marcado - a margem negativa padrão colava o texto na borda do balão
+   (reportado pelo Paulo, 15/07/2026). */
+#aviso-sem-aprovacao-contratante { margin-top: 8px; }
 
 .botao-secundario {
   width: 100%;
@@ -417,6 +392,16 @@ textarea { resize: vertical; overflow: hidden; }
   font-weight: bold;
   line-height: 16px;
   text-align: center;
+}
+
+/* Badge inline (14/07, "RDOs para revisar") - mesmo visual do .badge-aba
+   (bolinha vinho/dourado com número), só que no fluxo normal do texto em
+   vez de posicionado sobre um ícone de aba. */
+.badge-inline {
+  position: static;
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 /* Cabeçalho/resumo/rodapé do Meu Perfil (12/07) - "Perfil" virou também o
@@ -565,6 +550,74 @@ textarea { resize: vertical; overflow: hidden; }
   letter-spacing: .03em;
   color: var(--texto-suave);
   margin: 0 0 10px;
+}
+
+/* Separação visual melhor entre Atividades da Contratada e da Contratante
+   (14/07) - antes as duas subseções só tinham a linha tracejada genérica
+   (mesma de qualquer par de subseções empilhadas), fácil de confundir
+   qual bloco é de quem. Cor vinho = Contratada (mesma cor da marca/FN em
+   todo o resto do app), dourado = Contratante (cor de destaque, sinaliza
+   "é de fora"). Sobrescreve o border-top tracejado genérico (a borda
+   lateral colorida já cumpre esse papel de separador). */
+.secao-formulario .conteudo-secao > .subsecao-atividades + .subsecao-atividades {
+  border-top: none;
+  margin-top: 16px;
+  padding-top: 0;
+}
+.subsecao-atividades {
+  border-left: 4px solid transparent;
+  border-radius: var(--raio-sm);
+  padding: 10px 10px 10px 12px;
+}
+.subsecao-atividades-contratada {
+  border-left-color: var(--vinho);
+  background: var(--vinho-claro);
+}
+.subsecao-atividades-contratada > h3 { color: var(--vinho); }
+.subsecao-atividades-contratante {
+  border-left-color: var(--dourado-escuro);
+  background: var(--dourado-claro);
+}
+.subsecao-atividades-contratante > h3 { color: var(--dourado-escuro); }
+
+/* Balão "Adicionar atividades do Contratante" (14/07) - nasce com cara de
+   bloqueado/apagado (igual outros elementos desabilitados do app) porque
+   normalmente NINGUÉM preenche essa lista no fluxo direto (é o Contratante
+   quem escreve, pela tela de aprovação por link) - só faz sentido usar
+   aqui se o representante do Contratante estiver presente e ditando as
+   atividades na hora. Primeiro clique "libera" o visual (some essa
+   classe via JS, vira botão secundário normal) e already adiciona a
+   primeira linha.
+*/
+.botao-balao-bloqueado {
+  background: var(--desabilitado-bg);
+  color: var(--desabilitado-texto);
+  border: 1px dashed var(--desabilitado-texto);
+}
+
+/* Balão de opção liga/desliga (15/07/2026) - ex: "Gerar RDO sem assinatura
+   da Contratante". Mesma linguagem visual do .balao circular (contorno
+   neutro -> dourado quando marcado), só que em formato de botão largo com
+   texto, pra opções que precisam de rótulo em vez de um ícone só. */
+.balao-opcao {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 2px solid var(--borda);
+  border-radius: var(--raio-sm);
+  background: #fff;
+  color: var(--texto-suave);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: center;
+}
+.balao-opcao.marcado {
+  color: var(--vinho-escuro);
+  border-color: var(--dourado);
+  background: var(--dourado-claro);
 }
 
 /* Tela de Perfil - RDOs agrupados por obra, ver telaPerfil_ em app.js */

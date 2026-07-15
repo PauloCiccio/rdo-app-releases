@@ -49,12 +49,6 @@
     <input type="text" id="campo-funcao" placeholder="Ex: Fiscal de obra, Engenheiro responsável" autocomplete="off">
     <label for="campo-empresa">Responsável por qual empresa</label>
     <input type="text" id="campo-empresa" placeholder="Nome da empresa" autocomplete="off">
-    <label>Assine abaixo com o dedo (fica salva pra você não precisar assinar de novo nas próximas obras)</label>
-    <canvas id="canvas-assinatura-cadastro" class="canvas-assinatura" width="600" height="200"></canvas>
-    <div class="linha-botoes-assinatura">
-      <button type="button" id="btn-limpar-assinatura-cadastro" class="botao-secundario">Limpar assinatura</button>
-      <button type="button" id="btn-travar-assinatura-cadastro" class="botao-secundario btn-travar travado">Destravar para assinar</button>
-    </div>
     <button type="button" id="btn-salvar-cadastro" class="botao-principal">Salvar e continuar</button>
     <div id="status-cadastro" class="status" aria-live="polite"></div>
   </section>
@@ -105,12 +99,6 @@
   <section class="cartao" id="cartao-assinatura" style="display:none;">
     <h2><svg class="icone-secao" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25z"/><path d="M14.5 5.9l3.6 3.6 2-2a1.5 1.5 0 0 0 0-2.12l-1.48-1.48a1.5 1.5 0 0 0-2.12 0l-2 2z"/></svg>Assinatura</h2>
     <p class="orcamento-info">Assinando como: <strong id="assinatura-nome-exibicao"></strong></p>
-    <label>Assine abaixo com o dedo</label>
-    <canvas id="canvas-assinatura" class="canvas-assinatura" width="600" height="200"></canvas>
-    <div class="linha-botoes-assinatura">
-      <button type="button" id="btn-limpar-assinatura" class="botao-secundario">Limpar assinatura</button>
-      <button type="button" id="btn-travar-assinatura" class="botao-secundario btn-travar travado">Destravar para assinar</button>
-    </div>
     <label class="linha-checkbox">
       <input type="checkbox" id="campo-concordo">
       Declaro que sou responsável pela Contratante e concordo com as informações registradas neste RDO

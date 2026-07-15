@@ -1,15 +1,14 @@
 // Página pública (link mandado por e-mail, ver enviarParaAprovacao_ no
 // Code.gs) onde o Contratante se identifica (CPF+Nome, cadastro na
-// primeira vez), escreve as atividades dele e assina por toque (mesmo
-// mecanismo do app principal - canvas). O RDO final (FN + Contratante)
-// é enviado direto nesta mesma página, sem serviço externo - o registro
-// de auditoria (CPF conferido + horário do servidor + IP/navegador do
-// cliente) é o que dá a esse "visto" digital o mesmo valor (ou mais) que
-// um visto em papel (ver finalizarAprovacao_ no Code.gs).
+// primeira vez), escreve as atividades dele e confirma (declaração de
+// concordância) - sem desenhar assinatura nenhuma (14/07/2026, ver
+// [[project_rdo_app]]: o registro de auditoria - CPF conferido + horário
+// do servidor + IP/navegador do cliente - é o que dá a esse "visto"
+// digital o mesmo valor (ou mais) que um visto em papel, ver
+// finalizarAprovacao_ no Code.gs).
 //
 // Algumas funções abaixo (temConteudoAtividade/calcularLinhasUsadas/
-// atualizarOrcamento/renderizarListaAtividades/autoGrow/
-// configurarCanvasAssinatura_/configurarBotaoTravar_) são cópias das
+// atualizarOrcamento/renderizarListaAtividades/autoGrow) são cópias das
 // equivalentes em app.js - mantidas sincronizadas à mão (mesmo padrão já
 // usado entre excel-fill.js e test_excel_fill.js neste projeto), já que
 // são páginas HTML separadas sem um bundler que permita compartilhar
@@ -30,9 +29,6 @@ const el = {
   cartaoCadastro: document.getElementById('cartao-cadastro'),
   funcao: document.getElementById('campo-funcao'),
   empresa: document.getElementById('campo-empresa'),
-  canvasAssinaturaCadastro: document.getElementById('canvas-assinatura-cadastro'),
-  btnLimparAssinaturaCadastro: document.getElementById('btn-limpar-assinatura-cadastro'),
-  btnTravarAssinaturaCadastro: document.getElementById('btn-travar-assinatura-cadastro'),
   btnSalvarCadastro: document.getElementById('btn-salvar-cadastro'),
   statusCadastro: document.getElementById('status-cadastro'),
 
@@ -66,9 +62,6 @@ const el = {
 
   cartaoAssinatura: document.getElementById('cartao-assinatura'),
   assinaturaNomeExibicao: document.getElementById('assinatura-nome-exibicao'),
-  canvasAssinatura: document.getElementById('canvas-assinatura'),
-  btnLimparAssinatura: document.getElementById('btn-limpar-assinatura'),
-  btnTravarAssinatura: document.getElementById('btn-travar-assinatura'),
   concordo: document.getElementById('campo-concordo'),
 
   cartaoEnviar: document.getElementById('cartao-enviar'),
@@ -289,93 +282,6 @@ function renderizarListaAtividades(cfg) {
   atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd);
 }
 
-// Assinatura por toque - cópia de configurarCanvasAssinatura_/
-// configurarBotaoTravar_ do app.js (ver comentário no topo do arquivo).
-function configurarCanvasAssinatura_(canvas) {
-  const ctx = canvas.getContext('2d');
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#1a1a1a';
-  let assinando = false;
-  const estado = { temAssinatura: false, travada: true };
-  canvas.style.touchAction = 'pan-y';
-
-  function posNoCanvas(e) {
-    const rect = canvas.getBoundingClientRect();
-    const escalaX = canvas.width / rect.width;
-    const escalaY = canvas.height / rect.height;
-    return { x: (e.clientX - rect.left) * escalaX, y: (e.clientY - rect.top) * escalaY };
-  }
-
-  canvas.addEventListener('pointerdown', e => {
-    if (estado.travada) return;
-    assinando = true;
-    estado.temAssinatura = true;
-    const p = posNoCanvas(e);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', e => {
-    if (!assinando || estado.travada) return;
-    const p = posNoCanvas(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-  });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => {
-    canvas.addEventListener(ev, () => { assinando = false; });
-  });
-
-  return {
-    ctx,
-    estado,
-    limpar() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      estado.temAssinatura = false;
-    },
-    // Redesenha uma assinatura já salva (cópia de app.js, ver comentário lá) -
-    // usado pra lembrar a assinatura do Contratante de uma obra pra outra.
-    // Continua TRAVADO por padrão mesmo restaurada.
-    restaurar(base64Png) {
-      return new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          estado.temAssinatura = true;
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = 'data:image/png;base64,' + base64Png;
-      });
-    },
-    alternarTravamento() {
-      estado.travada = !estado.travada;
-      canvas.style.touchAction = estado.travada ? 'pan-y' : 'none';
-      return estado.travada;
-    }
-  };
-}
-
-function configurarBotaoTravar_(botao, assinatura) {
-  botao.textContent = assinatura.estado.travada ? 'Destravar para assinar' : 'Travar assinatura';
-  botao.classList.toggle('travado', assinatura.estado.travada);
-  botao.addEventListener('click', () => {
-    const travada = assinatura.alternarTravamento();
-    botao.textContent = travada ? 'Destravar para assinar' : 'Travar assinatura';
-    botao.classList.toggle('travado', travada);
-  });
-}
-
-const assinaturaContratante = configurarCanvasAssinatura_(el.canvasAssinatura);
-el.btnLimparAssinatura.addEventListener('click', () => assinaturaContratante.limpar());
-configurarBotaoTravar_(el.btnTravarAssinatura, assinaturaContratante);
-
-// Canvas do CADASTRO (13/07) - obrigatório só na primeira vez, ver
-// btnSalvarCadastro.
-const assinaturaCadastro = configurarCanvasAssinatura_(el.canvasAssinaturaCadastro);
-el.btnLimparAssinaturaCadastro.addEventListener('click', () => assinaturaCadastro.limpar());
-configurarBotaoTravar_(el.btnTravarAssinaturaCadastro, assinaturaCadastro);
-
 // IP do cliente (só pra registro de auditoria, ver finalizarAprovacao_ no
 // Code.gs) - reportado pelo PRÓPRIO navegador via serviço público
 // (ipify), não verificado pelo servidor. Melhor esforço: se falhar
@@ -424,11 +330,6 @@ let cpfAtual = null;
 let nomeAtual = null;
 let funcaoAtual = null;
 let empresaAtual = null;
-// Assinatura salva no cadastro (13/07) - lembrada de uma obra pra outra,
-// mesmo padrão já usado pra Contratada no app principal: pré-preenche o
-// canvas de "Assinatura" (travado por padrão) na hora de assinar o RDO -
-// só quem quiser assinar diferente precisa destravar e redesenhar.
-let assinaturaContratanteSalva = null;
 
 const atividadesContratante = [{ inicio: '', fim: '', discriminacao: '' }];
 const cfgAtivContratante = {
@@ -564,7 +465,6 @@ el.btnContinuarIdentificacao.addEventListener('click', async () => {
     if (resp.encontrado) {
       funcaoAtual = resp.funcao;
       empresaAtual = resp.empresa;
-      assinaturaContratanteSalva = resp.assinaturaBase64 || null;
       el.cartaoIdentificacao.style.display = 'none';
       el.confirmarFuncaoTexto.textContent = funcaoAtual;
       el.confirmarEmpresaTexto.textContent = empresaAtual;
@@ -640,18 +540,12 @@ el.btnSalvarCadastro.addEventListener('click', async () => {
     el.statusCadastro.className = 'status erro';
     return;
   }
-  if (!assinaturaCadastro.estado.temAssinatura) {
-    el.statusCadastro.textContent = 'Desenhe sua assinatura antes de continuar.';
-    el.statusCadastro.className = 'status erro';
-    return;
-  }
 
   el.btnSalvarCadastro.disabled = true;
   try {
     el.statusCadastro.textContent = 'Salvando...';
     el.statusCadastro.className = 'status';
-    const assinaturaBase64 = el.canvasAssinaturaCadastro.toDataURL('image/png').split(',')[1];
-    const resp = await RdoApi.cadastrarCliente({ cpf: cpfAtual, nome: nomeAtual, funcao, empresa, assinaturaBase64 });
+    const resp = await RdoApi.cadastrarCliente({ cpf: cpfAtual, nome: nomeAtual, funcao, empresa });
     if (!resp.ok) {
       el.statusCadastro.textContent = resp.erro || 'Não consegui salvar o cadastro.';
       el.statusCadastro.className = 'status erro';
@@ -660,7 +554,6 @@ el.btnSalvarCadastro.addEventListener('click', async () => {
 
     funcaoAtual = funcao;
     empresaAtual = empresa;
-    assinaturaContratanteSalva = assinaturaBase64;
     el.cartaoCadastro.style.display = 'none';
     liberarFormularioPrincipal_();
   } catch (err) {
@@ -672,7 +565,7 @@ el.btnSalvarCadastro.addEventListener('click', async () => {
   }
 });
 
-async function liberarFormularioPrincipal_() {
+function liberarFormularioPrincipal_() {
   el.infoIdentificado.textContent = `${nomeAtual} (${funcaoAtual} - ${empresaAtual})`;
   el.assinaturaNomeExibicao.textContent = nomeAtual;
   el.info.style.display = 'block';
@@ -680,13 +573,6 @@ async function liberarFormularioPrincipal_() {
   el.cartaoAssinatura.style.display = 'block';
   el.cartaoEnviar.style.display = 'block';
   renderizarListaAtividades(cfgAtivContratante);
-
-  // Lembra a assinatura salva (13/07) - pré-preenche o canvas, travado por
-  // padrão (mesmo padrão já usado pra Contratada no app principal) - só
-  // quem quiser assinar diferente precisa destravar e redesenhar.
-  if (assinaturaContratanteSalva) {
-    await assinaturaContratante.restaurar(assinaturaContratanteSalva);
-  }
 }
 
 // Pré-visualização (12/07) - fundida num passo só (mesmo pedido do
@@ -718,11 +604,11 @@ function abrirPdfNoBrowser_(base64, fileName) {
 }
 
 function montarStateFinal_() {
-  const assinaturaImagemBase64 = el.canvasAssinatura.toDataURL('image/png').split(',')[1];
   return Object.assign({}, stateOriginal, {
     atividadesContratante: atividadesContratante.filter(temConteudoAtividade),
     assinaturaNome: nomeAtual,
-    assinaturaImagemBase64,
+    assinaturaFuncao: funcaoAtual,
+    assinaturaDataHora: new Date().toISOString(),
     assinaturaConcordo: true
   });
 }
@@ -730,11 +616,6 @@ function montarStateFinal_() {
 async function atualizarPreviewFinalInline_() {
   if (el.cartaoPreviewFinal.style.display !== 'block') return;
   if (atualizandoPreviewFinal_) return;
-  if (!assinaturaContratante.estado.temAssinatura) {
-    el.statusConfirmacao.textContent = 'Desenhe sua assinatura antes de continuar.';
-    el.statusConfirmacao.className = 'status erro';
-    return;
-  }
   if (!el.concordo.checked) {
     el.statusConfirmacao.textContent = 'Marque a caixa de concordância antes de continuar.';
     el.statusConfirmacao.className = 'status erro';
@@ -787,11 +668,6 @@ async function atualizarPreviewFinalInline_() {
 }
 
 el.btnPrevisualizar.addEventListener('click', async () => {
-  if (!assinaturaContratante.estado.temAssinatura) {
-    el.statusEnvio.textContent = 'Desenhe sua assinatura antes de continuar.';
-    el.statusEnvio.className = 'status erro';
-    return;
-  }
   if (!el.concordo.checked) {
     el.statusEnvio.textContent = 'Marque a caixa de concordância antes de continuar.';
     el.statusEnvio.className = 'status erro';
@@ -851,7 +727,6 @@ el.btnConcluir.addEventListener('click', async () => {
       pdfBase64: respPdfFinal.pdfBase64,
       fileName: fileNameFinal,
       assinaturaNome: stateFinal.assinaturaNome,
-      assinaturaImagemBase64: stateFinal.assinaturaImagemBase64,
       cpf: cpfAtual,
       ipCliente: ipClienteDetectado,
       userAgent: navigator.userAgent
