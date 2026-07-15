@@ -285,6 +285,8 @@ const el = {
   visualizadorApp: document.getElementById('visualizador-app'),
   avisoPreviaOffline: document.getElementById('aviso-previa-offline'),
   btnAbrirPreviaOffline: document.getElementById('btn-abrir-previa-offline'),
+  avisoPreviaAppNativo: document.getElementById('aviso-previa-app-nativo'),
+  btnAbrirPreviaAppNativo: document.getElementById('btn-abrir-previa-app-nativo'),
   btnZoomMaisApp: document.getElementById('btn-zoom-mais-app'),
   btnZoomMenosApp: document.getElementById('btn-zoom-menos-app'),
   btnAtualizarPreviaApp: document.getElementById('btn-atualizar-previa-app'),
@@ -482,6 +484,24 @@ function completarHorarioNoBlur_(valor) {
   return hh + ':' + mm;
 }
 
+// Iniciais de quem editou (15/07/2026) - só se aplica à lista da
+// Contratada (Contratante não tem esse conceito, é sempre o link). Uma
+// linha só chega com `item.autor` já preenchido durante uma revisão
+// interna com admin_master (bypass total - ver
+// aplicarTravamentoRevisaoInterna_, único perfil que consegue editar uma
+// linha travada). Se quem está editando agora é diferente de quem
+// escreveu originalmente, carimba `editorAutor` - aparece como um 2º
+// grupo de iniciais no PDF (ver preencherAtividades_ em excel-fill.js).
+// Vale pra QUALQUER campo da linha (discriminação OU só o horário) - mudar
+// só o horário sem tocar no texto também conta como edição.
+function carimbarEditorSeMudou_(item, container) {
+  if (container !== el.listaAtivContratada || !item.autor) return;
+  const sessaoAtual = carregarSessaoUsuario_();
+  if (sessaoAtual && sessaoAtual.nome && sessaoAtual.nome !== item.autor) {
+    item.editorAutor = sessaoAtual.nome;
+  }
+}
+
 function renderizarListaAtividades(cfg) {
   const { itens, container, elOrcamento, btnAdd, capacidade } = cfg;
   container.innerHTML = '';
@@ -521,18 +541,22 @@ function renderizarListaAtividades(cfg) {
     linha.querySelector('.input-inicio').addEventListener('input', e => {
       e.target.value = aplicarMascaraHorario_(e.target.value);
       item.inicio = e.target.value;
+      carimbarEditorSeMudou_(item, container);
     });
     linha.querySelector('.input-inicio').addEventListener('blur', e => {
       e.target.value = completarHorarioNoBlur_(e.target.value);
       item.inicio = e.target.value;
+      carimbarEditorSeMudou_(item, container);
     });
     linha.querySelector('.input-fim').addEventListener('input', e => {
       e.target.value = aplicarMascaraHorario_(e.target.value);
       item.fim = e.target.value;
+      carimbarEditorSeMudou_(item, container);
     });
     linha.querySelector('.input-fim').addEventListener('blur', e => {
       e.target.value = completarHorarioNoBlur_(e.target.value);
       item.fim = e.target.value;
+      carimbarEditorSeMudou_(item, container);
     });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
     let valorAnterior = item.discriminacao || '';
@@ -563,21 +587,7 @@ function renderizarListaAtividades(cfg) {
       valorAnterior = textoNovo;
       item.discriminacao = textoNovo;
 
-      // Iniciais de quem editou (15/07/2026) - só se aplica à lista da
-      // Contratada (Contratante não tem esse conceito, é sempre o link).
-      // Uma linha só chega aqui com `item.autor` já preenchido durante uma
-      // revisão interna com admin_master (bypass total - ver
-      // aplicarTravamentoRevisaoInterna_, único perfil que consegue editar
-      // texto de uma linha travada). Se quem está editando agora é
-      // diferente de quem escreveu originalmente, carimba `editorAutor` -
-      // aparece como um 2º grupo de iniciais no PDF (ver
-      // preencherAtividades_ em excel-fill.js).
-      if (container === el.listaAtivContratada && item.autor) {
-        const sessaoAtual = carregarSessaoUsuario_();
-        if (sessaoAtual && sessaoAtual.nome && sessaoAtual.nome !== item.autor) {
-          item.editorAutor = sessaoAtual.nome;
-        }
-      }
+      carimbarEditorSeMudou_(item, container);
 
       autoGrow(e.target);
       atualizarEstimativa();
@@ -2088,6 +2098,13 @@ let previewPdfOfflineFileNameAtual = null;
 // cada nova prévia gerada e ao fechar o cartão, pra não acumular memória
 // numa sessão com várias atualizações seguidas.
 let previewObjectUrlAtual_ = null;
+// PDF da prévia online rodando DENTRO do app instalado (Capacitor) - guardado
+// aqui pra "Abrir prévia em PDF" reaproveitar sem gerar de novo a cada
+// toque. O WebView do Android não tem visualizador de PDF nativo, então um
+// <iframe src="blob:..."> simplesmente fica em branco aí - só funciona
+// mostrado embutido em navegador de verdade (ver atualizarPreviewInline_).
+let previewPdfOnlineAppAtual = null;
+let previewPdfOnlineAppFileNameAtual = null;
 
 function fecharPreview_() {
   el.cartaoPreview.style.display = 'none';
@@ -2101,6 +2118,10 @@ function fecharPreview_() {
   el.btnAbrirPreviaOffline.style.display = 'none';
   previewPdfOfflineAtual = null;
   previewPdfOfflineFileNameAtual = null;
+  el.avisoPreviaAppNativo.style.display = 'none';
+  el.btnAbrirPreviaAppNativo.style.display = 'none';
+  previewPdfOnlineAppAtual = null;
+  previewPdfOnlineAppFileNameAtual = null;
   el.statusConfirmacao.textContent = '';
   el.statusConfirmacao.className = 'status';
 }
@@ -2257,6 +2278,8 @@ async function atualizarPreviewInline_() {
     if (RdoConectividade.estaOnline()) {
       el.avisoPreviaOffline.style.display = 'none';
       el.btnAbrirPreviaOffline.style.display = 'none';
+      el.avisoPreviaAppNativo.style.display = 'none';
+      el.btnAbrirPreviaAppNativo.style.display = 'none';
 
       const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra, state.data, state.os);
       previewNumeroAtual = numero;
@@ -2269,12 +2292,27 @@ async function atualizarPreviewInline_() {
       const respPreview = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
       if (!respPreview.ok) throw new Error(respPreview.erro || 'Não consegui gerar a prévia.');
 
-      if (previewObjectUrlAtual_) URL.revokeObjectURL(previewObjectUrlAtual_);
-      previewObjectUrlAtual_ = URL.createObjectURL(base64ParaBlob_(respPreview.pdfBase64, 'application/pdf'));
+      // O WebView do Android (app instalado via Capacitor) não tem
+      // visualizador de PDF nativo - um <iframe src="blob:...">
+      // simplesmente fica em branco aí, mesmo o Blob sendo válido (só
+      // funciona num navegador de verdade, com plugin de PDF embutido).
+      // Rodando no app, mostra um botão que abre no leitor de PDF do
+      // aparelho (mesmo mecanismo já usado pela prévia offline) em vez de
+      // tentar embutir.
+      if (rodandoNoApp_()) {
+        el.wrapVisualizadorApp.style.display = 'none';
+        previewPdfOnlineAppAtual = respPreview.pdfBase64;
+        previewPdfOnlineAppFileNameAtual = fileNamePreview.replace(/\.xlsx$/i, '.pdf');
+        el.avisoPreviaAppNativo.style.display = 'block';
+        el.btnAbrirPreviaAppNativo.style.display = 'block';
+      } else {
+        if (previewObjectUrlAtual_) URL.revokeObjectURL(previewObjectUrlAtual_);
+        previewObjectUrlAtual_ = URL.createObjectURL(base64ParaBlob_(respPreview.pdfBase64, 'application/pdf'));
 
-      el.visualizadorApp.style.display = 'block';
-      el.visualizadorApp.src = previewObjectUrlAtual_;
-      el.wrapVisualizadorApp.style.display = 'block';
+        el.visualizadorApp.style.display = 'block';
+        el.visualizadorApp.src = previewObjectUrlAtual_;
+        el.wrapVisualizadorApp.style.display = 'block';
+      }
 
       if (avisos && avisos.length) {
         el.statusConfirmacao.textContent = 'Atenção: ' + avisos.join(' ');
@@ -2295,6 +2333,8 @@ async function atualizarPreviewInline_() {
       previewNumeroAtual = null;
       el.visualizadorApp.style.display = 'none';
       el.wrapVisualizadorApp.style.display = 'none';
+      el.avisoPreviaAppNativo.style.display = 'none';
+      el.btnAbrirPreviaAppNativo.style.display = 'none';
       const { base64: pdfBase64Offline, fileName: fileNameOffline } = await RdoPreviewOffline.gerarPdfOffline_(state, null);
       previewPdfOfflineAtual = pdfBase64Offline;
       previewPdfOfflineFileNameAtual = fileNameOffline;
@@ -2389,6 +2429,21 @@ el.btnAbrirPreviaOffline.addEventListener('click', async () => {
     RdoApi.logErro('abrir_previa_offline', err && err.message ? err.message : String(err));
   } finally {
     el.btnAbrirPreviaOffline.disabled = false;
+  }
+});
+
+el.btnAbrirPreviaAppNativo.addEventListener('click', async () => {
+  if (!previewPdfOnlineAppAtual) return;
+  el.btnAbrirPreviaAppNativo.disabled = true;
+  try {
+    await abrirPdfParaVisualizar_(previewPdfOnlineAppAtual, previewPdfOnlineAppFileNameAtual);
+  } catch (err) {
+    console.error(err);
+    el.statusConfirmacao.textContent = 'Erro ao abrir a prévia: ' + (err && err.message ? err.message : err);
+    el.statusConfirmacao.className = 'status erro';
+    RdoApi.logErro('abrir_previa_app_nativo', err && err.message ? err.message : String(err));
+  } finally {
+    el.btnAbrirPreviaAppNativo.disabled = false;
   }
 });
 
