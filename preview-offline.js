@@ -254,7 +254,7 @@ const RdoPreviewOffline = (function () {
     // lado a lado numa linha só).
     escreverTexto_(doc, state.os || '', 'U', 6, 9, 17, { padXPt: 4, limparLarguraPt: 76.8 });
     escreverTexto_(doc, state.objetoContrato, 'A', 7, 10, 17, { limparLarguraPt: 372 });
-    escreverTexto_(doc, state.local, 'L', 7, 10, 17, { limparLarguraPt: 307.8 });
+    escreverTexto_(doc, state.local + (state.frente ? ' - Frente ' + state.frente : ''), 'L', 7, 10, 17, { limparLarguraPt: 307.8 });
     if (state.data) {
       const [ano, mes, dia] = state.data.split('-');
       escreverTexto_(doc, dia + '/' + mes + '/' + ano, 'A', 8, 9, 2, { padXPt: 32, limparLarguraPt: 0 });

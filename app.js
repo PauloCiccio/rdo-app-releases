@@ -138,6 +138,12 @@ const state = {
   obra: '',
   servico: '',
   local: '',
+  // Frente de serviço (15/07/2026) - só pra obras com mais de uma frente
+  // rodando ao mesmo tempo; some do "Local:" do relatório quando vazia.
+  // Ao contrário de Contratante/Obra/Local, NUNCA é reaproveitada entre
+  // RDOs (ver resetarParaProximoRdo_) - decisão deliberada: quem troca de
+  // frente de um dia pro outro não pode esquecer de atualizar.
+  frente: '',
   objetoContrato: '',
   data: '',
   // OS (Ordem de Serviço, 14/07/2026) - amarrada à combinação Cliente+
@@ -244,6 +250,9 @@ const el = {
   dlMod: document.getElementById('dl-mod'),
   objeto: document.getElementById('campo-objeto'),
   trecho: document.getElementById('campo-trecho'),
+  btnToggleFrente: document.getElementById('btn-toggle-frente'),
+  blocoFrente: document.getElementById('bloco-frente'),
+  frente: document.getElementById('campo-frente'),
   os: document.getElementById('campo-os'),
   data: document.getElementById('campo-data'),
   btnLimparIdentificacao: document.getElementById('btn-limpar-identificacao'),
@@ -705,6 +714,19 @@ el.data.addEventListener('input', () => {
 });
 el.objeto.addEventListener('input', () => { state.objetoContrato = el.objeto.value; salvarUltimaIdentificacao_(); });
 el.trecho.addEventListener('input', () => { state.local = el.trecho.value; salvarUltimaIdentificacao_(); });
+
+el.btnToggleFrente.addEventListener('click', () => {
+  const abrir = el.blocoFrente.style.display === 'none';
+  el.blocoFrente.style.display = abrir ? 'block' : 'none';
+  el.btnToggleFrente.classList.toggle('marcado', abrir);
+  if (abrir) {
+    el.frente.focus();
+  } else {
+    state.frente = '';
+    el.frente.value = '';
+  }
+});
+el.frente.addEventListener('input', () => { state.frente = el.frente.value; });
 // OS (14/07/2026) - auto-preenchida por aplicarServico, mas continua
 // editável manualmente (mesmo padrão de Objeto/Trecho); também dispara a
 // numeração de novo, já que ela agora faz parte da chave do número.
@@ -842,6 +864,7 @@ async function restaurarEstadoEmAndamento_() {
   state.servico = s.servico || '';
   state.objetoContrato = s.objetoContrato || '';
   state.local = s.local || '';
+  state.frente = s.frente || '';
   state.os = s.os || '';
   state.data = s.data || '';
   state.observacoes = s.observacoes || '';
@@ -862,6 +885,9 @@ async function restaurarEstadoEmAndamento_() {
   el.servico.value = state.servico;
   el.objeto.value = state.objetoContrato;
   el.trecho.value = state.local;
+  el.frente.value = state.frente;
+  el.blocoFrente.style.display = state.frente ? 'block' : 'none';
+  el.btnToggleFrente.classList.toggle('marcado', Boolean(state.frente));
   el.os.value = state.os;
   el.emailContratante.value = state.emailContratante;
   el.data.value = state.data;
@@ -904,7 +930,7 @@ async function restaurarEstadoEmAndamento_() {
 // Observações/Atividades/Aprovador na tela, igual resetarParaProximoRdo_
 // faz depois de um envio de verdade.
 el.btnLimparIdentificacao.addEventListener('click', () => {
-  if (!confirm('Apagar TODO o preenchimento e as alterações deste RDO (Contratante/Obra/Serviço/Objeto/Local/OS/Data/Tempo/Observações/Atividades/Efetivo/Equipamentos)? O formulário volta a ficar como no primeiro login.')) return;
+  if (!confirm('Apagar TODO o preenchimento e as alterações deste RDO (Contratante/Obra/Serviço/Objeto/Local/Frente/OS/Data/Tempo/Observações/Atividades/Efetivo/Equipamentos)? O formulário volta a ficar como no primeiro login.')) return;
 
   localStorage.removeItem(CHAVE_ULTIMA_IDENTIFICACAO);
   apagarEstadoEmAndamento_();
@@ -914,6 +940,7 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   state.servico = '';
   state.objetoContrato = '';
   state.local = '';
+  state.frente = '';
   state.os = '';
   state.emailContratante = '';
   el.contratante.value = '';
@@ -921,6 +948,9 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   el.servico.value = '';
   el.objeto.value = '';
   el.trecho.value = '';
+  el.frente.value = '';
+  el.blocoFrente.style.display = 'none';
+  el.btnToggleFrente.classList.remove('marcado');
   el.os.value = '';
   el.emailContratante.value = '';
   preencherDatalist(el.dlObra, []);
@@ -1769,6 +1799,7 @@ async function abrirRevisaoInterna_(tokenInterno) {
     state.servico = s.servico || '';
     state.objetoContrato = s.objetoContrato || '';
     state.local = s.local || '';
+    state.frente = s.frente || '';
     state.os = s.os || '';
     state.data = s.data || '';
     state.observacoes = s.observacoes || '';
@@ -1800,6 +1831,9 @@ async function abrirRevisaoInterna_(tokenInterno) {
     el.servico.value = state.servico;
     el.objeto.value = state.objetoContrato;
     el.trecho.value = state.local;
+    el.frente.value = state.frente;
+    el.blocoFrente.style.display = state.frente ? 'block' : 'none';
+    el.btnToggleFrente.classList.toggle('marcado', Boolean(state.frente));
     el.os.value = state.os;
     el.emailContratante.value = state.emailContratante;
     el.data.value = state.data;
@@ -2094,7 +2128,8 @@ configurarZoomIframe_(el.visualizadorApp, el.btnZoomMaisApp, el.btnZoomMenosApp)
 // Contratada) - tudo que é ESPECÍFICO deste RDO (Data, Tempo,
 // Observações, Atividades, assinatura/concordância da Contratante,
 // checkbox de aprovação) volta a ficar em branco, como se o app tivesse
-// acabado de abrir pra um RDO novo.
+// acabado de abrir pra um RDO novo. Frente (15/07/2026) entra nesse grupo
+// "específico do RDO" - nunca é reaproveitada de um RDO pro próximo.
 async function resetarParaProximoRdo_() {
   // Se este RDO era uma revisão de aprovação interna, o envio já concluiu
   // (marcarAprovacaoInternaProcessada_ no backend) - destrava o formulário
@@ -2113,6 +2148,11 @@ async function resetarParaProximoRdo_() {
 
   state.data = '';
   el.data.value = '';
+
+  state.frente = '';
+  el.frente.value = '';
+  el.blocoFrente.style.display = 'none';
+  el.btnToggleFrente.classList.remove('marcado');
 
   state.tempo = {
     bom: { manha: false, tarde: false, noite: false },

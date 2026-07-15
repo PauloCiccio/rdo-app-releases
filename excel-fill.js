@@ -506,7 +506,7 @@ const RdoExcel = (function () {
     sh.getCell(CELULAS.obra).value = 'OBRA:\n' + state.obra;
     sh.getCell(CELULAS.os).value = 'OS:\n' + (state.os || '');
     sh.getCell(CELULAS.objeto).value = 'OBJETO DO CONTRATO:\n' + state.objetoContrato;
-    sh.getCell(CELULAS.local).value = 'LOCAL:\n' + state.local;
+    sh.getCell(CELULAS.local).value = 'LOCAL:\n' + state.local + (state.frente ? ' - Frente ' + state.frente : '');
     sh.getCell(CELULAS.data).value = 'Data: ' + formatarDataBR_(state.data);
     marcarDiaSemana_(sh, state.data);
 
