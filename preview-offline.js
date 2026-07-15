@@ -132,9 +132,6 @@ const RdoPreviewOffline = (function () {
     if (tempo.chuva.manha) escreverTexto_(doc, 'X', 'I', 11, 9, 2, Object.assign({ negrito: true }, CEL));
     if (tempo.chuva.tarde) escreverTexto_(doc, 'X', 'J', 11, 9, 2, Object.assign({ negrito: true }, CEL));
     if (tempo.chuva.noite) escreverTexto_(doc, 'X', 'K', 11, 9, 2, Object.assign({ negrito: true }, CEL));
-    if (tempo.mm.manha !== '') escreverTexto_(doc, tempo.mm.manha, 'I', 12, 8, 1, { padXPt: 4, limparLarguraPt: 29 });
-    if (tempo.mm.tarde !== '') escreverTexto_(doc, tempo.mm.tarde, 'J', 12, 8, 1, { padXPt: 4, limparLarguraPt: 29 });
-    if (tempo.mm.noite !== '') escreverTexto_(doc, tempo.mm.noite, 'K', 12, 8, 1, { padXPt: 4, limparLarguraPt: 29 });
   }
 
   const DIAS_SEMANA_COL = { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 0: 'G' };

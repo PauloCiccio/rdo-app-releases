@@ -131,9 +131,6 @@ const RdoExcel = (function () {
     if (tempo.chuva.manha) marcarX_(sh, 'I11');
     if (tempo.chuva.tarde) marcarX_(sh, 'J11');
     if (tempo.chuva.noite) marcarX_(sh, 'K11');
-    if (tempo.mm.manha !== '') sh.getCell('I12').value = Number(tempo.mm.manha);
-    if (tempo.mm.tarde !== '') sh.getCell('J12').value = Number(tempo.mm.tarde);
-    if (tempo.mm.noite !== '') sh.getCell('K12').value = Number(tempo.mm.noite);
   }
 
   // Observações: rótulo L8:V8, conteúdo L9:V12 (mescla única de 4 linhas,
@@ -238,7 +235,9 @@ const RdoExcel = (function () {
       // Quant vai na coluna G - B:F é uma única mescla (rótulo), escrever
       // em F (célula secundária da mescla) redireciona pro "mestre" B e
       // apaga a descrição (bug real, 15/07/2026).
-      sh.getCell(`G${r}`).value = itemMod.quant !== '' && itemMod.quant != null ? Number(itemMod.quant) : null;
+      const cellQuantMod = sh.getCell(`G${r}`);
+      cellQuantMod.value = itemMod.quant !== '' && itemMod.quant != null ? Number(itemMod.quant) : null;
+      cellQuantMod.alignment = Object.assign({}, cellQuantMod.alignment, { horizontal: 'center' });
 
       const cellEquip = sh.getCell(`H${r}`);
       cellEquip.value = sanitizarTextoLivre_(descEquipAbrev);

@@ -146,8 +146,7 @@ const state = {
   os: '',
   tempo: {
     bom: { manha: false, tarde: false, noite: false },
-    chuva: { manha: false, tarde: false, noite: false },
-    mm: { manha: '', tarde: '', noite: '' }
+    chuva: { manha: false, tarde: false, noite: false }
   },
   observacoes: '',
   // Efetivo/Equipamentos agora crescem um de cada vez (botão "+
@@ -216,6 +215,18 @@ function autoGrow(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = (textarea.scrollHeight + 2) + 'px';
 }
+
+// Um <details> fechado não renderiza o conteúdo de verdade - autoGrow
+// chamado nesse estado (ex: restaurando texto salvo antes da seção ser
+// aberta) mede scrollHeight errado e nunca recalcula sozinho depois, só
+// no próximo 'input'. Reaplica autoGrow em toda textarea da seção quando
+// ela abre, pra não ficar com a caixa "cortada" até a pessoa digitar de novo.
+document.querySelectorAll('.secao-formulario').forEach(detalhes => {
+  detalhes.addEventListener('toggle', () => {
+    if (!detalhes.open) return;
+    detalhes.querySelectorAll('textarea').forEach(autoGrow);
+  });
+});
 
 const el = {
   bannerOffline: document.getElementById('banner-offline'),
@@ -683,12 +694,6 @@ document.querySelectorAll('.balao').forEach(botao => {
   });
 });
 
-document.querySelectorAll('.mm-chuva').forEach(input => {
-  input.addEventListener('input', () => {
-    state.tempo.mm[input.dataset.periodo] = input.value;
-  });
-});
-
 el.observacoes.addEventListener('input', () => { state.observacoes = el.observacoes.value; autoGrow(el.observacoes); });
 // Data (14/07/2026) agora também dispara a numeração - o número do RDO
 // depende de Contratante+Obra+Data+OS (ver atualizarPreviewNumero), não só
@@ -867,9 +872,6 @@ async function restaurarEstadoEmAndamento_() {
     const marcado = Boolean(state.tempo[botao.dataset.tempo] && state.tempo[botao.dataset.tempo][botao.dataset.periodo]);
     botao.classList.toggle('marcado', marcado);
   });
-  document.querySelectorAll('.mm-chuva').forEach(input => {
-    input.value = (state.tempo.mm && state.tempo.mm[input.dataset.periodo]) || '';
-  });
 
   renderizarListaQuantCrescente(cfgEfetivo);
   renderizarListaQuantCrescente(cfgEquipamentos);
@@ -938,11 +940,9 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
 
   state.tempo = {
     bom: { manha: false, tarde: false, noite: false },
-    chuva: { manha: false, tarde: false, noite: false },
-    mm: { manha: '', tarde: '', noite: '' }
+    chuva: { manha: false, tarde: false, noite: false }
   };
   document.querySelectorAll('.balao').forEach(botao => botao.classList.remove('marcado'));
-  document.querySelectorAll('.mm-chuva').forEach(input => { input.value = ''; });
 
   state.observacoes = '';
   el.observacoes.value = '';
@@ -1810,9 +1810,6 @@ async function abrirRevisaoInterna_(tokenInterno) {
       const marcado = Boolean(state.tempo[botao.dataset.tempo] && state.tempo[botao.dataset.tempo][botao.dataset.periodo]);
       botao.classList.toggle('marcado', marcado);
     });
-    document.querySelectorAll('.mm-chuva').forEach(input => {
-      input.value = (state.tempo.mm && state.tempo.mm[input.dataset.periodo]) || '';
-    });
 
     renderizarListaQuantCrescente(cfgEfetivo);
     renderizarListaQuantCrescente(cfgEquipamentos);
@@ -2119,11 +2116,9 @@ async function resetarParaProximoRdo_() {
 
   state.tempo = {
     bom: { manha: false, tarde: false, noite: false },
-    chuva: { manha: false, tarde: false, noite: false },
-    mm: { manha: '', tarde: '', noite: '' }
+    chuva: { manha: false, tarde: false, noite: false }
   };
   document.querySelectorAll('.balao').forEach(botao => botao.classList.remove('marcado'));
-  document.querySelectorAll('.mm-chuva').forEach(input => { input.value = ''; });
 
   state.observacoes = '';
   el.observacoes.value = '';

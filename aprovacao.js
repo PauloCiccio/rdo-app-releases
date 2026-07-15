@@ -399,11 +399,19 @@ async function iniciar() {
 // toda vez que volta. A conferência de verdade (CPF+Nome) continua
 // acontecendo no clique de "Continuar" abaixo, sem pular esse passo.
 //
-// SEMPRE sobrescreve o campo Nome quando encontra (sem checar se já tem
-// texto) - a primeira versão só preenchia se o campo estivesse vazio, o
-// que bloqueava silenciosamente o auto-preenchimento sempre que a pessoa
-// preenchia os campos fora de ordem (ou o navegador reaproveitava algo
-// digitado antes). Dispara tanto no 'input' (digitando) quanto no 'blur'
+// Sobrescreve o campo Nome quando encontra, MAS só se ninguém tiver
+// mexido nele desde que essa busca específica começou - a primeira
+// versão só preenchia se o campo estivesse vazio, o que bloqueava
+// silenciosamente o auto-preenchimento sempre que a pessoa preenchia os
+// campos fora de ordem (ou o navegador reaproveitava algo digitado
+// antes); a versão seguinte passou a sobrescrever sempre, o que abriu
+// uma corrida diferente - se a pessoa começa a digitar o próprio nome
+// enquanto a busca (com rede) ainda está em voo, a resposta chegava
+// depois e apagava o que ela tinha acabado de digitar. Guardar o valor
+// do campo no instante em que a busca começou e comparar no retorno
+// resolve os dois casos: preenche por cima de texto "parado" (autofill
+// antigo, campo vazio) mas nunca por cima de uma edição feita durante a
+// própria espera. Dispara tanto no 'input' (digitando) quanto no 'blur'
 // (saindo do campo) como reforço - cobre o caso de colar o CPF de uma vez
 // (autofill do teclado/gerenciador de senhas), que às vezes não dispara
 // 'input' do mesmo jeito que digitar tecla por tecla.
@@ -412,9 +420,10 @@ async function autoPreencherNomePorCpf_() {
   const digitos = el.cpf.value.replace(/\D/g, '');
   if (digitos.length !== 11 || !validarCpf_(el.cpf.value) || digitos === ultimoCpfBuscado_) return;
   ultimoCpfBuscado_ = digitos;
+  const nomeAntesDaBusca = el.nomeIdentificacao.value;
   try {
     const resp = await RdoApi.buscarNomeCliente(el.cpf.value);
-    if (resp.ok && resp.encontrado) {
+    if (resp.ok && resp.encontrado && el.nomeIdentificacao.value === nomeAntesDaBusca) {
       el.nomeIdentificacao.value = resp.nome;
     }
   } catch (err) {
