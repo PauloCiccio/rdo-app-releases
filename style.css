@@ -484,6 +484,14 @@ textarea { resize: vertical; overflow: hidden; }
 .versao-app-perfil { font-size: 11px; color: var(--texto-suave); }
 .status-atualizacao-perfil { font-size: 11px; color: var(--texto-suave); }
 
+.creditos-app {
+  font-size: 10px;
+  color: var(--texto-suave);
+  text-align: center;
+  margin: 10px 0 0;
+  opacity: .7;
+}
+
 .modal-confirmacao {
   position: fixed;
   inset: 0;
