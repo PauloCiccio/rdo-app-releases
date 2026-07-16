@@ -2073,19 +2073,18 @@ function aplicarTravamentoRevisaoInterna_(travar, perfil) {
     campo.disabled = true;
   });
 
-  // Dentro da lista da Contratada: linhas que já tinham autor ANTES desta
-  // sessão de revisão (ou seja, escritas pelo elaborador ou por uma
-  // revisão anterior) ficam com o texto travado e sem botão de remover -
-  // só uma linha NOVA (adicionada agora, autor ainda vazio) pode ser
-  // editada/removida por um administrador comum.
+  // Dentro da lista da Contratada: um administrador comum PODE editar o
+  // texto/horário de uma linha já autorada pelo elaborador (pedido
+  // original do Paulo, ver [[project_rdo_app]] - a autoria de quem mudou
+  // fica registrada via carimbarEditorSeMudou_, não precisa travar o
+  // campo pra isso) - só não pode REMOVER a linha inteira (uma remoção
+  // não tem como ser atribuída a ninguém, ao contrário de uma edição).
   if (travar && !bypassTotal) {
     document.querySelectorAll('#lista-atividades-contratada .linha-atividade').forEach((linha, i) => {
       const item = state.atividadesContratada[i];
-      if (!item || !item.autor) return; // linha nova, ainda sem autor - liberada
-      linha.querySelectorAll('input, textarea').forEach(campo => { campo.disabled = true; });
+      if (!item || !item.autor) return; // linha nova, ainda sem autor - sem restrição nenhuma
       const btnRemover = linha.querySelector('.btn-remover-atividade');
       if (btnRemover) btnRemover.style.display = 'none';
-      linha.classList.add('linha-atividade-travada');
     });
   }
 }

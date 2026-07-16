@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.9.17';
+const VERSAO_APP = 'BETA 0.9.18';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
