@@ -216,6 +216,17 @@ let numeroReservado = null;
 // normal). Declarado cedo porque renderizarListaAtividades (chamada já na
 // inicialização do módulo) referencia essa variável.
 let aprovacaoInternaAtual_ = null;
+// Reabertura de RDO já enviado (15/07/2026) - { origem, identificador,
+// loginElaborador, nomeElaborador }, preenchido por abrirRdoParaRevisao_
+// quando um administrador reabre um RDO já enviado (não confundir com
+// aprovacaoInternaAtual_, que é a revisão ANTES do primeiro envio). Mesmo
+// travamento de formulário/mesmo caminho de envio das duas situações -
+// ver emRevisaoDeOutrem_.
+let reaberturaAtual_ = null;
+
+function emRevisaoDeOutrem_() {
+  return Boolean(aprovacaoInternaAtual_ || reaberturaAtual_);
+}
 
 function autoGrow(textarea) {
   textarea.style.height = 'auto';
@@ -313,6 +324,7 @@ const el = {
   cartaoPerfil: document.getElementById('cartao-perfil'),
   perfilResumo: document.getElementById('perfil-resumo'),
   resumoTotal: document.getElementById('resumo-total'),
+  resumoRevisaoInterna: document.getElementById('resumo-revisao-interna'),
   resumoPendentes: document.getElementById('resumo-pendentes'),
   resumoAprovados: document.getElementById('resumo-aprovados'),
   perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
@@ -326,8 +338,17 @@ const el = {
   btnVoltarObras: document.getElementById('btn-voltar-obras'),
   perfilPendentes: document.getElementById('perfil-pendentes'),
   perfilSemPendentes: document.getElementById('perfil-sem-pendentes'),
-  perfilAprovados: document.getElementById('perfil-aprovados'),
-  perfilSemAprovados: document.getElementById('perfil-sem-aprovados'),
+  perfilAprovadosCliente: document.getElementById('perfil-aprovados-cliente'),
+  perfilSemAprovadosCliente: document.getElementById('perfil-sem-aprovados-cliente'),
+  perfilAprovadosSemAssinatura: document.getElementById('perfil-aprovados-sem-assinatura'),
+  perfilSemAprovadosSemAssinatura: document.getElementById('perfil-sem-aprovados-sem-assinatura'),
+
+  perfilFiltroObras: document.getElementById('perfil-filtro-obras'),
+  listaFiltroObras: document.getElementById('lista-filtro-obras'),
+  filtroObrasSemItens: document.getElementById('filtro-obras-sem-itens'),
+  contagemFiltroObras: document.getElementById('contagem-filtro-obras'),
+  btnSalvarFiltroObras: document.getElementById('btn-salvar-filtro-obras'),
+  statusFiltroObras: document.getElementById('status-filtro-obras'),
 
   cartaoAprovacoesInternas: document.getElementById('cartao-aprovacoes-internas'),
   badgeAprovacoesInternas: document.getElementById('badge-aprovacoes-internas'),
@@ -607,7 +628,7 @@ function renderizarListaAtividades(cfg) {
   // Contratada (ex: depois de "+ Adicionar" ou remover uma linha nova)
   // reconstrói o DOM do zero - reaplica o travamento das linhas que já
   // tinham autor antes desta sessão, senão elas voltariam editáveis.
-  if (container === el.listaAtivContratada && aprovacaoInternaAtual_) {
+  if (container === el.listaAtivContratada && emRevisaoDeOutrem_()) {
     aplicarTravamentoRevisaoInterna_(true, perfilAtual_());
   }
 }
@@ -1065,7 +1086,7 @@ function carregarSessaoUsuario_() {
 // do RDO sendo revisado, não a quem está logado agora.
 async function atualizarSessaoDoServidor_() {
   const sessaoAtual = carregarSessaoUsuario_();
-  if (!sessaoAtual || !RdoConectividade.estaOnline() || aprovacaoInternaAtual_) return;
+  if (!sessaoAtual || !RdoConectividade.estaOnline() || emRevisaoDeOutrem_()) return;
   try {
     const resp = await RdoApi.validarSessao(sessaoAtual.token);
     // Falha silenciosa (token expirado, revogado, ou qualquer erro de
@@ -1074,7 +1095,7 @@ async function atualizarSessaoDoServidor_() {
     // verdade inválida vai aparecer como erro na próxima ação real
     // (enviar RDO, abrir Perfil, etc.), onde faz sentido tratar o logout.
     if (!resp.ok) return;
-    const sessaoAtualizada = { token: sessaoAtual.token, login: resp.login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil };
+    const sessaoAtualizada = { token: sessaoAtual.token, login: resp.login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil, obrasFiltro: resp.obrasFiltro || [] };
     salvarSessaoUsuario_(sessaoAtualizada);
     state.assinaturaContratadaNome = sessaoAtualizada.nome;
     state.assinaturaContratadaFuncao = sessaoAtualizada.funcao || '';
@@ -1430,7 +1451,7 @@ el.btnEntrar.addEventListener('click', async () => {
       return;
     }
 
-    const sessao = { token: resp.token, login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil };
+    const sessao = { token: resp.token, login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil, obrasFiltro: resp.obrasFiltro || [] };
     salvarSessaoUsuario_(sessao);
     aplicarSessaoNoFormulario_(sessao);
   } catch (err) {
@@ -1468,7 +1489,7 @@ el.btnTrocarSenha.addEventListener('click', async () => {
       return;
     }
 
-    const sessao = { token: resp.token, login: trocaSenhaPendente_.login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil };
+    const sessao = { token: resp.token, login: trocaSenhaPendente_.login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil, obrasFiltro: resp.obrasFiltro || [] };
     trocaSenhaPendente_ = null;
     el.campoNovaSenha.value = '';
     el.campoNovaSenhaConfirmar.value = '';
@@ -1563,24 +1584,45 @@ function abrirDetalheObraPerfil_(chave) {
   pendentesDaObra.forEach(item => el.perfilPendentes.appendChild(montarLinhaPendente_(item)));
   el.perfilSemPendentes.style.display = pendentesDaObra.length ? 'none' : 'block';
 
-  el.perfilAprovados.innerHTML = '';
-  aprovadosDaObra.forEach(item => el.perfilAprovados.appendChild(montarLinhaAprovado_(item)));
-  el.perfilSemAprovados.style.display = aprovadosDaObra.length ? 'none' : 'block';
+  // Aprovados pelo Cliente (via link de aprovação) e Emitidos sem
+  // Assinatura (balão "Gerar RDO sem assinatura") eram uma lista só, sem
+  // distinção - separados (15/07/2026) porque só o segundo grupo pode
+  // "Enviar ao Cliente sem revisão" (ver montarLinhaAprovado_).
+  const aprovadosClienteDaObra = aprovadosDaObra.filter(item => item.origem === 'aprovacao');
+  const aprovadosSemAssinaturaDaObra = aprovadosDaObra.filter(item => item.origem === 'direto');
+
+  el.perfilAprovadosCliente.innerHTML = '';
+  aprovadosClienteDaObra.forEach(item => el.perfilAprovadosCliente.appendChild(montarLinhaAprovado_(item)));
+  el.perfilSemAprovadosCliente.style.display = aprovadosClienteDaObra.length ? 'none' : 'block';
+
+  el.perfilAprovadosSemAssinatura.innerHTML = '';
+  aprovadosSemAssinaturaDaObra.forEach(item => el.perfilAprovadosSemAssinatura.appendChild(montarLinhaAprovado_(item)));
+  el.perfilSemAprovadosSemAssinatura.style.display = aprovadosSemAssinaturaDaObra.length ? 'none' : 'block';
 }
 
 function montarLinhaAprovado_(item) {
   const linha = document.createElement('div');
-  linha.className = 'linha-rdo-perfil aprovado';
+  linha.className = 'linha-rdo-perfil aprovado' + (item.origem === 'direto' ? ' sem-assinatura' : '');
   // Botão "Baixar .xlsx" (14/07/2026) - exclusivo admin_master, e só
   // aparece se este RDO tiver um xlsxFileId salvo (RDOs enviados ANTES
   // dessa mudança não têm o arquivo guardado no Drive, só o PDF).
   const mostrarBotaoXlsx = perfilAtual_() === 'admin_master' && item.xlsxFileId;
+  // Reabrir/enviar sem revisão (15/07/2026) - só administrador/admin_master,
+  // e só funciona pra RDOs com StateJSON guardado (ver liberarRdoParaRevisao_
+  // no Code.gs) - RDOs enviados antes dessa coluna existir simplesmente não
+  // mostram os botões (falha silenciosa e explícita, não erro).
+  const ehAdmin = perfilAtual_() === 'administrador' || perfilAtual_() === 'admin_master';
+  const identificadorReabertura = item.origem === 'direto' ? item.pdfFileId : item.token;
+  const mostrarReabrir = ehAdmin && identificadorReabertura;
+  const mostrarEnviarSemRevisao = ehAdmin && item.origem === 'direto';
   linha.innerHTML = `
     <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg><span>RDO nº ${item.numero} - ${item.data || ''}</span></div>
     <div class="botoes-rdo-perfil">
       <button type="button" class="botao-mini btn-ver-perfil">Visualizar PDF</button>
       <button type="button" class="botao-mini btn-compartilhar-perfil">Compartilhar</button>
       ${mostrarBotaoXlsx ? '<button type="button" class="botao-mini btn-baixar-xlsx-perfil">Baixar .xlsx</button>' : ''}
+      ${mostrarReabrir ? '<button type="button" class="botao-mini btn-reabrir-perfil">Reabrir para revisão</button>' : ''}
+      ${mostrarEnviarSemRevisao ? '<button type="button" class="botao-mini btn-enviar-sem-revisao-perfil">Enviar ao Cliente sem revisão</button>' : ''}
     </div>
     <div class="status status-linha-perfil"></div>`;
 
@@ -1640,6 +1682,54 @@ function montarLinhaAprovado_(item) {
         const nomeXlsx = item.fileName.replace(/\.pdf$/i, '.xlsx');
         await compartilharPdf_(resp.xlsxBase64, nomeXlsx, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         statusLinha.textContent = '';
+      } catch (err) {
+        statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+        statusLinha.className = 'status status-linha-perfil erro';
+      } finally {
+        botao.disabled = false;
+      }
+    });
+  }
+
+  const btnReabrir = linha.querySelector('.btn-reabrir-perfil');
+  if (btnReabrir) {
+    btnReabrir.addEventListener('click', async (e) => {
+      const botao = e.currentTarget;
+      botao.disabled = true;
+      try {
+        statusLinha.textContent = 'Reabrindo...';
+        statusLinha.className = 'status status-linha-perfil';
+        await abrirRdoParaRevisao_(item.origem, identificadorReabertura);
+      } catch (err) {
+        statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+        statusLinha.className = 'status status-linha-perfil erro';
+      } finally {
+        botao.disabled = false;
+      }
+    });
+  }
+
+  const btnEnviarSemRevisao = linha.querySelector('.btn-enviar-sem-revisao-perfil');
+  if (btnEnviarSemRevisao) {
+    btnEnviarSemRevisao.addEventListener('click', async (e) => {
+      const emailSugerido = state.emailContratante || '';
+      const email = window.prompt('E-mail do responsável da Contratante pra receber o link de aprovação:', emailSugerido);
+      if (email === null) return;
+      const emailLimpo = email.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpo)) {
+        statusLinha.textContent = 'E-mail parece inválido.';
+        statusLinha.className = 'status status-linha-perfil erro';
+        return;
+      }
+      const botao = e.currentTarget;
+      botao.disabled = true;
+      try {
+        statusLinha.textContent = 'Enviando...';
+        statusLinha.className = 'status status-linha-perfil';
+        const resp = await RdoApi.enviarParaAprovacaoSemRevisao(sessao.token, item.pdfFileId, emailLimpo);
+        if (!resp.ok) throw new Error(resp.erro || 'Não consegui enviar.');
+        statusLinha.textContent = `RDO nº ${resp.numero} enviado pra aprovação de ${emailLimpo}!`;
+        statusLinha.className = 'status status-linha-perfil sucesso';
       } catch (err) {
         statusLinha.textContent = 'Erro: ' + (err && err.message ? err.message : err);
         statusLinha.className = 'status status-linha-perfil erro';
@@ -1743,6 +1833,7 @@ async function carregarPerfil_() {
     const totalPendentes = resp.pendentes.length;
     const totalAprovados = resp.aprovados.length;
     el.resumoTotal.textContent = String(totalPendentes + totalAprovados);
+    el.resumoRevisaoInterna.textContent = String(resp.pendentesRevisaoInterna || 0);
     el.resumoPendentes.textContent = String(totalPendentes);
     el.resumoAprovados.textContent = String(totalAprovados);
     el.perfilResumo.style.display = (totalPendentes + totalAprovados) > 0 ? 'flex' : 'none';
@@ -1758,11 +1849,14 @@ async function carregarPerfil_() {
   }
 
   // Papéis de usuário (14/07/2026): só administrador/admin_master veem o
-  // card "RDOs para revisar" - visão global, sem filtro de obra (decisão
-  // do Paulo). Falha aqui não deve travar o resto do Perfil - card some
-  // silenciosamente se der erro (best-effort).
+  // card "RDOs para revisar" - filtrado (15/07/2026) pelas obras que o
+  // próprio administrador escolheu acompanhar (ObrasFiltro, vazio = vê
+  // tudo, ver [[project_rdo_app]]). Falha aqui não deve travar o resto do
+  // Perfil - cards somem silenciosamente se der erro (best-effort).
   if (sessao.perfil === 'administrador' || sessao.perfil === 'admin_master') {
     el.cartaoAprovacoesInternas.style.display = 'block';
+    el.perfilFiltroObras.style.display = 'block';
+    renderizarFiltroObrasPerfil_(sessao);
     try {
       const respInternas = await RdoApi.listarAprovacoesInternas(sessao.token);
       if (respInternas.ok) renderizarListaAprovacoesInternas_(respInternas.pendentes);
@@ -1771,8 +1865,62 @@ async function carregarPerfil_() {
     }
   } else {
     el.cartaoAprovacoesInternas.style.display = 'none';
+    el.perfilFiltroObras.style.display = 'none';
   }
 }
+
+// Filtro de obras (15/07/2026) - administrador/admin_master escolhem quais
+// obras acompanham (ObrasFiltro, salvo no servidor, vale pra QUALQUER
+// administrador que logar - decisão do Paulo); filtra a lista "RDOs para
+// revisar", que sem filtro mostra tudo (comportamento de sempre). Lista de
+// obras vem do mesmo cache já carregado pro formulário (obrasDisponiveis),
+// sem chamada nova ao backend.
+function renderizarFiltroObrasPerfil_(sessao) {
+  const chaves = [...new Set(obrasDisponiveis.map(o => `${o.cliente} - ${o.obra}`))].sort();
+  const selecionadas = new Set(sessao.obrasFiltro || []);
+
+  el.listaFiltroObras.innerHTML = '';
+  chaves.forEach(chave => {
+    const linha = document.createElement('label');
+    linha.className = 'linha-filtro-obra';
+    const marcado = selecionadas.has(chave);
+    linha.innerHTML = `<input type="checkbox" value="${chave}" ${marcado ? 'checked' : ''}><span>${chave}</span>`;
+    el.listaFiltroObras.appendChild(linha);
+  });
+  el.filtroObrasSemItens.style.display = chaves.length ? 'none' : 'block';
+  el.contagemFiltroObras.style.display = selecionadas.size ? 'inline-block' : 'none';
+  el.contagemFiltroObras.textContent = String(selecionadas.size);
+}
+
+el.btnSalvarFiltroObras.addEventListener('click', async () => {
+  const sessao = carregarSessaoUsuario_();
+  if (!sessao) return;
+  const obrasEscolhidas = [...el.listaFiltroObras.querySelectorAll('input:checked')].map(c => c.value);
+
+  el.btnSalvarFiltroObras.disabled = true;
+  el.statusFiltroObras.textContent = 'Salvando...';
+  el.statusFiltroObras.className = 'status';
+  try {
+    const resp = await RdoApi.salvarObrasFiltro(sessao.token, obrasEscolhidas);
+    if (!resp.ok) throw new Error(resp.erro || 'Não consegui salvar o filtro.');
+
+    sessao.obrasFiltro = obrasEscolhidas;
+    salvarSessaoUsuario_(sessao);
+    el.contagemFiltroObras.style.display = obrasEscolhidas.length ? 'inline-block' : 'none';
+    el.contagemFiltroObras.textContent = String(obrasEscolhidas.length);
+    el.statusFiltroObras.textContent = 'Filtro salvo!';
+    el.statusFiltroObras.className = 'status sucesso';
+
+    const respInternas = await RdoApi.listarAprovacoesInternas(sessao.token);
+    if (respInternas.ok) renderizarListaAprovacoesInternas_(respInternas.pendentes);
+  } catch (err) {
+    console.error(err);
+    el.statusFiltroObras.textContent = 'Erro: ' + (err && err.message ? err.message : err);
+    el.statusFiltroObras.className = 'status erro';
+  } finally {
+    el.btnSalvarFiltroObras.disabled = false;
+  }
+});
 
 function renderizarListaAprovacoesInternas_(pendentes) {
   el.listaAprovacoesInternas.innerHTML = '';
@@ -1793,86 +1941,115 @@ function renderizarListaAprovacoesInternas_(pendentes) {
 
 // aprovacaoInternaAtual_ já declarado no topo do arquivo (ver comentário lá).
 
+// Restaura um stateJSON salvo (revisão de aprovação interna OU reabertura
+// de um RDO já enviado - mesmo mecanismo, muda só de onde vem o stateJSON)
+// no formulário - copia campo a campo pro state atual e sincroniza a tela.
+// Travamento/troca de aba/scroll ficam aqui porque são idênticos nos dois
+// fluxos; o que muda entre eles (aprovacaoInternaAtual_ x reaberturaAtual_)
+// fica a cargo de quem chama.
+function restaurarRdoNoFormulario_(stateJSON, nomeElaboradorFallback, sessao) {
+  const s = JSON.parse(stateJSON);
+
+  // Mesmo padrão de restaurarEstadoEmAndamento_ - copia campo a campo do
+  // state salvo pro state atual, depois sincroniza a tela.
+  state.contratante = s.contratante || '';
+  state.obra = s.obra || '';
+  state.servico = s.servico || '';
+  state.objetoContrato = s.objetoContrato || '';
+  state.local = s.local || '';
+  state.frente = s.frente || '';
+  state.os = s.os || '';
+  state.data = s.data || '';
+  state.observacoes = s.observacoes || '';
+  state.emailContratante = s.emailContratante || '';
+  state.tempo = s.tempo || state.tempo;
+  // Elaborador (assinaturaContratadaNome/Funcao/DataHora) vem do state
+  // salvo - é quem CRIOU o RDO, não pode ser sobrescrito pela sessão de
+  // quem está revisando.
+  state.assinaturaContratadaNome = s.assinaturaContratadaNome || '';
+  state.assinaturaContratadaFuncao = s.assinaturaContratadaFuncao || '';
+  state.assinaturaContratadaDataHora = s.assinaturaContratadaDataHora || '';
+
+  state.efetivo.length = 0;
+  (s.efetivo || []).forEach(item => state.efetivo.push(item));
+  state.equipamentos.length = 0;
+  (s.equipamentos || []).forEach(item => state.equipamentos.push(item));
+  state.atividadesContratada.length = 0;
+  (s.atividadesContratada && s.atividadesContratada.length ? s.atividadesContratada : [{ inicio: '', fim: '', discriminacao: '', autor: '' }]).forEach(item => state.atividadesContratada.push(item));
+  state.atividadesContratante.length = 0;
+  (s.atividadesContratante && s.atividadesContratante.length ? s.atividadesContratante : [{ inicio: '', fim: '', discriminacao: '' }]).forEach(item => state.atividadesContratante.push(item));
+
+  // Aprovador = quem está revisando agora - Função/Nome já salvos do
+  // próprio login (ver aba Usuarios).
+  state.assinaturaAprovadorNome = sessao.nome;
+  state.assinaturaAprovadorFuncao = sessao.funcao || '';
+
+  el.contratante.value = state.contratante;
+  el.obra.value = state.obra;
+  el.servico.value = state.servico;
+  el.objeto.value = state.objetoContrato;
+  el.trecho.value = state.local;
+  el.frente.value = state.frente;
+  el.blocoFrente.style.display = state.frente ? 'block' : 'none';
+  el.btnToggleFrente.classList.toggle('marcado', Boolean(state.frente));
+  el.os.value = state.os;
+  el.emailContratante.value = state.emailContratante;
+  el.data.value = state.data;
+  el.observacoes.value = state.observacoes;
+  autoGrow(el.observacoes);
+
+  document.querySelectorAll('.balao').forEach(botao => {
+    const marcado = Boolean(state.tempo[botao.dataset.tempo] && state.tempo[botao.dataset.tempo][botao.dataset.periodo]);
+    botao.classList.toggle('marcado', marcado);
+  });
+
+  renderizarListaQuantCrescente(cfgEfetivo);
+  renderizarListaQuantCrescente(cfgEquipamentos);
+  renderizarListaAtividades(cfgAtivContratada);
+  renderizarListaAtividades(cfgAtivContratante);
+  atualizarBalaoContratante_();
+
+  el.assinaturaContratadaInfo.textContent = 'Elaborado por: ' + (s.assinaturaContratadaNome || nomeElaboradorFallback || '');
+
+  aplicarTravamentoRevisaoInterna_(true, sessao.perfil);
+
+  mostrarAba_('rdo');
+  document.querySelectorAll('.secao-formulario').forEach(d => { d.open = true; });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 async function abrirRevisaoInterna_(tokenInterno) {
   const sessao = carregarSessaoUsuario_();
   if (!sessao) return;
   try {
     const resp = await RdoApi.buscarAprovacaoInterna(sessao.token, tokenInterno);
     if (!resp.ok) { alert(resp.erro || 'Não consegui abrir esse RDO.'); return; }
-
-    const s = JSON.parse(resp.stateJSON);
-
-    // Mesmo padrão de restaurarEstadoEmAndamento_ - copia campo a campo do
-    // state salvo pro state atual, depois sincroniza a tela.
-    state.contratante = s.contratante || '';
-    state.obra = s.obra || '';
-    state.servico = s.servico || '';
-    state.objetoContrato = s.objetoContrato || '';
-    state.local = s.local || '';
-    state.frente = s.frente || '';
-    state.os = s.os || '';
-    state.data = s.data || '';
-    state.observacoes = s.observacoes || '';
-    state.emailContratante = s.emailContratante || '';
-    state.tempo = s.tempo || state.tempo;
-    // Elaborador (assinaturaContratadaNome/Funcao/DataHora) vem do state
-    // salvo - é quem CRIOU o RDO, não pode ser sobrescrito pela sessão de
-    // quem está revisando.
-    state.assinaturaContratadaNome = s.assinaturaContratadaNome || '';
-    state.assinaturaContratadaFuncao = s.assinaturaContratadaFuncao || '';
-    state.assinaturaContratadaDataHora = s.assinaturaContratadaDataHora || '';
-
-    state.efetivo.length = 0;
-    (s.efetivo || []).forEach(item => state.efetivo.push(item));
-    state.equipamentos.length = 0;
-    (s.equipamentos || []).forEach(item => state.equipamentos.push(item));
-    state.atividadesContratada.length = 0;
-    (s.atividadesContratada && s.atividadesContratada.length ? s.atividadesContratada : [{ inicio: '', fim: '', discriminacao: '', autor: '' }]).forEach(item => state.atividadesContratada.push(item));
-    state.atividadesContratante.length = 0;
-    (s.atividadesContratante && s.atividadesContratante.length ? s.atividadesContratante : [{ inicio: '', fim: '', discriminacao: '' }]).forEach(item => state.atividadesContratante.push(item));
-
-    // Aprovador = quem está revisando agora - Função/Nome já salvos do
-    // próprio login (ver aba Usuarios).
-    state.assinaturaAprovadorNome = sessao.nome;
-    state.assinaturaAprovadorFuncao = sessao.funcao || '';
-
-    el.contratante.value = state.contratante;
-    el.obra.value = state.obra;
-    el.servico.value = state.servico;
-    el.objeto.value = state.objetoContrato;
-    el.trecho.value = state.local;
-    el.frente.value = state.frente;
-    el.blocoFrente.style.display = state.frente ? 'block' : 'none';
-    el.btnToggleFrente.classList.toggle('marcado', Boolean(state.frente));
-    el.os.value = state.os;
-    el.emailContratante.value = state.emailContratante;
-    el.data.value = state.data;
-    el.observacoes.value = state.observacoes;
-    autoGrow(el.observacoes);
-
-    document.querySelectorAll('.balao').forEach(botao => {
-      const marcado = Boolean(state.tempo[botao.dataset.tempo] && state.tempo[botao.dataset.tempo][botao.dataset.periodo]);
-      botao.classList.toggle('marcado', marcado);
-    });
-
-    renderizarListaQuantCrescente(cfgEfetivo);
-    renderizarListaQuantCrescente(cfgEquipamentos);
-    renderizarListaAtividades(cfgAtivContratada);
-    renderizarListaAtividades(cfgAtivContratante);
-    atualizarBalaoContratante_();
-
-    el.assinaturaContratadaInfo.textContent = 'Elaborado por: ' + (s.assinaturaContratadaNome || resp.nomeElaborador || '');
-
+    restaurarRdoNoFormulario_(resp.stateJSON, resp.nomeElaborador, sessao);
     aprovacaoInternaAtual_ = { token: tokenInterno, loginElaborador: resp.loginElaborador, nomeElaborador: resp.nomeElaborador };
-    aplicarTravamentoRevisaoInterna_(true, sessao.perfil);
-
-    mostrarAba_('rdo');
-    document.querySelectorAll('.secao-formulario').forEach(d => { d.open = true; });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
     console.error(err);
     alert('Erro ao abrir revisão: ' + (err && err.message ? err.message : err));
     RdoApi.logErro('abrir_revisao_interna', err && err.message ? err.message : String(err));
+  }
+}
+
+// Reabertura de um RDO já enviado (15/07/2026, botão "Reabrir para
+// revisão" no Perfil) - origem 'direto' (identificador = PdfFileId) ou
+// 'aprovacao' (identificador = Token), ver liberarRdoParaRevisao_ no
+// Code.gs. Mesmo restauro/travamento de abrirRevisaoInterna_, só muda de
+// onde vem o stateJSON e o que fica marcado (reaberturaAtual_).
+async function abrirRdoParaRevisao_(origem, identificador) {
+  const sessao = carregarSessaoUsuario_();
+  if (!sessao) return;
+  try {
+    const resp = await RdoApi.liberarRdoParaRevisao(sessao.token, origem, identificador);
+    if (!resp.ok) { alert(resp.erro || 'Não consegui reabrir esse RDO.'); return; }
+    restaurarRdoNoFormulario_(resp.stateJSON, resp.nomeElaborador, sessao);
+    reaberturaAtual_ = { origem, identificador, loginElaborador: resp.loginElaborador, nomeElaborador: resp.nomeElaborador };
+  } catch (err) {
+    console.error(err);
+    alert('Erro ao reabrir RDO: ' + (err && err.message ? err.message : err));
+    RdoApi.logErro('abrir_rdo_para_revisao', err && err.message ? err.message : String(err));
   }
 }
 
@@ -2164,8 +2341,9 @@ async function resetarParaProximoRdo_() {
   // (marcarAprovacaoInternaProcessada_ no backend) - destrava o formulário
   // e volta a assinatura da Contratada pro dono da sessão ATUAL (durante a
   // revisão ela tinha o nome/assinatura do elaborador original emprestada).
-  if (aprovacaoInternaAtual_) {
+  if (emRevisaoDeOutrem_()) {
     aprovacaoInternaAtual_ = null;
+    reaberturaAtual_ = null;
     aplicarTravamentoRevisaoInterna_(false, perfilAtual_());
     const sessaoAtual = carregarSessaoUsuario_();
     if (sessaoAtual) {
@@ -2468,12 +2646,18 @@ async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoIn
   const respPdfFinal = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxFinalBase64, fileName: fileNameFinal });
   const pdfBase64 = respPdfFinal.pdfBase64;
 
-  // tokenAprovacaoInterna é o único campo que ainda mandamos sobre a
-  // revisão - o servidor deriva quem é o elaborador dono e quem é o
-  // administrador aprovador a partir do token de sessão (abaixo) e do
-  // próprio registro da revisão em AprovacoesInternas, nunca de um campo
-  // solto no payload (ver enviarRDO_/enviarParaAprovacao_ no Code.gs).
-  const camposRevisao = revisaoInterna ? { tokenAprovacaoInterna: revisaoInterna.tokenAprovacaoInterna } : {};
+  // tokenAprovacaoInterna (revisão antes do primeiro envio) OU
+  // reaberturaOrigem/reaberturaIdentificador (RDO já enviado, reaberto) -
+  // são os únicos campos que ainda mandamos sobre a revisão; o servidor
+  // deriva quem é o elaborador dono e quem é o administrador aprovador a
+  // partir do token de sessão (abaixo) e do próprio registro original,
+  // nunca de um campo solto no payload (ver enviarRDO_/enviarParaAprovacao_
+  // no Code.gs).
+  const camposRevisao = revisaoInterna
+    ? (revisaoInterna.tokenAprovacaoInterna
+      ? { tokenAprovacaoInterna: revisaoInterna.tokenAprovacaoInterna }
+      : { reaberturaOrigem: revisaoInterna.reaberturaOrigem, reaberturaIdentificador: revisaoInterna.reaberturaIdentificador })
+    : {};
 
   // Token da sessão de quem está confirmando o envio agora (elaborador
   // direto ou administrador finalizando uma revisão) - enviarRDO_/
@@ -2506,6 +2690,7 @@ async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoIn
       pdfBase64,
       fileName: fileNameFinal,
       emailContratante: stateParaEnviar.emailContratante,
+      stateJSON: JSON.stringify(stateParaEnviar),
       token: tokenSessao,
       os: stateParaEnviar.os
     }, camposRevisao));
@@ -2729,6 +2914,9 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     if (aprovacaoInternaAtual_) {
       state.assinaturaAprovadorDataHora = new Date().toISOString();
       revisaoInterna = { tokenAprovacaoInterna: aprovacaoInternaAtual_.token };
+    } else if (reaberturaAtual_) {
+      state.assinaturaAprovadorDataHora = new Date().toISOString();
+      revisaoInterna = { reaberturaOrigem: reaberturaAtual_.origem, reaberturaIdentificador: reaberturaAtual_.identificador };
     }
 
     // Gera a partir do state ATUAL - nunca reaproveita o que foi gerado só

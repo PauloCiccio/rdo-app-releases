@@ -444,6 +444,34 @@ textarea { resize: vertical; overflow: hidden; }
 .resumo-item.sucesso .resumo-numero { color: var(--sucesso); }
 .resumo-rotulo { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 2px; }
 
+.detalhes-filtro-obras {
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-md);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--fundo);
+}
+.detalhes-filtro-obras summary {
+  margin: 0;
+  cursor: pointer;
+  list-style: none;
+}
+.detalhes-filtro-obras summary::-webkit-details-marker { display: none; }
+.lista-filtro-obras {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.linha-filtro-obra {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--texto);
+}
+.linha-filtro-obra input { margin: 0; }
+
 .perfil-rodape {
   display: flex;
   align-items: center;
@@ -686,6 +714,7 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-rdo-perfil .icone-linha { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
 .linha-rdo-perfil.pendente .icone-linha { color: var(--alerta); }
 .linha-rdo-perfil.aprovado .icone-linha { color: var(--sucesso); }
+.linha-rdo-perfil.sem-assinatura .icone-linha { color: var(--alerta); }
 .linha-rdo-perfil .botoes-rdo-perfil {
   display: flex;
   gap: 6px;

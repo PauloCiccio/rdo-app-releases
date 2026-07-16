@@ -34,15 +34,31 @@
       <span class="resumo-numero" id="resumo-total">0</span>
       <span class="resumo-rotulo">RDOs enviados</span>
     </div>
+    <div class="resumo-item">
+      <span class="resumo-numero" id="resumo-revisao-interna">0</span>
+      <span class="resumo-rotulo">Em revisão interna</span>
+    </div>
     <div class="resumo-item alerta">
       <span class="resumo-numero" id="resumo-pendentes">0</span>
-      <span class="resumo-rotulo">Aguardando aprovação</span>
+      <span class="resumo-rotulo">Aguardando Cliente</span>
     </div>
     <div class="resumo-item sucesso">
       <span class="resumo-numero" id="resumo-aprovados">0</span>
       <span class="resumo-rotulo">Aprovados</span>
     </div>
   </div>
+
+  <details id="perfil-filtro-obras" class="detalhes-filtro-obras" style="display:none;">
+    <summary class="subtitulo-perfil">Obras que acompanho
+      <span id="contagem-filtro-obras" class="badge-aba badge-inline" style="display:none;"></span>
+    </summary>
+    <div id="lista-filtro-obras" class="lista-filtro-obras"></div>
+    <p class="orcamento-info" id="filtro-obras-sem-itens" style="display:none;">Nenhuma obra cadastrada ainda.</p>
+    <div class="botoes-rdo-perfil">
+      <button type="button" id="btn-salvar-filtro-obras" class="botao-mini">Salvar</button>
+    </div>
+    <div class="status" id="status-filtro-obras"></div>
+  </details>
 
   <div id="cartao-aprovacoes-internas" style="display:none;">
     <h3 class="subtitulo-perfil">RDOs para revisar
@@ -70,9 +86,13 @@
     <div id="perfil-pendentes"></div>
     <p class="orcamento-info" id="perfil-sem-pendentes" style="display:none;">Nenhum RDO aguardando aprovação nesta obra.</p>
 
-    <h3 class="subtitulo-perfil">Aprovados</h3>
-    <div id="perfil-aprovados"></div>
-    <p class="orcamento-info" id="perfil-sem-aprovados" style="display:none;">Nenhum RDO aprovado ainda nesta obra.</p>
+    <h3 class="subtitulo-perfil">Aprovados pelo Cliente</h3>
+    <div id="perfil-aprovados-cliente"></div>
+    <p class="orcamento-info" id="perfil-sem-aprovados-cliente" style="display:none;">Nenhum RDO aprovado pelo Cliente ainda nesta obra.</p>
+
+    <h3 class="subtitulo-perfil">Emitidos sem Assinatura</h3>
+    <div id="perfil-aprovados-sem-assinatura"></div>
+    <p class="orcamento-info" id="perfil-sem-aprovados-sem-assinatura" style="display:none;">Nenhum RDO emitido sem assinatura ainda nesta obra.</p>
   </div>
 
   <div class="perfil-rodape">

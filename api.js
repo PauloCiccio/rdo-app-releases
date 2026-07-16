@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.9.13';
+const VERSAO_APP = 'BETA 0.9.14';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
@@ -329,8 +329,10 @@ const RdoApi = (function () {
   // do próprio registro da revisão - loginAprovador/nomeAprovador NÃO são
   // mais aceitos vindos do cliente (ver enviarRDO_ no Code.gs). os
   // (14/07/2026) - base da numeração nova.
-  function enviarRDO({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os }) {
-    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os });
+  // stateJSON (15/07/2026) - guardado em RDOs.StateJSON, permite reabrir
+  // este RDO pra revisão depois (ver liberarRdoParaRevisao_ no Code.gs).
+  function enviarRDO({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os, stateJSON, reaberturaOrigem, reaberturaIdentificador }) {
+    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os, stateJSON, reaberturaOrigem, reaberturaIdentificador });
   }
 
   function previsualizarRDO({ xlsxBase64, fileName }) {
@@ -347,8 +349,8 @@ const RdoApi = (function () {
   // Aprovação do Contratante por e-mail (11/07) - ver www/aprovacao.html.
   // tokenAprovacaoInterna: mesmo significado de enviarRDO acima. os
   // (14/07/2026): base da numeração nova.
-  function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os }) {
-    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os });
+  function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os, reaberturaOrigem, reaberturaIdentificador }) {
+    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os, reaberturaOrigem, reaberturaIdentificador });
   }
 
   // Aprovação INTERNA (14/07/2026) - ver [[project_rdo_app]].
@@ -364,6 +366,14 @@ const RdoApi = (function () {
   // confundir com o token de sessão do administrador que está abrindo.
   function buscarAprovacaoInterna(token, tokenInterno) {
     return postJson_({ action: 'buscarAprovacaoInterna', token, tokenInterno });
+  }
+
+  function liberarRdoParaRevisao(token, origem, identificador) {
+    return postJson_({ action: 'liberarRdoParaRevisao', token, origem, identificador });
+  }
+
+  function enviarParaAprovacaoSemRevisao(token, pdfFileId, emailResponsavel) {
+    return postJson_({ action: 'enviarParaAprovacaoSemRevisao', token, pdfFileId, emailResponsavel });
   }
 
   async function buscarAprovacao(token) {
@@ -420,6 +430,13 @@ const RdoApi = (function () {
 
   function logout(token) {
     return postJson_({ action: 'logout', token });
+  }
+
+  // obras: array de strings "Cliente - Obra" (mesmo formato de
+  // chaveObraPerfil_) - filtra a lista "RDOs para revisar" desse
+  // administrador. Lista vazia remove o filtro.
+  function salvarObrasFiltro(token, obras) {
+    return postJson_({ action: 'salvarObrasFiltro', token, obras });
   }
 
   // Tela de Perfil (11/07 tarde, ícone da FN no topo) - ver telaPerfil_ em app.js.
@@ -482,6 +499,7 @@ const RdoApi = (function () {
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
     buscarCliente, buscarNomeCliente, cadastrarCliente, login, trocarSenhaObrigatoria, validarSessao, logout,
     meusRdos, buscarPdfPorId, buscarXlsxPorId, reenviarLinkAprovacao, corrigirEmailAprovacao,
-    salvarParaAprovacaoInterna, listarAprovacoesInternas, buscarAprovacaoInterna
+    salvarParaAprovacaoInterna, listarAprovacoesInternas, buscarAprovacaoInterna, salvarObrasFiltro,
+    liberarRdoParaRevisao, enviarParaAprovacaoSemRevisao
   };
 })();
