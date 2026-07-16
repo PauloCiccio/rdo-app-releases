@@ -58,6 +58,7 @@ const RdoPreviewOffline = (function () {
 
   function yTopoLinha_(linha) { return LINHA_Y_PT[linha] || 0; }
   function xColuna_(coluna) { return COLUNA_X_PT[coluna] || 0; }
+  function alturaLinha_(linha) { return yTopoLinha_(linha + 1) - yTopoLinha_(linha); }
 
   // Escreve texto de VERDADE (vetor, nítido em qualquer zoom). O modelo
   // atual (16/07/2026) não tem mais texto de exemplo nas células que a app
@@ -71,20 +72,27 @@ const RdoPreviewOffline = (function () {
   //
   // `centralizarAteColuna` centraliza de verdade o texto na largura da
   // célula (de `coluna` até essa coluna, em pontos, via `doc.getTextWidth`)
-  // - substitui os antigos `padXPt` fixos "no olho" nos campos que o Paulo
-  // reportou desalinhados (RDO-Nº/Rev/Página, OS, Dia da Semana, Condições
-  // do Tempo), que precisavam de retoque toda vez que a fonte/coluna mudava
-  // um pouco. Continua usando `padXPt` (deslocamento fixo) nos campos onde
-  // o texto é alinhado à esquerda de propósito (descrição de atividade,
-  // M.O.D., etc.).
+  // - substitui os antigos `padXPt` fixos "no olho". `centralizarVerticalmente`
+  // faz o mesmo no eixo vertical, usando a altura da linha (mais
+  // `alturaExtraPt` pra células mescladas em mais de uma linha, tipo o
+  // campo "Data:") - quase toda célula que a app reescreve usa
+  // `verticalAlignment: center` no modelo de verdade (conferido célula por
+  // célula via openpyxl em 16/07/2026), daí isso ser o padrão certo pra
+  // quase tudo. Só os campos que têm rótulo+valor empilhados na MESMA
+  // célula mesclada (Contratante/Obra/Objeto/Local/Observações) continuam
+  // usando `padXPt`/`deslocTopoPt` fixos (alinhados ao topo de propósito,
+  // pra ficar logo abaixo do rótulo).
   function escreverTexto_(doc, texto, coluna, linha, fontePt, deslocTopoPt, opts) {
     const t = (texto == null ? '' : String(texto)).trim();
     if (!t) return;
     const o = opts || {};
-    const y = yTopoLinha_(linha) + deslocTopoPt + fontePt * 0.8;
 
     doc.setFont('helvetica', o.negrito ? 'bold' : 'normal');
     doc.setFontSize(fontePt);
+
+    const y = o.centralizarVerticalmente
+      ? yTopoLinha_(linha) + (alturaLinha_(linha) + (o.alturaExtraPt || 0)) / 2 + fontePt * 0.32
+      : yTopoLinha_(linha) + deslocTopoPt + fontePt * 0.8;
 
     let x;
     if (o.centralizarAteColuna) {
@@ -145,9 +153,12 @@ const RdoPreviewOffline = (function () {
     return String.fromCharCode(coluna.charCodeAt(0) + 1);
   }
 
+  // Negrito só nas marcações de Condições do Tempo - conferido célula por
+  // célula via openpyxl: I10/I11 (e colunas seguintes) são bold=true, mas
+  // a linha do Dia da Semana (A12 em diante) é bold=false no modelo.
   function desenharTempo_(doc, tempo) {
     function marcar(coluna, linha) {
-      escreverTexto_(doc, 'X', coluna, linha, 9, 2, { negrito: true, centralizarAteColuna: proximaColuna_(coluna) });
+      escreverTexto_(doc, 'X', coluna, linha, 9, 0, { negrito: true, centralizarAteColuna: proximaColuna_(coluna), centralizarVerticalmente: true });
     }
     if (tempo.bom.manha) marcar('I', 10);
     if (tempo.bom.tarde) marcar('J', 10);
@@ -163,7 +174,7 @@ const RdoPreviewOffline = (function () {
     const [ano, mes, dia] = isoYyyyMmDd.split('-').map(Number);
     const diaJs = new Date(ano, mes - 1, dia).getDay();
     const coluna = DIAS_SEMANA_COL[diaJs];
-    escreverTexto_(doc, 'X', coluna, 12, 9, 1, { negrito: true, centralizarAteColuna: proximaColuna_(coluna) });
+    escreverTexto_(doc, 'X', coluna, 12, 9, 0, { centralizarAteColuna: proximaColuna_(coluna), centralizarVerticalmente: true });
   }
 
   function quebrarLinhas_(texto, maxCharsPorLinha) {
@@ -198,12 +209,12 @@ const RdoPreviewOffline = (function () {
       const mod = efetivo[i] || { descricao: '', quant: '' };
       const equip = equipamentosVeiculos[i] || { descricao: '', quant: '' };
       const veic = equipamentosVeiculos[i + 12] || { descricao: '', quant: '' };
-      escreverTexto_(doc, truncar_(mod.descricao, 25), 'B', r, 8, 1, {});
-      escreverTexto_(doc, mod.quant, 'G', r, 8, 1, { padXPt: 10 });
-      escreverTexto_(doc, truncar_(RdoExcel.abreviarDescricaoEquipamento_(equip.descricao), 27), 'H', r, 8, 1, {});
-      escreverTexto_(doc, equip.quant, 'N', r, 8, 1, { padXPt: 10 });
-      escreverTexto_(doc, truncar_(RdoExcel.abreviarDescricaoEquipamento_(veic.descricao), 29), 'P', r, 8, 1, {});
-      escreverTexto_(doc, veic.quant, 'V', r, 8, 1, { padXPt: 10 });
+      escreverTexto_(doc, truncar_(mod.descricao, 22), 'B', r, 9, 0, { centralizarVerticalmente: true });
+      escreverTexto_(doc, mod.quant, 'G', r, 9, 0, { padXPt: 10, centralizarVerticalmente: true });
+      escreverTexto_(doc, truncar_(RdoExcel.abreviarDescricaoEquipamento_(equip.descricao), 24), 'H', r, 9, 0, { centralizarVerticalmente: true });
+      escreverTexto_(doc, equip.quant, 'N', r, 9, 0, { padXPt: 10, centralizarVerticalmente: true });
+      escreverTexto_(doc, truncar_(RdoExcel.abreviarDescricaoEquipamento_(veic.descricao), 26), 'P', r, 9, 0, { centralizarVerticalmente: true });
+      escreverTexto_(doc, veic.quant, 'V', r, 9, 0, { padXPt: 10, centralizarVerticalmente: true });
     });
   }
 
@@ -238,11 +249,11 @@ const RdoPreviewOffline = (function () {
 
       // Mesma regra do traço (14/07/2026, ver excel-fill.js) - item com
       // discriminação mas sem horário mostra "-" em vez de ficar em branco.
-      escreverTexto_(doc, item.inicio || '-', 'C', linhaAtual, 8, 1, { padXPt: 2, limparLarguraPt: 36 });
-      escreverTexto_(doc, item.fim || '-', 'D', linhaAtual, 8, 1, { padXPt: 2, limparLarguraPt: 36 });
+      escreverTexto_(doc, item.inicio || '-', 'C', linhaAtual, 9, 0, { padXPt: 2, centralizarVerticalmente: true });
+      escreverTexto_(doc, item.fim || '-', 'D', linhaAtual, 9, 0, { padXPt: 2, centralizarVerticalmente: true });
       const linhasTexto = quebrarLinhas_(texto, 90);
       linhasTexto.slice(0, nLinhas).forEach((linhaTexto, i) => {
-        escreverTexto_(doc, linhaTexto, 'E', linhaAtual + i, 8, 1, { limparLarguraPt: 535 });
+        escreverTexto_(doc, linhaTexto, 'E', linhaAtual + i, 9, 0, { centralizarVerticalmente: true });
       });
 
       slotsUsados += nLinhas;
@@ -263,37 +274,37 @@ const RdoPreviewOffline = (function () {
     doc.addImage(imgBinStr, 'JPEG', 0, 0, LARGURA_PAGINA_PT, ALTURA_PAGINA_PT);
 
     // Modelo novo de 13/07/2026: rótulo (linha 3) e valor (linha 4) agora
-    // são células separadas - antes ficavam juntos na linha 3.
+    // são células separadas - antes ficavam juntos na linha 3. Todas as 3
+    // são bold=true no modelo de verdade (conferido via openpyxl).
     const numeroTexto = (numero != null) ? String(numero) : '(provisório)';
-    escreverTexto_(doc, numeroTexto, 'L', 4, 10, 12, { negrito: true, centralizarAteColuna: 'R' });
-    escreverTexto_(doc, '0', 'R', 4, 10, 12, { centralizarAteColuna: 'U' });
-    escreverTexto_(doc, '1/1', 'U', 4, 9, 12, { centralizarAteColuna: 'FIM' });
+    escreverTexto_(doc, numeroTexto, 'L', 4, 9, 0, { negrito: true, centralizarAteColuna: 'R', centralizarVerticalmente: true });
+    escreverTexto_(doc, '0', 'R', 4, 9, 0, { negrito: true, centralizarAteColuna: 'U', centralizarVerticalmente: true });
+    escreverTexto_(doc, '1/1', 'U', 4, 9, 0, { negrito: true, centralizarAteColuna: 'FIM', centralizarVerticalmente: true });
 
-    escreverTexto_(doc, state.contratante, 'A', 6, 10, 17, { limparLarguraPt: 372 });
-    escreverTexto_(doc, state.obra, 'L', 6, 10, 17, { limparLarguraPt: 307.8 });
-    // OS (15/07/2026) - rótulo "OS:" agora fica sozinho na 1ª linha (já
-    // vem impresso no fundo estático, igual OBRA/LOCAL) e só o VALOR é
-    // desenhado na 2ª linha, mesmo padrão de deslocTopoPt=17 usado pra
-    // OBRA/LOCAL na mesma linha física (corrigido - antes ficava tudo
-    // lado a lado numa linha só).
-    escreverTexto_(doc, state.os || '', 'U', 6, 9, 17, { centralizarAteColuna: 'FIM' });
-    escreverTexto_(doc, state.objetoContrato, 'A', 7, 10, 17, { limparLarguraPt: 372 });
-    escreverTexto_(doc, state.local + (state.frente ? ' - Frente ' + state.frente : ''), 'L', 7, 10, 17, { limparLarguraPt: 307.8 });
+    // Contratante/Obra/Objeto/Local/OS: rótulo (linha de cima) e valor
+    // (linha de baixo) na MESMA célula mesclada, alinhados ao topo de
+    // propósito no modelo (`deslocTopoPt: 17` desce até a 2ª linha) - bold
+    // porque a célula inteira (rótulo+valor) é bold=true no modelo.
+    escreverTexto_(doc, state.contratante, 'A', 6, 9, 17, { negrito: true });
+    escreverTexto_(doc, state.obra, 'L', 6, 9, 17, { negrito: true });
+    escreverTexto_(doc, state.os || '', 'U', 6, 9, 17, { negrito: true, centralizarAteColuna: 'FIM' });
+    escreverTexto_(doc, state.objetoContrato, 'A', 7, 9, 17, { negrito: true });
+    escreverTexto_(doc, state.local + (state.frente ? ' - Frente ' + state.frente : ''), 'L', 7, 9, 17, { negrito: true });
     if (state.data) {
       const [ano, mes, dia] = state.data.split('-');
-      // A célula A8 vem com "Data: 09/07/2026" de exemplo já escrito no
-      // modelo em branco (rótulo+valor no mesmo texto, ao contrário de
-      // OBRA/LOCAL que têm rótulo estático numa célula e valor noutra) -
-      // pré-existente desde antes desta remedição (já acontecia no modelo
-      // anterior também), não é regressão de hoje. `limparLarguraPt: 0`
-      // mantém o comportamento de sempre.
-      escreverTexto_(doc, dia + '/' + mes + '/' + ano, 'A', 8, 9, 2, { padXPt: 32, limparLarguraPt: 0 });
+      // Modelo novo (16/07/2026) veio com a célula "Data: " limpa (sem
+      // exemplo cravado no texto do rótulo) - dá pra centralizar
+      // verticalmente de verdade agora. A9:G9 mesclada só JUNTO com a
+      // linha 8 (A8:G9, 2 linhas) - `alturaExtraPt` soma a altura da
+      // linha 9 pra centralizar na área inteira da mescla, não só na
+      // linha 8 sozinha.
+      escreverTexto_(doc, dia + '/' + mes + '/' + ano, 'A', 8, 9, 0, { padXPt: 32, centralizarVerticalmente: true, alturaExtraPt: alturaLinha_(9) });
     }
     desenharDiaSemana_(doc, state.data);
     desenharTempo_(doc, state.tempo);
     if (state.observacoes) {
       quebrarLinhas_(state.observacoes, 55).slice(0, 4).forEach((linhaTexto, i) => {
-        escreverTexto_(doc, linhaTexto, 'L', 9 + i, 8, 1, { limparLarguraPt: 307.8 });
+        escreverTexto_(doc, linhaTexto, 'L', 9 + i, 9, 0, { centralizarVerticalmente: true });
       });
     }
 
@@ -305,12 +316,13 @@ const RdoPreviewOffline = (function () {
     // Assinatura em texto (14/07/2026 - ninguém mais desenha, ver
     // [[project_rdo_app]]): Função/Assinado por/Data nas linhas 72
     // (Elaborador) / 73 (Aprovador, só quando existir) / 74 (Contratante).
-    // Larguras de limpeza calculadas a partir de COLUNA_X_PT: Função ocupa
-    // A:F (180pt), Nome ocupa K:R (169.2pt), Data ocupa R:FIM (144pt).
+    // Célula mesclada por campo (A:E Função, K:Q Nome, R:V Data) - centraliza
+    // nas duas direções, igual ao modelo de verdade (`horizontalAlignment`/
+    // `verticalAlignment: center` nas 3 células, conferido via openpyxl).
     function desenharLinhaAssinatura_(linha, funcao, nome, dataHoraIso) {
-      escreverTexto_(doc, funcao, 'A', linha, 8, 2, { limparLarguraPt: 180 });
-      escreverTexto_(doc, nome, 'K', linha, 8, 2, { limparLarguraPt: 169.2 });
-      escreverTexto_(doc, formatarDataHoraBR_(dataHoraIso), 'R', linha, 7, 2, { limparLarguraPt: 144 });
+      escreverTexto_(doc, funcao, 'A', linha, 9, 0, { centralizarAteColuna: 'F', centralizarVerticalmente: true });
+      escreverTexto_(doc, nome, 'K', linha, 9, 0, { centralizarAteColuna: 'R', centralizarVerticalmente: true });
+      escreverTexto_(doc, formatarDataHoraBR_(dataHoraIso), 'R', linha, 9, 0, { centralizarAteColuna: 'FIM', centralizarVerticalmente: true });
     }
     desenharLinhaAssinatura_(72, state.assinaturaContratadaFuncao, state.assinaturaContratadaNome, state.assinaturaContratadaDataHora);
     if (mostrarAprovador) {
