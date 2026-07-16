@@ -2281,8 +2281,46 @@ let previewObjectUrlAtual_ = null;
 // mostrado embutido em navegador de verdade (ver atualizarPreviewInline_).
 let previewPdfOnlineAppAtual = null;
 let previewPdfOnlineAppFileNameAtual = null;
+// Fechamento automático da prévia depois de um envio concluído (16/07/2026,
+// pedido do Paulo: a prévia ficava aberta indefinidamente depois de
+// enviar, precisando fechar na mão pra começar o próximo RDO) - ver
+// agendarFechamentoAutomaticoPreview_.
+let timerFecharPreviewAuto_ = null;
+
+// Mostra a contagem regressiva de 10s junto da mensagem de sucesso e
+// fecha a prévia sozinha no final, deixando o formulário (já resetado por
+// resetarParaProximoRdo_ antes disso) pronto pro próximo RDO sem precisar
+// fechar na mão. Cancela sozinha se a prévia já tiver sido fechada por
+// outro motivo antes de completar (ver fecharPreview_/
+// atualizarPreviewInline_).
+function agendarFechamentoAutomaticoPreview_(mensagemBase) {
+  if (timerFecharPreviewAuto_) clearInterval(timerFecharPreviewAuto_);
+  let segundosRestantes = 10;
+  const classeAtual = el.statusConfirmacao.className;
+  el.statusConfirmacao.textContent = `${mensagemBase} Fechando em ${segundosRestantes}s...`;
+  timerFecharPreviewAuto_ = setInterval(() => {
+    if (el.cartaoPreview.style.display === 'none') {
+      clearInterval(timerFecharPreviewAuto_);
+      timerFecharPreviewAuto_ = null;
+      return;
+    }
+    segundosRestantes--;
+    if (segundosRestantes <= 0) {
+      clearInterval(timerFecharPreviewAuto_);
+      timerFecharPreviewAuto_ = null;
+      fecharPreview_();
+      return;
+    }
+    el.statusConfirmacao.textContent = `${mensagemBase} Fechando em ${segundosRestantes}s...`;
+    el.statusConfirmacao.className = classeAtual;
+  }, 1000);
+}
 
 function fecharPreview_() {
+  if (timerFecharPreviewAuto_) {
+    clearInterval(timerFecharPreviewAuto_);
+    timerFecharPreviewAuto_ = null;
+  }
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
@@ -2436,6 +2474,12 @@ async function resetarParaProximoRdo_() {
 // editar algo entre pré-visualizar e confirmar.
 async function atualizarPreviewInline_() {
   if (el.cartaoPreview.style.display !== 'block') return; // só atualiza se a prévia já estiver aberta
+  // Editou algo com o fechamento automático (pós-envio) ainda contando -
+  // cancela, a pessoa já está mexendo de novo, não faz sentido fechar sozinho.
+  if (timerFecharPreviewAuto_) {
+    clearInterval(timerFecharPreviewAuto_);
+    timerFecharPreviewAuto_ = null;
+  }
   if (atualizandoPreview_) return; // já tem uma atualização rodando, não empilha outra
   const erro = validarParaPreview_();
   if (erro) {
@@ -2850,9 +2894,9 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
         token: sessaoAtual.token
       });
       if (!resp.ok) throw new Error(resp.erro || 'Não consegui salvar.');
-      el.statusConfirmacao.textContent = 'RDO salvo! Um administrador vai revisar e enviar pro Contratante.';
       el.statusConfirmacao.className = 'status sucesso';
       await resetarParaProximoRdo_();
+      agendarFechamentoAutomaticoPreview_('RDO salvo! Um administrador vai revisar e enviar pro Contratante.');
       return;
     }
 
@@ -2880,9 +2924,9 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       });
       salvarFilaPendente_(fila);
 
-      el.statusConfirmacao.textContent = 'Sem internet - RDO salvo no aparelho. Será enviado sozinho assim que a conexão voltar.';
       el.statusConfirmacao.className = 'status sucesso';
       await resetarParaProximoRdo_();
+      agendarFechamentoAutomaticoPreview_('Sem internet - RDO salvo no aparelho. Será enviado sozinho assim que a conexão voltar.');
       return;
     }
 
@@ -2925,13 +2969,14 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     previewPdfBase64 = pdfBase64;
     previewFileName = fileNameFinal;
 
+    let mensagemSucesso;
     if (state.aprovacaoContratante) {
-      el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado pra aprovação da Contratante! ` +
+      mensagemSucesso = `RDO nº ${resp.numero} enviado pra aprovação da Contratante! ` +
         'O RDO final chega por e-mail (pra você e pra ela) assim que ela concluir pelo link.';
       el.statusConfirmacao.className = 'status sucesso';
       el.btnCompartilhar.style.display = 'none';
     } else {
-      el.statusConfirmacao.textContent = `RDO nº ${resp.numero} enviado com sucesso!`;
+      mensagemSucesso = `RDO nº ${resp.numero} enviado com sucesso!`;
       el.statusConfirmacao.className = 'status sucesso';
       el.btnCompartilhar.style.display = 'block';
       el.btnCompartilhar.onclick = async () => {
@@ -2947,6 +2992,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     }
 
     await resetarParaProximoRdo_();
+    agendarFechamentoAutomaticoPreview_(mensagemSucesso);
   } catch (err) {
     console.error(err);
     el.statusConfirmacao.textContent = 'Erro ao enviar o RDO: ' + err.message;
