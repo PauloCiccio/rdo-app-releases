@@ -58,38 +58,43 @@ const RdoPreviewOffline = (function () {
 
   function yTopoLinha_(linha) { return LINHA_Y_PT[linha] || 0; }
   function xColuna_(coluna) { return COLUNA_X_PT[coluna] || 0; }
-  function alturaLinha_(linha) { return yTopoLinha_(linha + 1) - yTopoLinha_(linha); }
 
-  // Escreve texto de VERDADE (vetor, nítido em qualquer zoom) - limpa
-  // (retângulo branco) a área antes, já que o modelo em branco pode vir com
-  // texto padrão nalgumas células (rótulos que a app REESCREVE no xlsx
-  // real) - sem limpar, o texto novo "dobraria" visualmente em cima do
-  // antigo. `limparLarguraPt: 0` pula a limpeza pros campos onde o rótulo É
-  // estático de verdade (só o valor é escrito do lado). O retângulo de
-  // limpeza é semitransparente (16/07/2026, pedido do Paulo) - opaco ele
-  // apagava as linhas de grade da tabela por baixo (M.O.D./Equipamentos/
-  // Atividades), fazendo o campo parecer "flutuando" sem borda; com opacidade
-  // parcial a grade do fundo continua visível e ainda cobre o suficiente
-  // pra não dobrar visualmente com texto estático eventual.
+  // Escreve texto de VERDADE (vetor, nítido em qualquer zoom). O modelo
+  // atual (16/07/2026) não tem mais texto de exemplo nas células que a app
+  // reescreve - por isso o retângulo de limpeza que existia aqui (branco
+  // opaco, depois semitransparente) foi REMOVIDO por completo (pedido do
+  // Paulo: "transparência de 100%") - `limparLarguraPt`/`limparOffsetPt`
+  // que ainda aparecem nas chamadas abaixo ficam sem efeito nenhum (não
+  // removidos de cada chamada pra não inflar o diff à toa). Se o modelo
+  // voltar a ter texto de exemplo nalguma célula, precisa reintroduzir a
+  // limpeza só ali, não de volta pra tudo.
+  //
+  // `centralizarAteColuna` centraliza de verdade o texto na largura da
+  // célula (de `coluna` até essa coluna, em pontos, via `doc.getTextWidth`)
+  // - substitui os antigos `padXPt` fixos "no olho" nos campos que o Paulo
+  // reportou desalinhados (RDO-Nº/Rev/Página, OS, Dia da Semana, Condições
+  // do Tempo), que precisavam de retoque toda vez que a fonte/coluna mudava
+  // um pouco. Continua usando `padXPt` (deslocamento fixo) nos campos onde
+  // o texto é alinhado à esquerda de propósito (descrição de atividade,
+  // M.O.D., etc.).
   function escreverTexto_(doc, texto, coluna, linha, fontePt, deslocTopoPt, opts) {
     const t = (texto == null ? '' : String(texto)).trim();
     if (!t) return;
     const o = opts || {};
-    const x = xColuna_(coluna) + (o.padXPt != null ? o.padXPt : 3);
     const y = yTopoLinha_(linha) + deslocTopoPt + fontePt * 0.8;
-
-    const larguraLimparPt = o.limparLarguraPt != null ? o.limparLarguraPt : 150;
-    if (larguraLimparPt > 0) {
-      const offsetPt = o.limparOffsetPt || 0;
-      doc.saveGraphicsState();
-      doc.setGState(new doc.GState({ opacity: 0.7 }));
-      doc.setFillColor(255, 255, 255);
-      doc.rect(xColuna_(coluna) + offsetPt + 0.5, yTopoLinha_(linha) + 0.5, larguraLimparPt, alturaLinha_(linha) - 1, 'F');
-      doc.restoreGraphicsState();
-    }
 
     doc.setFont('helvetica', o.negrito ? 'bold' : 'normal');
     doc.setFontSize(fontePt);
+
+    let x;
+    if (o.centralizarAteColuna) {
+      const larguraCelulaPt = xColuna_(o.centralizarAteColuna) - xColuna_(coluna);
+      const larguraTextoPt = doc.getTextWidth(t);
+      x = xColuna_(coluna) + (larguraCelulaPt - larguraTextoPt) / 2;
+    } else {
+      x = xColuna_(coluna) + (o.padXPt != null ? o.padXPt : 3);
+    }
+
     doc.setTextColor(26, 26, 26);
     doc.text(t, x, y);
   }
@@ -133,14 +138,23 @@ const RdoPreviewOffline = (function () {
     return imagemBaseBinStrCache_;
   }
 
+  // Próxima coluna (letra seguinte) - todas as colunas usadas neste arquivo
+  // são de uma letra só (A-V), então somar 1 no código do caractere já
+  // resolve, sem precisar de tabela.
+  function proximaColuna_(coluna) {
+    return String.fromCharCode(coluna.charCodeAt(0) + 1);
+  }
+
   function desenharTempo_(doc, tempo) {
-    const CEL = { padXPt: 8, limparLarguraPt: 29 };
-    if (tempo.bom.manha) escreverTexto_(doc, 'X', 'I', 10, 9, 2, Object.assign({ negrito: true }, CEL));
-    if (tempo.bom.tarde) escreverTexto_(doc, 'X', 'J', 10, 9, 2, Object.assign({ negrito: true }, CEL));
-    if (tempo.bom.noite) escreverTexto_(doc, 'X', 'K', 10, 9, 2, Object.assign({ negrito: true }, CEL));
-    if (tempo.chuva.manha) escreverTexto_(doc, 'X', 'I', 11, 9, 2, Object.assign({ negrito: true }, CEL));
-    if (tempo.chuva.tarde) escreverTexto_(doc, 'X', 'J', 11, 9, 2, Object.assign({ negrito: true }, CEL));
-    if (tempo.chuva.noite) escreverTexto_(doc, 'X', 'K', 11, 9, 2, Object.assign({ negrito: true }, CEL));
+    function marcar(coluna, linha) {
+      escreverTexto_(doc, 'X', coluna, linha, 9, 2, { negrito: true, centralizarAteColuna: proximaColuna_(coluna) });
+    }
+    if (tempo.bom.manha) marcar('I', 10);
+    if (tempo.bom.tarde) marcar('J', 10);
+    if (tempo.bom.noite) marcar('K', 10);
+    if (tempo.chuva.manha) marcar('I', 11);
+    if (tempo.chuva.tarde) marcar('J', 11);
+    if (tempo.chuva.noite) marcar('K', 11);
   }
 
   const DIAS_SEMANA_COL = { 1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 0: 'G' };
@@ -148,7 +162,8 @@ const RdoPreviewOffline = (function () {
     if (!isoYyyyMmDd) return;
     const [ano, mes, dia] = isoYyyyMmDd.split('-').map(Number);
     const diaJs = new Date(ano, mes - 1, dia).getDay();
-    escreverTexto_(doc, 'X', DIAS_SEMANA_COL[diaJs], 12, 9, 1, { negrito: true, padXPt: 8, limparLarguraPt: 29 });
+    const coluna = DIAS_SEMANA_COL[diaJs];
+    escreverTexto_(doc, 'X', coluna, 12, 9, 1, { negrito: true, centralizarAteColuna: proximaColuna_(coluna) });
   }
 
   function quebrarLinhas_(texto, maxCharsPorLinha) {
@@ -183,12 +198,12 @@ const RdoPreviewOffline = (function () {
       const mod = efetivo[i] || { descricao: '', quant: '' };
       const equip = equipamentosVeiculos[i] || { descricao: '', quant: '' };
       const veic = equipamentosVeiculos[i + 12] || { descricao: '', quant: '' };
-      escreverTexto_(doc, truncar_(mod.descricao, 25), 'B', r, 8, 1, { limparLarguraPt: 144 });
-      escreverTexto_(doc, mod.quant, 'G', r, 8, 1, { padXPt: 10, limparLarguraPt: 36 });
-      escreverTexto_(doc, truncar_(equip.descricao, 27), 'H', r, 8, 1, { limparLarguraPt: 158 });
-      escreverTexto_(doc, equip.quant, 'N', r, 8, 1, { padXPt: 10, limparLarguraPt: 33 });
-      escreverTexto_(doc, truncar_(veic.descricao, 29), 'P', r, 8, 1, { limparLarguraPt: 170 });
-      escreverTexto_(doc, veic.quant, 'V', r, 8, 1, { padXPt: 10, limparLarguraPt: 65 });
+      escreverTexto_(doc, truncar_(mod.descricao, 25), 'B', r, 8, 1, {});
+      escreverTexto_(doc, mod.quant, 'G', r, 8, 1, { padXPt: 10 });
+      escreverTexto_(doc, truncar_(RdoExcel.abreviarDescricaoEquipamento_(equip.descricao), 27), 'H', r, 8, 1, {});
+      escreverTexto_(doc, equip.quant, 'N', r, 8, 1, { padXPt: 10 });
+      escreverTexto_(doc, truncar_(RdoExcel.abreviarDescricaoEquipamento_(veic.descricao), 29), 'P', r, 8, 1, {});
+      escreverTexto_(doc, veic.quant, 'V', r, 8, 1, { padXPt: 10 });
     });
   }
 
@@ -250,9 +265,9 @@ const RdoPreviewOffline = (function () {
     // Modelo novo de 13/07/2026: rótulo (linha 3) e valor (linha 4) agora
     // são células separadas - antes ficavam juntos na linha 3.
     const numeroTexto = (numero != null) ? String(numero) : '(provisório)';
-    escreverTexto_(doc, numeroTexto, 'L', 4, 10, 12, { negrito: true, padXPt: 62, limparLarguraPt: 0 });
-    escreverTexto_(doc, '0', 'R', 4, 10, 12, { padXPt: 22, limparLarguraPt: 0 });
-    escreverTexto_(doc, '1/1', 'U', 4, 9, 12, { padXPt: 40, limparLarguraPt: 0 });
+    escreverTexto_(doc, numeroTexto, 'L', 4, 10, 12, { negrito: true, centralizarAteColuna: 'R' });
+    escreverTexto_(doc, '0', 'R', 4, 10, 12, { centralizarAteColuna: 'U' });
+    escreverTexto_(doc, '1/1', 'U', 4, 9, 12, { centralizarAteColuna: 'FIM' });
 
     escreverTexto_(doc, state.contratante, 'A', 6, 10, 17, { limparLarguraPt: 372 });
     escreverTexto_(doc, state.obra, 'L', 6, 10, 17, { limparLarguraPt: 307.8 });
@@ -261,7 +276,7 @@ const RdoPreviewOffline = (function () {
     // desenhado na 2ª linha, mesmo padrão de deslocTopoPt=17 usado pra
     // OBRA/LOCAL na mesma linha física (corrigido - antes ficava tudo
     // lado a lado numa linha só).
-    escreverTexto_(doc, state.os || '', 'U', 6, 9, 17, { padXPt: 4, limparLarguraPt: 76.8 });
+    escreverTexto_(doc, state.os || '', 'U', 6, 9, 17, { centralizarAteColuna: 'FIM' });
     escreverTexto_(doc, state.objetoContrato, 'A', 7, 10, 17, { limparLarguraPt: 372 });
     escreverTexto_(doc, state.local + (state.frente ? ' - Frente ' + state.frente : ''), 'L', 7, 10, 17, { limparLarguraPt: 307.8 });
     if (state.data) {

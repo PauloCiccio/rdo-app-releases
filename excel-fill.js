@@ -557,6 +557,7 @@ const RdoExcel = (function () {
   return {
     gerarWorkbook,
     estimarLinhasAtividade,
+    abreviarDescricaoEquipamento_,
     CAPACIDADE_CONTRATADA,
     CAPACIDADE_CONTRATANTE,
     LINHAS_QUANT
