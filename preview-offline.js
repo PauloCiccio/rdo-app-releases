@@ -19,34 +19,36 @@
 // LINHA_ATIV_CONTRATADA/CONTRATANTE_INICIO) pra saber onde cada campo cai.
 // Só precisa remedir se o modelo_rdo.xlsx mudar de layout de novo.
 const RdoPreviewOffline = (function () {
-  // Remedido em 14/07/2026 (modelo trocado de novo - ver [[project_rdo_app]]
-  // release da assinatura em texto): a área de assinatura desceu e encolheu
-  // (71-74 em vez de 73-76, agora tabela de texto em vez de imagem) e o
-  // bloco de atividades da Contratante perdeu 3 linhas (57-69 em vez de
-  // 57-72). Processo de medição igual ao de sempre - via Excel COM,
-  // Rows(n).Top relativo à célula A1 (linha 1/2 ficam em 0.0 porque a linha
-  // 1 é uma linha "espaçadora" oculta no modelo, sempre foi assim). As
-  // COLUNAS também mudaram um pouco desta vez (R em diante ficou ~6pt mais
-  // estreito - Q encolheu) - remedidas as duas tabelas inteiras.
+  // Remedido em 16/07/2026 (modelo trocado de novo - modelo_rdo.xlsx sem os
+  // textos de exemplo que sobravam antes nas células do M.O.D. e do número
+  // de RDO). Achado importante desta remedição: `Rows(n).Top`/`Columns(n).
+  // Left` via Excel COM (o valor "de catálogo") NÃO bate com a posição de
+  // verdade quando o Excel exporta pra PDF/imagem - a exportação aplica uma
+  // escala pequena e ASSIMÉTRICA por eixo (vertical ~3% menor, horizontal
+  // ~7% maior) que não aparece nas propriedades COM, só no resultado
+  // exportado. Confirmado comparando a posição real de ~15 textos-âncora
+  // (números de item, "Elaborador"/"Aprovador"/etc.) no PDF exportado contra
+  // o valor bruto do COM - o desvio cresce da esquerda/topo pra
+  // direita/baixo, ficando bem visível (>30pt) na área de assinaturas. Os
+  // valores abaixo já são CORRIGIDOS (ponto medido no PDF de verdade, não o
+  // valor bruto do COM) - por isso não formam mais uma progressão redonda
+  // tipo "36.0, 72.0, 108.0...". Reproduzir a medição: exportar o modelo em
+  // branco via Excel COM (`ExportAsFixedFormat`, papel A3, Zoom=100,
+  // margens=0) e comparar a posição de textos conhecidos (`page.search_for`
+  // do PyMuPDF) contra `Rows/Columns.Top/Left` pra achar a escala real.
   const LINHA_Y_PT = {
-    1: 0.0, 2: 0.0, 3: 9.0, 4: 27.0, 5: 45.0, 6: 61.2, 7: 94.8, 8: 128.4,
-    9: 144.0, 10: 156.6, 11: 169.2, 12: 181.8, 13: 194.4, 14: 207.6, 15: 220.8,
-    16: 233.4, 17: 246.0, 18: 258.6, 19: 271.2, 20: 283.8, 21: 296.4, 22: 309.0,
-    23: 321.6, 24: 334.2, 25: 346.8, 26: 359.4, 27: 372.0, 28: 384.6, 29: 397.8,
-    30: 411.0, 31: 426.0, 32: 441.0, 33: 456.0, 34: 471.0, 35: 486.0, 36: 501.0,
-    37: 516.0, 38: 531.0, 39: 546.0, 40: 561.0, 41: 576.0, 42: 591.0, 43: 606.0,
-    44: 621.0, 45: 636.0, 46: 651.0, 47: 666.0, 48: 681.0, 49: 696.0, 50: 711.0,
-    51: 726.0, 52: 741.0, 53: 756.0, 54: 771.0, 55: 786.0, 56: 786.0, 57: 786.0,
-    58: 801.0, 59: 816.0, 60: 831.0, 61: 846.0, 62: 861.0, 63: 876.0, 64: 891.0,
-    65: 906.0, 66: 921.0, 67: 936.0, 68: 951.0, 69: 966.0, 70: 966.0, 71: 980.4,
-    72: 992.4, 73: 1012.8, 74: 1033.2, 75: 1053.6, 76: 1066.8, 77: 1080.0,
-    78: 1092.6, 79: 1105.8, 80: 1118.4
+    1: 0.0, 2: 0.0, 3: 6.64, 4: 24.08, 5: 41.51, 6: 57.49, 7: 90.18, 8: 122.87, 9: 138.12, 10: 150.47, 11: 162.82, 12: 175.17, 13: 187.52,
+    14: 199.87, 15: 212.22, 16: 224.57, 17: 236.92, 18: 249.27, 19: 261.62, 20: 273.97, 21: 286.32, 22: 298.66, 23: 311.01, 24: 323.36, 25: 335.71, 26: 348.06,
+    27: 360.41, 28: 372.76, 29: 385.11, 30: 397.46, 31: 411.99, 32: 426.52, 33: 441.04, 34: 455.57, 35: 470.1, 36: 484.63, 37: 499.16, 38: 513.69, 39: 528.21,
+    40: 542.74, 41: 557.27, 42: 571.8, 43: 586.33, 44: 600.86, 45: 615.39, 46: 629.91, 47: 644.44, 48: 658.97, 49: 673.5, 50: 688.03, 51: 702.56, 52: 717.08,
+    53: 731.61, 54: 746.14, 55: 760.67, 56: 760.67, 57: 760.67, 58: 775.2, 59: 789.73, 60: 804.26, 61: 818.78, 62: 833.31, 63: 847.84, 64: 862.37, 65: 876.9,
+    66: 891.43, 67: 905.96, 68: 920.48, 69: 935.01, 70: 935.01, 71: 948.81, 72: 960.44, 73: 980.05, 74: 999.66, 75: 1019.28, 76: 1031.63, 77: 1044.7, 78: 1057.05,
+    79: 1069.4, 80: 1081.75
   };
   const COLUNA_X_PT = {
-    A: 0.0, B: 36.0, C: 72.0, D: 108.0, E: 144.0, F: 180.0, G: 216.0, H: 252.0,
-    I: 282.0, J: 312.0, K: 342.0, L: 372.0, M: 375.6, N: 410.4, O: 440.4,
-    P: 444.0, Q: 474.0, R: 511.2, S: 541.2, T: 548.4, U: 578.4, V: 608.4,
-    W: 655.2, FIM: 655.2
+    A: 0.0, B: 39.4, C: 77.27, D: 115.15, E: 153.03, F: 190.91, G: 228.79, H: 266.67,
+    I: 298.1, J: 329.53, K: 360.96, L: 392.39, M: 396.42, N: 432.69, O: 464.12, P: 468.15,
+    Q: 499.58, R: 538.26, S: 569.69, T: 576.95, U: 608.38, V: 639.81, FIM: 688.97
   };
   // Print area do modelo é $A$2:$V$76 - a altura da página é o topo da
   // linha SEGUINTE ao fim da área impressa (linha 77), mesmo raciocínio já
@@ -59,12 +61,16 @@ const RdoPreviewOffline = (function () {
   function alturaLinha_(linha) { return yTopoLinha_(linha + 1) - yTopoLinha_(linha); }
 
   // Escreve texto de VERDADE (vetor, nítido em qualquer zoom) - limpa
-  // (retângulo branco) a área antes, já que o modelo em branco vem com
-  // texto padrão nalgumas células (nomes das funções do M.O.D., rótulos
-  // "RDO - Nº.:"/"Data:" que a app REESCREVE no xlsx real) - sem limpar, o
-  // texto novo "dobraria" visualmente em cima do antigo. `limparLarguraPt:
-  // 0` pula a limpeza pros campos onde o rótulo É estático de verdade (só
-  // o valor é escrito do lado).
+  // (retângulo branco) a área antes, já que o modelo em branco pode vir com
+  // texto padrão nalgumas células (rótulos que a app REESCREVE no xlsx
+  // real) - sem limpar, o texto novo "dobraria" visualmente em cima do
+  // antigo. `limparLarguraPt: 0` pula a limpeza pros campos onde o rótulo É
+  // estático de verdade (só o valor é escrito do lado). O retângulo de
+  // limpeza é semitransparente (16/07/2026, pedido do Paulo) - opaco ele
+  // apagava as linhas de grade da tabela por baixo (M.O.D./Equipamentos/
+  // Atividades), fazendo o campo parecer "flutuando" sem borda; com opacidade
+  // parcial a grade do fundo continua visível e ainda cobre o suficiente
+  // pra não dobrar visualmente com texto estático eventual.
   function escreverTexto_(doc, texto, coluna, linha, fontePt, deslocTopoPt, opts) {
     const t = (texto == null ? '' : String(texto)).trim();
     if (!t) return;
@@ -75,8 +81,11 @@ const RdoPreviewOffline = (function () {
     const larguraLimparPt = o.limparLarguraPt != null ? o.limparLarguraPt : 150;
     if (larguraLimparPt > 0) {
       const offsetPt = o.limparOffsetPt || 0;
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.7 }));
       doc.setFillColor(255, 255, 255);
       doc.rect(xColuna_(coluna) + offsetPt + 0.5, yTopoLinha_(linha) + 0.5, larguraLimparPt, alturaLinha_(linha) - 1, 'F');
+      doc.restoreGraphicsState();
     }
 
     doc.setFont('helvetica', o.negrito ? 'bold' : 'normal');
@@ -257,6 +266,12 @@ const RdoPreviewOffline = (function () {
     escreverTexto_(doc, state.local + (state.frente ? ' - Frente ' + state.frente : ''), 'L', 7, 10, 17, { limparLarguraPt: 307.8 });
     if (state.data) {
       const [ano, mes, dia] = state.data.split('-');
+      // A célula A8 vem com "Data: 09/07/2026" de exemplo já escrito no
+      // modelo em branco (rótulo+valor no mesmo texto, ao contrário de
+      // OBRA/LOCAL que têm rótulo estático numa célula e valor noutra) -
+      // pré-existente desde antes desta remedição (já acontecia no modelo
+      // anterior também), não é regressão de hoje. `limparLarguraPt: 0`
+      // mantém o comportamento de sempre.
       escreverTexto_(doc, dia + '/' + mes + '/' + ano, 'A', 8, 9, 2, { padXPt: 32, limparLarguraPt: 0 });
     }
     desenharDiaSemana_(doc, state.data);
