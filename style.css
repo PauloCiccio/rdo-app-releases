@@ -427,22 +427,39 @@ textarea { resize: vertical; overflow: hidden; }
 .perfil-avatar svg { width: 24px; height: 24px; }
 .perfil-nome { font-size: 16px; font-weight: bold; color: var(--texto); margin: 0; }
 
-.perfil-resumo {
-  display: flex;
-  gap: 8px;
+/* Perfil reorganizado em 4 quadrados (17/07/2026) - substituiu o antigo
+   .perfil-resumo (4 números lado a lado, não clicáveis). */
+.grade-perfil {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   margin-bottom: 16px;
 }
-.resumo-item {
-  flex: 1;
+.quadrado-perfil {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 22px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-cartao);
+  background: var(--branco);
+  cursor: pointer;
+  font: inherit;
   text-align: center;
-  background: var(--fundo);
-  border-radius: var(--raio-md);
-  padding: 10px 4px;
 }
-.resumo-numero { display: block; font-size: 20px; font-weight: bold; color: var(--vinho); }
-.resumo-item.alerta .resumo-numero { color: var(--alerta); }
-.resumo-item.sucesso .resumo-numero { color: var(--sucesso); }
-.resumo-rotulo { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 2px; }
+.quadrado-perfil:active { box-shadow: none; }
+.quadrado-numero { font-size: 28px; font-weight: bold; color: var(--texto); }
+.quadrado-rotulo { font-size: 12px; color: var(--texto-suave); }
+.quadrado-revisar .quadrado-numero { color: var(--dourado-escuro); }
+.quadrado-aprovados .quadrado-numero { color: var(--sucesso); }
+.quadrado-sem-aprovacao .quadrado-numero { color: var(--alerta); }
+.quadrado-rascunhos .quadrado-numero { color: var(--vinho); }
+
+.campos-filtro-perfil { margin-top: 8px; }
+.campos-filtro-perfil > button { margin-top: 10px; }
 
 .detalhes-filtro-obras {
   border: 1px solid var(--borda);
@@ -723,6 +740,7 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-rdo-perfil.pendente .icone-linha { color: var(--alerta); }
 .linha-rdo-perfil.aprovado .icone-linha { color: var(--sucesso); }
 .linha-rdo-perfil.sem-assinatura .icone-linha { color: var(--alerta); }
+.linha-rdo-perfil.rascunho .icone-linha { color: var(--vinho); }
 .linha-rdo-perfil .botoes-rdo-perfil {
   display: flex;
   gap: 6px;
@@ -747,6 +765,7 @@ textarea { resize: vertical; overflow: hidden; }
 .botao-mini svg { width: 16px; height: 16px; }
 .botao-icone:disabled,
 .botao-mini:disabled { opacity: .5; cursor: not-allowed; }
+.botao-mini-perigo { border-color: var(--erro); background: var(--erro-claro); color: var(--erro); }
 .link-corrigir-email {
   background: none;
   border: none;

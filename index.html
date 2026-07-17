@@ -29,70 +29,62 @@
     <p class="perfil-nome" id="perfil-nome-usuario"></p>
   </div>
 
-  <div class="perfil-resumo" id="perfil-resumo" style="display:none;">
-    <div class="resumo-item">
-      <span class="resumo-numero" id="resumo-total">0</span>
-      <span class="resumo-rotulo">RDOs enviados</span>
-    </div>
-    <div class="resumo-item">
-      <span class="resumo-numero" id="resumo-revisao-interna">0</span>
-      <span class="resumo-rotulo">Em revisão interna</span>
-    </div>
-    <div class="resumo-item alerta">
-      <span class="resumo-numero" id="resumo-pendentes">0</span>
-      <span class="resumo-rotulo">Aguardando Cliente</span>
-    </div>
-    <div class="resumo-item sucesso">
-      <span class="resumo-numero" id="resumo-aprovados">0</span>
-      <span class="resumo-rotulo">Aprovados</span>
-    </div>
-  </div>
-
-  <details id="perfil-filtro-obras" class="detalhes-filtro-obras" style="display:none;">
-    <summary class="subtitulo-perfil">Obras que acompanho
-      <span id="contagem-filtro-obras" class="badge-aba badge-inline" style="display:none;"></span>
-    </summary>
-    <div id="lista-filtro-obras" class="lista-filtro-obras"></div>
-    <p class="orcamento-info" id="filtro-obras-sem-itens" style="display:none;">Nenhuma obra cadastrada ainda.</p>
-    <div class="botoes-rdo-perfil">
-      <button type="button" id="btn-salvar-filtro-obras" class="botao-mini">Salvar</button>
-    </div>
-    <div class="status" id="status-filtro-obras"></div>
-  </details>
-
-  <div id="cartao-aprovacoes-internas" style="display:none;">
-    <h3 class="subtitulo-perfil">RDOs para revisar
-      <span id="badge-aprovacoes-internas" class="badge-aba badge-inline" style="display:none;"></span>
-    </h3>
-    <div id="lista-aprovacoes-internas"></div>
-    <p class="orcamento-info" id="aprovacoes-internas-sem-itens" style="display:none;">Nenhum RDO aguardando revisão.</p>
+  <div class="grade-perfil" id="grade-perfil" style="display:none;">
+    <button type="button" class="quadrado-perfil quadrado-revisar" id="quad-revisar" style="display:none;">
+      <span class="quadrado-numero" id="qtd-revisar">0</span>
+      <span class="quadrado-rotulo">RDOs para revisar</span>
+    </button>
+    <button type="button" class="quadrado-perfil quadrado-aprovados" id="quad-aprovados">
+      <span class="quadrado-numero" id="qtd-aprovados">0</span>
+      <span class="quadrado-rotulo">RDOs aprovados</span>
+    </button>
+    <button type="button" class="quadrado-perfil quadrado-sem-aprovacao" id="quad-sem-aprovacao">
+      <span class="quadrado-numero" id="qtd-sem-aprovacao">0</span>
+      <span class="quadrado-rotulo">RDOs sem aprovação do Cliente</span>
+    </button>
+    <button type="button" class="quadrado-perfil quadrado-rascunhos" id="quad-rascunhos">
+      <span class="quadrado-numero" id="qtd-rascunhos">0</span>
+      <span class="quadrado-rotulo">Meus rascunhos</span>
+    </button>
   </div>
 
   <div id="perfil-carregando" class="status">Carregando seus RDOs...</div>
   <div id="perfil-erro" class="status erro" style="display:none;"></div>
 
-  <div id="perfil-lista-obras" style="display:none;">
-    <h3 class="subtitulo-perfil">Minhas Obras</h3>
-    <div id="perfil-obras"></div>
-    <p class="orcamento-info" id="perfil-sem-obras" style="display:none;">Você ainda não gerou nenhum RDO.</p>
-  </div>
-
-  <div id="perfil-detalhe-obra" style="display:none;">
+  <div id="perfil-detalhe-categoria" style="display:none;">
     <div class="cabecalho-secao">
-      <h3 id="perfil-obra-selecionada" class="subtitulo-perfil"></h3>
-      <button type="button" id="btn-voltar-obras" class="link-limpar-cache">‹ Minhas Obras</button>
+      <h3 id="titulo-detalhe-categoria" class="subtitulo-perfil"></h3>
+      <button type="button" id="btn-voltar-quadrados" class="link-limpar-cache">‹ Voltar</button>
     </div>
-    <h3 class="subtitulo-perfil">Para aprovação do Contratante</h3>
-    <div id="perfil-pendentes"></div>
-    <p class="orcamento-info" id="perfil-sem-pendentes" style="display:none;">Nenhum RDO aguardando aprovação nesta obra.</p>
 
-    <h3 class="subtitulo-perfil">Aprovados pelo Cliente</h3>
-    <div id="perfil-aprovados-cliente"></div>
-    <p class="orcamento-info" id="perfil-sem-aprovados-cliente" style="display:none;">Nenhum RDO aprovado pelo Cliente ainda nesta obra.</p>
+    <details id="perfil-filtro-obras" class="detalhes-filtro-obras" style="display:none;">
+      <summary class="subtitulo-perfil">Obras que acompanho
+        <span id="contagem-filtro-obras" class="badge-aba badge-inline" style="display:none;"></span>
+      </summary>
+      <div id="lista-filtro-obras" class="lista-filtro-obras"></div>
+      <p class="orcamento-info" id="filtro-obras-sem-itens" style="display:none;">Nenhuma obra cadastrada ainda.</p>
+      <div class="botoes-rdo-perfil">
+        <button type="button" id="btn-salvar-filtro-obras" class="botao-mini">Salvar</button>
+      </div>
+      <div class="status" id="status-filtro-obras"></div>
+    </details>
 
-    <h3 class="subtitulo-perfil">Emitidos sem Assinatura</h3>
-    <div id="perfil-aprovados-sem-assinatura"></div>
-    <p class="orcamento-info" id="perfil-sem-aprovados-sem-assinatura" style="display:none;">Nenhum RDO emitido sem assinatura ainda nesta obra.</p>
+    <details id="painel-filtros-perfil" class="detalhes-filtro-obras">
+      <summary class="subtitulo-perfil">Filtros</summary>
+      <div class="campos-filtro-perfil">
+        <input type="text" id="filtro-perfil-os" placeholder="OS">
+        <input type="text" id="filtro-perfil-contratante" list="lista-contratantes-perfil" placeholder="Contratante">
+        <datalist id="lista-contratantes-perfil"></datalist>
+        <input type="text" id="filtro-perfil-obra" list="lista-obras-perfil" placeholder="Obra">
+        <datalist id="lista-obras-perfil"></datalist>
+        <label>Execução de <input type="date" id="filtro-perfil-data-ini"></label>
+        <label>até <input type="date" id="filtro-perfil-data-fim"></label>
+        <button type="button" id="btn-limpar-filtros-perfil" class="botao-mini">Limpar filtros</button>
+      </div>
+    </details>
+
+    <div id="lista-itens-perfil"></div>
+    <p class="orcamento-info" id="perfil-sem-itens" style="display:none;">Nada encontrado.</p>
   </div>
 
   <div class="perfil-rodape">
@@ -310,6 +302,7 @@
           revisar e enviar pro Contratante - ele não vai direto pro cliente.
         </p>
         <button type="button" id="btn-gerar" class="botao-principal">Pré-visualizar RDO</button>
+        <button type="button" id="btn-salvar-rascunho" class="botao-secundario">Salvar como Rascunho</button>
         <div id="status-envio" class="status" aria-live="polite"></div>
       </div>
     </div>

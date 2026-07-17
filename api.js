@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.9.23';
+const VERSAO_APP = 'BETA 0.10.0';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
@@ -381,8 +381,8 @@ const RdoApi = (function () {
   }
 
   // Aprovação INTERNA (14/07/2026) - ver [[project_rdo_app]].
-  function salvarParaAprovacaoInterna({ cliente, obra, data, stateJSON, token }) {
-    return postJson_({ action: 'salvarParaAprovacaoInterna', cliente, obra, data, stateJSON, token });
+  function salvarParaAprovacaoInterna({ cliente, obra, data, os, stateJSON, token }) {
+    return postJson_({ action: 'salvarParaAprovacaoInterna', cliente, obra, data, os, stateJSON, token });
   }
 
   function listarAprovacoesInternas(token) {
@@ -401,6 +401,25 @@ const RdoApi = (function () {
 
   function enviarParaAprovacaoSemRevisao(token, pdfFileId, emailResponsavel) {
     return postJson_({ action: 'enviarParaAprovacaoSemRevisao', token, pdfFileId, emailResponsavel });
+  }
+
+  // Rascunhos (17/07/2026) - ver [[project_rdo_app]]. tokenRascunho é
+  // opcional em salvarRascunho: omitido cria um rascunho novo, presente
+  // atualiza esse mesmo rascunho (upsert no backend).
+  function salvarRascunho({ token, tokenRascunho, cliente, obra, os, data, stateJSON }) {
+    return postJson_({ action: 'salvarRascunho', token, tokenRascunho, cliente, obra, os, data, stateJSON });
+  }
+
+  function listarRascunhos(token) {
+    return postJson_({ action: 'listarRascunhos', token });
+  }
+
+  function buscarRascunho(token, tokenRascunho) {
+    return postJson_({ action: 'buscarRascunho', token, tokenRascunho });
+  }
+
+  function excluirRascunho(token, tokenRascunho) {
+    return postJson_({ action: 'excluirRascunho', token, tokenRascunho });
   }
 
   async function buscarAprovacao(token) {
@@ -527,6 +546,7 @@ const RdoApi = (function () {
     buscarCliente, buscarNomeCliente, cadastrarCliente, login, trocarSenhaObrigatoria, validarSessao, logout,
     meusRdos, buscarPdfPorId, buscarXlsxPorId, reenviarLinkAprovacao, corrigirEmailAprovacao,
     salvarParaAprovacaoInterna, listarAprovacoesInternas, buscarAprovacaoInterna, salvarObrasFiltro,
-    liberarRdoParaRevisao, enviarParaAprovacaoSemRevisao, definirCallbackSessaoInvalida
+    liberarRdoParaRevisao, enviarParaAprovacaoSemRevisao, definirCallbackSessaoInvalida,
+    salvarRascunho, listarRascunhos, buscarRascunho, excluirRascunho
   };
 })();

@@ -290,6 +290,7 @@ const el = {
   avisoSemAprovacaoContratante: document.getElementById('aviso-sem-aprovacao-contratante'),
   secaoAssinaturasEnvio: document.getElementById('secao-assinaturas-envio'),
   btnGerar: document.getElementById('btn-gerar'),
+  btnSalvarRascunho: document.getElementById('btn-salvar-rascunho'),
   status: document.getElementById('status-envio'),
   cartaoPreview: document.getElementById('cartao-preview'),
   wrapVisualizadorApp: document.getElementById('wrap-visualizador-app'),
@@ -322,38 +323,42 @@ const el = {
   btnTrocarSenha: document.getElementById('btn-trocar-senha'),
   statusLogin: document.getElementById('status-login'),
   cartaoPerfil: document.getElementById('cartao-perfil'),
-  perfilResumo: document.getElementById('perfil-resumo'),
-  resumoTotal: document.getElementById('resumo-total'),
-  resumoRevisaoInterna: document.getElementById('resumo-revisao-interna'),
-  resumoPendentes: document.getElementById('resumo-pendentes'),
-  resumoAprovados: document.getElementById('resumo-aprovados'),
   perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
   perfilCarregando: document.getElementById('perfil-carregando'),
   perfilErro: document.getElementById('perfil-erro'),
-  perfilListaObras: document.getElementById('perfil-lista-obras'),
-  perfilObras: document.getElementById('perfil-obras'),
-  perfilSemObras: document.getElementById('perfil-sem-obras'),
-  perfilDetalheObra: document.getElementById('perfil-detalhe-obra'),
-  perfilObraSelecionada: document.getElementById('perfil-obra-selecionada'),
-  btnVoltarObras: document.getElementById('btn-voltar-obras'),
-  perfilPendentes: document.getElementById('perfil-pendentes'),
-  perfilSemPendentes: document.getElementById('perfil-sem-pendentes'),
-  perfilAprovadosCliente: document.getElementById('perfil-aprovados-cliente'),
-  perfilSemAprovadosCliente: document.getElementById('perfil-sem-aprovados-cliente'),
-  perfilAprovadosSemAssinatura: document.getElementById('perfil-aprovados-sem-assinatura'),
-  perfilSemAprovadosSemAssinatura: document.getElementById('perfil-sem-aprovados-sem-assinatura'),
+
+  gradePerfil: document.getElementById('grade-perfil'),
+  quadRevisar: document.getElementById('quad-revisar'),
+  qtdRevisar: document.getElementById('qtd-revisar'),
+  quadAprovados: document.getElementById('quad-aprovados'),
+  qtdAprovados: document.getElementById('qtd-aprovados'),
+  quadSemAprovacao: document.getElementById('quad-sem-aprovacao'),
+  qtdSemAprovacao: document.getElementById('qtd-sem-aprovacao'),
+  quadRascunhos: document.getElementById('quad-rascunhos'),
+  qtdRascunhos: document.getElementById('qtd-rascunhos'),
+
+  perfilDetalheCategoria: document.getElementById('perfil-detalhe-categoria'),
+  tituloDetalheCategoria: document.getElementById('titulo-detalhe-categoria'),
+  btnVoltarQuadrados: document.getElementById('btn-voltar-quadrados'),
+  listaItensPerfil: document.getElementById('lista-itens-perfil'),
+  perfilSemItens: document.getElementById('perfil-sem-itens'),
+
+  painelFiltrosPerfil: document.getElementById('painel-filtros-perfil'),
+  filtroPerfilOs: document.getElementById('filtro-perfil-os'),
+  filtroPerfilContratante: document.getElementById('filtro-perfil-contratante'),
+  listaContratantesPerfil: document.getElementById('lista-contratantes-perfil'),
+  filtroPerfilObra: document.getElementById('filtro-perfil-obra'),
+  listaObrasPerfil: document.getElementById('lista-obras-perfil'),
+  filtroPerfilDataIni: document.getElementById('filtro-perfil-data-ini'),
+  filtroPerfilDataFim: document.getElementById('filtro-perfil-data-fim'),
+  btnLimparFiltrosPerfil: document.getElementById('btn-limpar-filtros-perfil'),
 
   perfilFiltroObras: document.getElementById('perfil-filtro-obras'),
   listaFiltroObras: document.getElementById('lista-filtro-obras'),
   filtroObrasSemItens: document.getElementById('filtro-obras-sem-itens'),
   contagemFiltroObras: document.getElementById('contagem-filtro-obras'),
   btnSalvarFiltroObras: document.getElementById('btn-salvar-filtro-obras'),
-  statusFiltroObras: document.getElementById('status-filtro-obras'),
-
-  cartaoAprovacoesInternas: document.getElementById('cartao-aprovacoes-internas'),
-  badgeAprovacoesInternas: document.getElementById('badge-aprovacoes-internas'),
-  listaAprovacoesInternas: document.getElementById('lista-aprovacoes-internas'),
-  aprovacoesInternasSemItens: document.getElementById('aprovacoes-internas-sem-itens')
+  statusFiltroObras: document.getElementById('status-filtro-obras')
 };
 
 // ---------------------------------------------------------------------------
@@ -1571,84 +1576,181 @@ el.btnSair.addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tela de Perfil (11/07 tarde) - tocar no ícone da FN mostra todos os RDOs
-// que ESSE usuário gerou, agrupados por obra: "Aprovados" (envio direto ou
-// aprovação do Contratante já concluída - dá pra visualizar/compartilhar o
-// PDF de novo) e "Para aprovação do Contratante" (ainda pendentes - dá pra
-// reenviar o link por e-mail, e corrigir o e-mail se o Contratante disser
-// que não recebeu porque estava errado).
+// Tela de Perfil (11/07 tarde, reorganizada em 4 quadrados 17/07/2026) -
+// tocar no ícone da FN mostra 4 quadrados grandes e clicáveis com a
+// contagem de cada categoria: "RDOs para revisar" (revisão interna, só
+// administrador/admin_master), "RDOs aprovados" (aprovação do Contratante
+// já concluída pelo link), "RDOs sem aprovação do Cliente" (emitidos sem
+// assinatura via bypass do administrador + ainda aguardando resposta do
+// Contratante - as duas coisas têm em comum "o Cliente ainda não
+// aprovou", pedido do Paulo) e "Meus rascunhos". Cada quadrado abre uma
+// lista única filtrável por OS/Contratante/Obra/período de execução -
+// substituiu a navegação em 2 níveis "Minhas Obras" → obra → 3 listas que
+// existia antes (a obra virou só mais um filtro, não um nível de
+// navegação).
 // ---------------------------------------------------------------------------
 
-function chaveObraPerfil_(item) {
-  return `${item.cliente} - ${item.obra}`;
-}
-
-// Guarda a resposta CRUA de meusRdos (todas as obras juntas) - a
-// navegação "Minhas Obras" (pedido do Paulo, 11/07 tarde: antes mostrava
-// tudo junto numa lista só, agora precisa escolher a obra primeiro) só
-// filtra esses dois arrays na hora de abrir o detalhe, sem rebuscar no
-// servidor.
+// Guarda a resposta CRUA de cada fonte (meusRdos/listarAprovacoesInternas/
+// listarRascunhos) - abrir um quadrado só filtra esses arrays localmente,
+// sem rebuscar no servidor a cada mudança de filtro.
 let perfilDadosAtuais = null;
+let perfilRevisar_ = [];
+let perfilRascunhosRemotos_ = [];
+let categoriaAberta_ = null; // 'revisar' | 'aprovados' | 'sem-aprovacao' | 'rascunhos'
 
-function listarObrasUnicasPerfil_() {
-  const mapa = new Map(); // chave "Cliente - Obra" -> {cliente, obra, nAprovados, nPendentes}
-  perfilDadosAtuais.pendentes.forEach(item => {
-    const chave = chaveObraPerfil_(item);
-    if (!mapa.has(chave)) mapa.set(chave, { cliente: item.cliente, obra: item.obra, nAprovados: 0, nPendentes: 0 });
-    mapa.get(chave).nPendentes++;
-  });
-  perfilDadosAtuais.aprovados.forEach(item => {
-    const chave = chaveObraPerfil_(item);
-    if (!mapa.has(chave)) mapa.set(chave, { cliente: item.cliente, obra: item.obra, nAprovados: 0, nPendentes: 0 });
-    mapa.get(chave).nAprovados++;
-  });
-  return mapa;
+const TITULOS_CATEGORIA_PERFIL_ = {
+  revisar: 'RDOs para revisar',
+  aprovados: 'RDOs aprovados',
+  'sem-aprovacao': 'RDOs sem aprovação do Cliente',
+  rascunhos: 'Meus rascunhos'
+};
+
+// Junta rascunhos locais com os que só existem na nuvem (salvos noutro
+// aparelho) - dedup por tokenNuvem, pra um rascunho já sincronizado não
+// aparecer duas vezes. Itens só-na-nuvem entram sem `.state` (buscado sob
+// demanda em abrirRascunho_, só quando a pessoa realmente abrir).
+function combinarRascunhos_(locais, remotos) {
+  const tokensLocais = new Set(locais.filter(item => item.tokenNuvem).map(item => item.tokenNuvem));
+  const somenteNuvem = (remotos || [])
+    .filter(r => !tokensLocais.has(r.token))
+    .map(r => ({ id: null, tokenNuvem: r.token, cliente: r.cliente, obra: r.obra, os: r.os, data: r.data, state: null, criadoEm: r.criadoEm, atualizadoEm: r.atualizadoEm }));
+  return [...locais, ...somenteNuvem];
 }
 
-function renderizarListaObrasPerfil_() {
-  el.perfilObras.innerHTML = '';
-  const mapa = listarObrasUnicasPerfil_();
-  mapa.forEach((info, chave) => {
-    const partes = [];
-    if (info.nPendentes) partes.push(`${info.nPendentes} para aprovação`);
-    if (info.nAprovados) partes.push(`${info.nAprovados} aprovado(s)`);
-    const botao = document.createElement('button');
-    botao.type = 'button';
-    botao.className = 'linha-obra-perfil';
-    botao.innerHTML = `<svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v15"/><path d="M14 21V10a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11"/><path d="M2 21h20M7 8h.01M7 12h.01M7 16h.01M17 13h.01M17 17h.01"/></svg><span class="texto-linha-obra"><span class="nome-obra-perfil">${chave}</span><span class="contagem-obra-perfil">${partes.join(' · ')}</span></span>`;
-    botao.addEventListener('click', () => abrirDetalheObraPerfil_(chave));
-    el.perfilObras.appendChild(botao);
+function itensBrutosDaCategoriaPerfil_(categoria) {
+  if (categoria === 'revisar') return perfilRevisar_;
+  if (categoria === 'aprovados') return perfilDadosAtuais.aprovados.filter(item => item.origem === 'aprovacao');
+  if (categoria === 'sem-aprovacao') {
+    return [...perfilDadosAtuais.aprovados.filter(item => item.origem === 'direto'), ...perfilDadosAtuais.pendentes]
+      .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  }
+  if (categoria === 'rascunhos') return combinarRascunhos_(carregarRascunhosLocais_(), perfilRascunhosRemotos_);
+  return [];
+}
+
+function atualizarContadoresPerfil_() {
+  el.qtdRevisar.textContent = String(perfilRevisar_.length);
+  el.qtdAprovados.textContent = String(itensBrutosDaCategoriaPerfil_('aprovados').length);
+  el.qtdSemAprovacao.textContent = String(itensBrutosDaCategoriaPerfil_('sem-aprovacao').length);
+  el.qtdRascunhos.textContent = String(itensBrutosDaCategoriaPerfil_('rascunhos').length);
+}
+
+function popularDatalistsFiltroPerfil_(itens) {
+  const contratantes = [...new Set(itens.map(item => item.cliente).filter(Boolean))].sort();
+  const obras = [...new Set(itens.map(item => item.obra).filter(Boolean))].sort();
+  el.listaContratantesPerfil.innerHTML = contratantes.map(c => `<option value="${c}">`).join('');
+  el.listaObrasPerfil.innerHTML = obras.map(o => `<option value="${o}">`).join('');
+}
+
+// OS/Contratante/Obra: substring, sem diferenciar maiúsculas/minúsculas.
+// Período: string 'yyyy-mm-dd' já é comparável diretamente.
+function filtrarItensPerfil_(itens) {
+  const os = (el.filtroPerfilOs.value || '').trim().toLowerCase();
+  const contratante = (el.filtroPerfilContratante.value || '').trim().toLowerCase();
+  const obra = (el.filtroPerfilObra.value || '').trim().toLowerCase();
+  const dataIni = el.filtroPerfilDataIni.value || '';
+  const dataFim = el.filtroPerfilDataFim.value || '';
+  return itens.filter(item => {
+    if (os && !String(item.os || '').toLowerCase().includes(os)) return false;
+    if (contratante && !String(item.cliente || '').toLowerCase().includes(contratante)) return false;
+    if (obra && !String(item.obra || '').toLowerCase().includes(obra)) return false;
+    const data = item.data || '';
+    if (dataIni && data && data < dataIni) return false;
+    if (dataFim && data && data > dataFim) return false;
+    return true;
   });
-  el.perfilSemObras.style.display = mapa.size ? 'none' : 'block';
 }
 
-function abrirDetalheObraPerfil_(chave) {
-  el.perfilObraSelecionada.textContent = chave;
-  el.perfilListaObras.style.display = 'none';
-  el.perfilDetalheObra.style.display = 'block';
-
-  const pendentesDaObra = perfilDadosAtuais.pendentes.filter(item => chaveObraPerfil_(item) === chave).reverse();
-  const aprovadosDaObra = perfilDadosAtuais.aprovados.filter(item => chaveObraPerfil_(item) === chave).reverse();
-
-  el.perfilPendentes.innerHTML = '';
-  pendentesDaObra.forEach(item => el.perfilPendentes.appendChild(montarLinhaPendente_(item)));
-  el.perfilSemPendentes.style.display = pendentesDaObra.length ? 'none' : 'block';
-
-  // Aprovados pelo Cliente (via link de aprovação) e Emitidos sem
-  // Assinatura (balão "Gerar RDO sem assinatura") eram uma lista só, sem
-  // distinção - separados (15/07/2026) porque só o segundo grupo pode
-  // "Enviar ao Cliente sem revisão" (ver montarLinhaAprovado_).
-  const aprovadosClienteDaObra = aprovadosDaObra.filter(item => item.origem === 'aprovacao');
-  const aprovadosSemAssinaturaDaObra = aprovadosDaObra.filter(item => item.origem === 'direto');
-
-  el.perfilAprovadosCliente.innerHTML = '';
-  aprovadosClienteDaObra.forEach(item => el.perfilAprovadosCliente.appendChild(montarLinhaAprovado_(item)));
-  el.perfilSemAprovadosCliente.style.display = aprovadosClienteDaObra.length ? 'none' : 'block';
-
-  el.perfilAprovadosSemAssinatura.innerHTML = '';
-  aprovadosSemAssinaturaDaObra.forEach(item => el.perfilAprovadosSemAssinatura.appendChild(montarLinhaAprovado_(item)));
-  el.perfilSemAprovadosSemAssinatura.style.display = aprovadosSemAssinaturaDaObra.length ? 'none' : 'block';
+function renderizarListaPerfilAtual_() {
+  if (!categoriaAberta_) return;
+  const filtrados = filtrarItensPerfil_(itensBrutosDaCategoriaPerfil_(categoriaAberta_));
+  el.listaItensPerfil.innerHTML = '';
+  filtrados.forEach(item => {
+    let linha;
+    if (categoriaAberta_ === 'revisar') linha = montarLinhaRevisar_(item);
+    else if (categoriaAberta_ === 'rascunhos') linha = montarLinhaRascunho_(item);
+    else if (item.origem) linha = montarLinhaAprovado_(item);
+    else linha = montarLinhaPendente_(item);
+    el.listaItensPerfil.appendChild(linha);
+  });
+  el.perfilSemItens.style.display = filtrados.length ? 'none' : 'block';
 }
+
+function abrirCategoriaPerfil_(categoria) {
+  categoriaAberta_ = categoria;
+  el.tituloDetalheCategoria.textContent = TITULOS_CATEGORIA_PERFIL_[categoria];
+  el.gradePerfil.style.display = 'none';
+  el.perfilDetalheCategoria.style.display = 'block';
+  // "Obras que acompanho" (preferência do administrador) só faz sentido
+  // dentro do quadrado "revisar" - é o que ela filtra.
+  el.perfilFiltroObras.style.display = categoria === 'revisar' ? 'block' : 'none';
+  el.filtroPerfilOs.value = '';
+  el.filtroPerfilContratante.value = '';
+  el.filtroPerfilObra.value = '';
+  el.filtroPerfilDataIni.value = '';
+  el.filtroPerfilDataFim.value = '';
+  popularDatalistsFiltroPerfil_(itensBrutosDaCategoriaPerfil_(categoria));
+  renderizarListaPerfilAtual_();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function fecharCategoriaPerfil_() {
+  categoriaAberta_ = null;
+  el.perfilDetalheCategoria.style.display = 'none';
+  el.gradePerfil.style.display = 'grid';
+}
+
+function montarLinhaRevisar_(item) {
+  const linha = document.createElement('button');
+  linha.type = 'button';
+  linha.className = 'linha-obra-perfil';
+  linha.innerHTML = `<strong>${item.obra}</strong> (${item.cliente})<br>` +
+    `Elaborado por ${item.nomeElaborador} - ${item.data || ''}`;
+  linha.addEventListener('click', () => abrirRevisaoInterna_(item.token));
+  return linha;
+}
+
+function montarLinhaRascunho_(item) {
+  const linha = document.createElement('div');
+  linha.className = 'linha-rdo-perfil rascunho';
+  const sincronizado = item.tokenNuvem ? '☁ sincronizado' : '📱 só neste aparelho';
+  const partes = [];
+  if (item.os) partes.push('OS ' + item.os);
+  partes.push(item.data || 'sem data');
+  partes.push(sincronizado);
+  linha.innerHTML = `
+    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>${item.obra || '(obra não preenchida)'}${item.cliente ? ' (' + item.cliente + ')' : ''} - ${partes.join(' · ')}</span></div>
+    <div class="botoes-rdo-perfil">
+      <button type="button" class="botao-mini btn-continuar-rascunho">Continuar preenchendo</button>
+      <button type="button" class="botao-mini botao-mini-perigo btn-excluir-rascunho">Excluir</button>
+    </div>`;
+  linha.querySelector('.btn-continuar-rascunho').addEventListener('click', () => abrirRascunho_(item));
+  linha.querySelector('.btn-excluir-rascunho').addEventListener('click', async () => {
+    if (!confirm('Excluir este rascunho? Essa ação não pode ser desfeita.')) return;
+    await excluirRascunhoLocalENuvem_(item);
+    renderizarListaPerfilAtual_();
+    atualizarContadoresPerfil_();
+  });
+  return linha;
+}
+
+[el.filtroPerfilOs, el.filtroPerfilContratante, el.filtroPerfilObra, el.filtroPerfilDataIni, el.filtroPerfilDataFim].forEach(campo => {
+  campo.addEventListener('input', () => renderizarListaPerfilAtual_());
+});
+el.btnLimparFiltrosPerfil.addEventListener('click', () => {
+  el.filtroPerfilOs.value = '';
+  el.filtroPerfilContratante.value = '';
+  el.filtroPerfilObra.value = '';
+  el.filtroPerfilDataIni.value = '';
+  el.filtroPerfilDataFim.value = '';
+  renderizarListaPerfilAtual_();
+});
+
+el.quadRevisar.addEventListener('click', () => abrirCategoriaPerfil_('revisar'));
+el.quadAprovados.addEventListener('click', () => abrirCategoriaPerfil_('aprovados'));
+el.quadSemAprovacao.addEventListener('click', () => abrirCategoriaPerfil_('sem-aprovacao'));
+el.quadRascunhos.addEventListener('click', () => abrirCategoriaPerfil_('rascunhos'));
+el.btnVoltarQuadrados.addEventListener('click', () => fecharCategoriaPerfil_());
 
 function montarLinhaAprovado_(item) {
   const linha = document.createElement('div');
@@ -1872,50 +1974,44 @@ async function carregarPerfil_() {
   el.perfilNomeUsuario.textContent = sessao.nome;
   el.perfilCarregando.style.display = 'block';
   el.perfilErro.style.display = 'none';
-  el.perfilListaObras.style.display = 'none';
-  el.perfilDetalheObra.style.display = 'none';
+  el.gradePerfil.style.display = 'none';
+  fecharCategoriaPerfil_();
+
+  // Papéis de usuário (14/07/2026): só administrador/admin_master veem o
+  // quadrado "RDOs para revisar" - filtrado (15/07/2026) pelas obras que o
+  // próprio administrador escolheu acompanhar (ObrasFiltro, vazio = vê
+  // tudo, ver [[project_rdo_app]]).
+  const ehAdmin = sessao.perfil === 'administrador' || sessao.perfil === 'admin_master';
+  el.quadRevisar.style.display = ehAdmin ? 'flex' : 'none';
 
   try {
-    const resp = await RdoApi.meusRdos(sessao.token);
-    if (!resp.ok) throw new Error(resp.erro || 'Não consegui carregar seus RDOs.');
+    // meusRdos/listarRascunhos/listarAprovacoesInternas em paralelo -
+    // rascunhos e revisão interna têm try/catch próprio (best-effort, não
+    // travam o resto do Perfil se falharem - mesma filosofia de antes).
+    const [respMeusRdos, respRascunhos, respInternas] = await Promise.all([
+      RdoApi.meusRdos(sessao.token),
+      RdoApi.listarRascunhos(sessao.token).catch(err => { console.error('Falha ao carregar rascunhos:', err); return { ok: false }; }),
+      ehAdmin
+        ? RdoApi.listarAprovacoesInternas(sessao.token).catch(err => { console.error('Falha ao carregar RDOs para revisar:', err); return { ok: false }; })
+        : Promise.resolve({ ok: true, pendentes: [] })
+    ]);
 
-    perfilDadosAtuais = { aprovados: resp.aprovados, pendentes: resp.pendentes };
-    const totalPendentes = resp.pendentes.length;
-    const totalAprovados = resp.aprovados.length;
-    el.resumoTotal.textContent = String(totalPendentes + totalAprovados);
-    el.resumoRevisaoInterna.textContent = String(resp.pendentesRevisaoInterna || 0);
-    el.resumoPendentes.textContent = String(totalPendentes);
-    el.resumoAprovados.textContent = String(totalAprovados);
-    el.perfilResumo.style.display = (totalPendentes + totalAprovados) > 0 ? 'flex' : 'none';
+    if (!respMeusRdos.ok) throw new Error(respMeusRdos.erro || 'Não consegui carregar seus RDOs.');
+    perfilDadosAtuais = { aprovados: respMeusRdos.aprovados, pendentes: respMeusRdos.pendentes };
+    perfilRascunhosRemotos_ = respRascunhos.ok ? respRascunhos.rascunhos : [];
+    perfilRevisar_ = respInternas.ok ? respInternas.pendentes : [];
+
+    atualizarContadoresPerfil_();
     el.perfilCarregando.style.display = 'none';
-    el.perfilListaObras.style.display = 'block';
-    renderizarListaObrasPerfil_();
+    el.gradePerfil.style.display = 'grid';
+
+    if (ehAdmin) renderizarFiltroObrasPerfil_(sessao);
   } catch (err) {
     console.error(err);
     el.perfilCarregando.style.display = 'none';
     el.perfilErro.style.display = 'block';
     el.perfilErro.textContent = 'Erro: ' + (err && err.message ? err.message : err);
     RdoApi.logErro('carregar_perfil', err && err.message ? err.message : String(err));
-  }
-
-  // Papéis de usuário (14/07/2026): só administrador/admin_master veem o
-  // card "RDOs para revisar" - filtrado (15/07/2026) pelas obras que o
-  // próprio administrador escolheu acompanhar (ObrasFiltro, vazio = vê
-  // tudo, ver [[project_rdo_app]]). Falha aqui não deve travar o resto do
-  // Perfil - cards somem silenciosamente se der erro (best-effort).
-  if (sessao.perfil === 'administrador' || sessao.perfil === 'admin_master') {
-    el.cartaoAprovacoesInternas.style.display = 'block';
-    el.perfilFiltroObras.style.display = 'block';
-    renderizarFiltroObrasPerfil_(sessao);
-    try {
-      const respInternas = await RdoApi.listarAprovacoesInternas(sessao.token);
-      if (respInternas.ok) renderizarListaAprovacoesInternas_(respInternas.pendentes);
-    } catch (err) {
-      console.error('Falha ao carregar RDOs para revisar:', err);
-    }
-  } else {
-    el.cartaoAprovacoesInternas.style.display = 'none';
-    el.perfilFiltroObras.style.display = 'none';
   }
 }
 
@@ -1962,7 +2058,11 @@ el.btnSalvarFiltroObras.addEventListener('click', async () => {
     el.statusFiltroObras.className = 'status sucesso';
 
     const respInternas = await RdoApi.listarAprovacoesInternas(sessao.token);
-    if (respInternas.ok) renderizarListaAprovacoesInternas_(respInternas.pendentes);
+    if (respInternas.ok) {
+      perfilRevisar_ = respInternas.pendentes;
+      atualizarContadoresPerfil_();
+      if (categoriaAberta_ === 'revisar') renderizarListaPerfilAtual_();
+    }
   } catch (err) {
     console.error(err);
     el.statusFiltroObras.textContent = 'Erro: ' + (err && err.message ? err.message : err);
@@ -1972,36 +2072,16 @@ el.btnSalvarFiltroObras.addEventListener('click', async () => {
   }
 });
 
-function renderizarListaAprovacoesInternas_(pendentes) {
-  el.listaAprovacoesInternas.innerHTML = '';
-  el.badgeAprovacoesInternas.style.display = pendentes.length > 0 ? 'inline-block' : 'none';
-  el.badgeAprovacoesInternas.textContent = String(pendentes.length);
-  el.aprovacoesInternasSemItens.style.display = pendentes.length === 0 ? 'block' : 'none';
-
-  pendentes.forEach(item => {
-    const linha = document.createElement('button');
-    linha.type = 'button';
-    linha.className = 'linha-obra-perfil';
-    linha.innerHTML = `<strong>${item.obra}</strong> (${item.cliente})<br>` +
-      `Elaborado por ${item.nomeElaborador} - ${item.data || ''}`;
-    linha.addEventListener('click', () => abrirRevisaoInterna_(item.token));
-    el.listaAprovacoesInternas.appendChild(linha);
-  });
-}
-
 // aprovacaoInternaAtual_ já declarado no topo do arquivo (ver comentário lá).
 
-// Restaura um stateJSON salvo (revisão de aprovação interna OU reabertura
-// de um RDO já enviado - mesmo mecanismo, muda só de onde vem o stateJSON)
-// no formulário - copia campo a campo pro state atual e sincroniza a tela.
-// Travamento/troca de aba/scroll ficam aqui porque são idênticos nos dois
-// fluxos; o que muda entre eles (aprovacaoInternaAtual_ x reaberturaAtual_)
-// fica a cargo de quem chama.
-function restaurarRdoNoFormulario_(stateJSON, nomeElaboradorFallback, sessao) {
-  const s = JSON.parse(stateJSON);
-
-  // Mesmo padrão de restaurarEstadoEmAndamento_ - copia campo a campo do
-  // state salvo pro state atual, depois sincroniza a tela.
+// Cópia campo-a-campo de um state salvo (revisão interna, reabertura, ou
+// rascunho - 17/07/2026) pro state atual + resync de toda a UI. NÃO mexe
+// em Aprovador/travamento/mensagem de "Elaborado por" - isso é específico
+// de cada chamador (ver restaurarRdoNoFormulario_ pra revisão/reabertura,
+// e restaurarRascunhoNoFormulario_ pra rascunho, que não trava nada nem
+// tem noção de "Aprovador" já que ninguém revisou ainda). Mesmo padrão de
+// restaurarEstadoEmAndamento_.
+function preencherFormularioComState_(s) {
   state.contratante = s.contratante || '';
   state.obra = s.obra || '';
   state.servico = s.servico || '';
@@ -2013,9 +2093,6 @@ function restaurarRdoNoFormulario_(stateJSON, nomeElaboradorFallback, sessao) {
   state.observacoes = s.observacoes || '';
   state.emailContratante = s.emailContratante || '';
   state.tempo = s.tempo || state.tempo;
-  // Elaborador (assinaturaContratadaNome/Funcao/DataHora) vem do state
-  // salvo - é quem CRIOU o RDO, não pode ser sobrescrito pela sessão de
-  // quem está revisando.
   state.assinaturaContratadaNome = s.assinaturaContratadaNome || '';
   state.assinaturaContratadaFuncao = s.assinaturaContratadaFuncao || '';
   state.assinaturaContratadaDataHora = s.assinaturaContratadaDataHora || '';
@@ -2028,11 +2105,6 @@ function restaurarRdoNoFormulario_(stateJSON, nomeElaboradorFallback, sessao) {
   (s.atividadesContratada && s.atividadesContratada.length ? s.atividadesContratada : [{ inicio: '', fim: '', discriminacao: '', autor: '' }]).forEach(item => state.atividadesContratada.push(item));
   state.atividadesContratante.length = 0;
   (s.atividadesContratante && s.atividadesContratante.length ? s.atividadesContratante : [{ inicio: '', fim: '', discriminacao: '' }]).forEach(item => state.atividadesContratante.push(item));
-
-  // Aprovador = quem está revisando agora - Função/Nome já salvos do
-  // próprio login (ver aba Usuarios).
-  state.assinaturaAprovadorNome = sessao.nome;
-  state.assinaturaAprovadorFuncao = sessao.funcao || '';
 
   el.contratante.value = state.contratante;
   el.obra.value = state.obra;
@@ -2059,13 +2131,26 @@ function restaurarRdoNoFormulario_(stateJSON, nomeElaboradorFallback, sessao) {
   renderizarListaAtividades(cfgAtivContratante);
   atualizarBalaoContratante_();
 
-  el.assinaturaContratadaInfo.textContent = 'Elaborado por: ' + (s.assinaturaContratadaNome || nomeElaboradorFallback || '');
-
-  aplicarTravamentoRevisaoInterna_(true, sessao.perfil);
-
   mostrarAba_('rdo');
   document.querySelectorAll('.secao-formulario').forEach(d => { d.open = true; });
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function restaurarRdoNoFormulario_(stateJSON, nomeElaboradorFallback, sessao) {
+  const s = JSON.parse(stateJSON);
+  preencherFormularioComState_(s);
+
+  // Elaborador (assinaturaContratadaNome/Funcao/DataHora) já veio do state
+  // salvo dentro de preencherFormularioComState_ - é quem CRIOU o RDO, não
+  // pode ser sobrescrito pela sessão de quem está revisando. Aprovador =
+  // quem está revisando agora - Função/Nome já salvos do próprio login
+  // (ver aba Usuarios).
+  state.assinaturaAprovadorNome = sessao.nome;
+  state.assinaturaAprovadorFuncao = sessao.funcao || '';
+
+  el.assinaturaContratadaInfo.textContent = 'Elaborado por: ' + (s.assinaturaContratadaNome || nomeElaboradorFallback || '');
+
+  aplicarTravamentoRevisaoInterna_(true, sessao.perfil);
 }
 
 async function abrirRevisaoInterna_(tokenInterno) {
@@ -2141,11 +2226,6 @@ function aplicarTravamentoRevisaoInterna_(travar, perfil) {
 
 el.abaRdo.addEventListener('click', () => mostrarAba_('rdo'));
 el.abaPerfil.addEventListener('click', () => mostrarAba_('perfil'));
-
-el.btnVoltarObras.addEventListener('click', () => {
-  el.perfilDetalheObra.style.display = 'none';
-  el.perfilListaObras.style.display = 'block';
-});
 
 el.emailContratante.addEventListener('input', () => {
   state.emailContratante = el.emailContratante.value.trim();
@@ -2492,6 +2572,15 @@ async function resetarParaProximoRdo_() {
   // RDO foi enviado de verdade - não tem mais o que restaurar de um "RDO em
   // andamento" (ver CHAVE_ESTADO_EM_ANDAMENTO).
   apagarEstadoEmAndamento_();
+
+  // Se este RDO começou como rascunho (17/07/2026), o rascunho não faz
+  // mais sentido - foi enviado de verdade agora (direto, pra aprovação
+  // interna, ou enfileirado offline, os 3 chamadores desta função). Apaga
+  // local+nuvem (best-effort) e solta a referência.
+  if (rascunhoAtual_) {
+    excluirRascunhoLocalENuvem_(rascunhoAtual_);
+    rascunhoAtual_ = null;
+  }
 
   // Prévia exibida (se houver) era do RDO anterior - esconde pra não
   // mostrar um documento errado até a pessoa gerar um RDO novo.
@@ -2901,6 +2990,204 @@ async function sincronizarFilaOffline_() {
 }
 RdoConectividade.aoMudar(online => { if (online) sincronizarFilaOffline_(); });
 
+// ---------------------------------------------------------------------------
+// Rascunhos (17/07/2026) - "Salvar como Rascunho" (botão abaixo de
+// "Pré-visualizar RDO"): pra quando o RDO está sendo feito sem internet, ou
+// a pessoa não quer terminar de preencher agora. Diferente da fila offline
+// acima (que é pra um RDO já DECIDIDO como pronto pra envio) - um rascunho
+// nunca foi mandado, só fica guardado pra continuar depois. Salva local
+// SEMPRE (funciona 100% offline) e tenta sincronizar pra nuvem quando há
+// internet (padrão igual ao da fila offline, ver sincronizarFilaOffline_
+// acima), pra o mesmo rascunho aparecer em qualquer aparelho logado com a
+// mesma conta (pedido do Paulo).
+// ---------------------------------------------------------------------------
+const CHAVE_RASCUNHOS = 'rdo_rascunhos';
+let sincronizandoRascunhos_ = false;
+
+// id local do rascunho sendo editado agora no formulário, se houver -
+// controla se "Salvar como Rascunho" cria uma linha nova ou atualiza a
+// mesma (senão cada clique geraria um rascunho duplicado). Zerado ao
+// enviar o RDO de verdade (ver resetarParaProximoRdo_) ou ao abrir um
+// rascunho diferente.
+let rascunhoAtual_ = null;
+
+function carregarRascunhosLocais_() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_RASCUNHOS);
+    return bruto ? JSON.parse(bruto) : [];
+  } catch (err) { return []; }
+}
+function salvarRascunhosLocais_(lista) {
+  localStorage.setItem(CHAVE_RASCUNHOS, JSON.stringify(lista));
+}
+
+// Snapshot do state atual num rascunho novo ou já existente
+// (rascunhoAtual_) - sempre local primeiro, sincronização com o backend é
+// best-effort (silenciosa se falhar, mesma filosofia da fila offline -
+// sincronizarRascunhosPendentes_ tenta de novo no próximo evento online).
+async function salvarComoRascunho_() {
+  const lista = carregarRascunhosLocais_();
+  const agora = new Date().toISOString();
+  let item = rascunhoAtual_ ? lista.find(r => r.id === rascunhoAtual_) : null;
+
+  if (item) {
+    item.cliente = state.contratante;
+    item.obra = state.obra;
+    item.os = state.os;
+    item.data = state.data;
+    item.state = JSON.parse(JSON.stringify(state));
+    item.atualizadoEm = agora;
+  } else {
+    item = {
+      id: Date.now() + '-' + Math.random().toString(36).slice(2),
+      tokenNuvem: null,
+      cliente: state.contratante,
+      obra: state.obra,
+      os: state.os,
+      data: state.data,
+      state: JSON.parse(JSON.stringify(state)),
+      criadoEm: agora,
+      atualizadoEm: agora
+    };
+    lista.push(item);
+    rascunhoAtual_ = item.id;
+  }
+  salvarRascunhosLocais_(lista);
+  mostrarStatus('Rascunho salvo neste aparelho.', 'sucesso');
+
+  const sessaoAtual = carregarSessaoUsuario_();
+  if (sessaoAtual && RdoConectividade.estaOnline()) {
+    try {
+      const resp = await RdoApi.salvarRascunho({
+        token: sessaoAtual.token,
+        tokenRascunho: item.tokenNuvem || undefined,
+        cliente: item.cliente,
+        obra: item.obra,
+        os: item.os,
+        data: item.data,
+        stateJSON: JSON.stringify(item.state)
+      });
+      if (resp.ok) {
+        item.tokenNuvem = resp.token;
+        salvarRascunhosLocais_(lista);
+        mostrarStatus('Rascunho salvo e sincronizado.', 'sucesso');
+      }
+    } catch (err) {
+      // Falha de rede/backend - o rascunho já está salvo local, tenta de
+      // novo sozinho no próximo evento online (ver hook abaixo). Não
+      // alarma o usuário por isso.
+      console.warn('Falha ao sincronizar rascunho (fica local, tenta de novo depois):', err);
+    }
+  }
+}
+
+// Varre rascunhos locais ainda sem tokenNuvem (nunca sincronizaram, ou
+// sincronizaram offline em algum momento que falhou) e tenta de novo -
+// mesmo gatilho de sincronizarFilaOffline_ (evento online + boot).
+async function sincronizarRascunhosPendentes_() {
+  if (sincronizandoRascunhos_) return;
+  if (!RdoConectividade.estaOnline()) return;
+  const sessaoAtual = carregarSessaoUsuario_();
+  if (!sessaoAtual) return;
+  sincronizandoRascunhos_ = true;
+  try {
+    const lista = carregarRascunhosLocais_();
+    let mudou = false;
+    for (const item of lista) {
+      if (item.tokenNuvem) continue;
+      try {
+        const resp = await RdoApi.salvarRascunho({
+          token: sessaoAtual.token,
+          cliente: item.cliente,
+          obra: item.obra,
+          os: item.os,
+          data: item.data,
+          stateJSON: JSON.stringify(item.state)
+        });
+        if (resp.ok) { item.tokenNuvem = resp.token; mudou = true; }
+      } catch (err) {
+        console.error('Falha ao sincronizar rascunho pendente:', err);
+        break; // próxima tentativa no próximo evento online, mesma filosofia da fila offline
+      }
+    }
+    if (mudou) salvarRascunhosLocais_(lista);
+  } finally {
+    sincronizandoRascunhos_ = false;
+  }
+}
+RdoConectividade.aoMudar(online => { if (online) sincronizarRascunhosPendentes_(); });
+
+// Carrega um rascunho de volta no formulário pra continuar preenchendo -
+// SEM travar nada e SEM mexer em Aprovador (diferente de
+// restaurarRdoNoFormulario_, que é pra revisão/reabertura de um RDO de
+// outra pessoa). Marca rascunhoAtual_ pra próximos "Salvar como Rascunho"
+// atualizarem esta mesma linha em vez de duplicar.
+function restaurarRascunhoNoFormulario_(s, idLocal) {
+  preencherFormularioComState_(s);
+  rascunhoAtual_ = idLocal;
+}
+
+function formularioTemConteudoRelevante_() {
+  return Boolean(state.contratante || state.obra || state.data ||
+    state.atividadesContratada.some(a => (a.discriminacao || '').trim()));
+}
+
+// item vem da lista local (tem .state pronto) OU só da nuvem (lista vinda
+// de listarRascunhos, sem .state - busca sob demanda via buscarRascunho).
+async function abrirRascunho_(item) {
+  if (item.id && item.id !== rascunhoAtual_ && formularioTemConteudoRelevante_()) {
+    const confirmou = confirm('Você tem um RDO em andamento não salvo como rascunho. Ao abrir este rascunho, o que está preenchido agora na tela vai ser substituído. Continuar?');
+    if (!confirmou) return;
+  }
+
+  let s = item.state;
+  let idLocal = item.id;
+  if (!s) {
+    // Rascunho sem cópia local (sincronizado de outro aparelho) - busca
+    // o StateJSON completo sob demanda.
+    const sessaoAtual = carregarSessaoUsuario_();
+    if (!sessaoAtual) return;
+    try {
+      const resp = await RdoApi.buscarRascunho(sessaoAtual.token, item.tokenNuvem || item.token);
+      if (!resp.ok) { alert(resp.erro || 'Não consegui abrir esse rascunho.'); return; }
+      s = JSON.parse(resp.stateJSON);
+      // Guarda uma cópia local a partir de agora, associada ao mesmo token
+      // da nuvem (evita duplicar na próxima sincronização).
+      const lista = carregarRascunhosLocais_();
+      idLocal = Date.now() + '-' + Math.random().toString(36).slice(2);
+      lista.push({ id: idLocal, tokenNuvem: item.tokenNuvem || item.token, cliente: item.cliente, obra: item.obra, os: item.os, data: item.data, state: s, criadoEm: item.criadoEm, atualizadoEm: item.atualizadoEm });
+      salvarRascunhosLocais_(lista);
+    } catch (err) {
+      alert('Erro ao abrir rascunho: ' + (err && err.message ? err.message : err));
+      RdoApi.logErro('abrir_rascunho', err && err.message ? err.message : String(err));
+      return;
+    }
+  }
+
+  restaurarRascunhoNoFormulario_(s, idLocal);
+}
+
+// Remove um rascunho local + nuvem (best-effort - se a exclusão remota
+// falhar, o rascunho já saiu da lista local mesmo assim; não vale travar
+// o usuário numa ação de limpeza por causa de rede).
+async function excluirRascunhoLocalENuvem_(item) {
+  const lista = carregarRascunhosLocais_().filter(r => r.id !== item.id);
+  salvarRascunhosLocais_(lista);
+  if (rascunhoAtual_ === item.id) rascunhoAtual_ = null;
+
+  const tokenNuvem = item.tokenNuvem || item.token;
+  if (!tokenNuvem) return;
+  const sessaoAtual = carregarSessaoUsuario_();
+  if (!sessaoAtual) return;
+  try {
+    await RdoApi.excluirRascunho(sessaoAtual.token, tokenNuvem);
+  } catch (err) {
+    console.warn('Falha ao excluir rascunho na nuvem (removido só localmente):', err);
+  }
+}
+
+el.btnSalvarRascunho.addEventListener('click', () => { salvarComoRascunho_(); });
+
 // Atualização automática (14/07): pedido do Paulo pra sempre atualizar
 // sozinho quando o app tiver internet, não só na abertura fria (a
 // checagem já rodava uma vez no topo do arquivo, mas se o app abrisse
@@ -2951,6 +3238,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
         cliente: state.contratante,
         obra: state.obra,
         data: state.data,
+        os: state.os,
         stateJSON: JSON.stringify(state),
         token: sessaoAtual.token
       });
@@ -3085,3 +3373,4 @@ if (sessaoInicial) {
 atualizarBadgePendentes_();
 mostrarProximaConfirmacaoPendente_();
 sincronizarFilaOffline_();
+sincronizarRascunhosPendentes_();
