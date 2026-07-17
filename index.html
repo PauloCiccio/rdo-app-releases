@@ -60,6 +60,7 @@
     <details id="perfil-filtro-obras" class="detalhes-filtro-obras" style="display:none;">
       <summary class="subtitulo-perfil">Obras que acompanho
         <span id="contagem-filtro-obras" class="badge-aba badge-inline" style="display:none;"></span>
+        <svg class="seta-filtro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </summary>
       <div id="lista-filtro-obras" class="lista-filtro-obras"></div>
       <p class="orcamento-info" id="filtro-obras-sem-itens" style="display:none;">Nenhuma obra cadastrada ainda.</p>
@@ -70,15 +71,28 @@
     </details>
 
     <details id="painel-filtros-perfil" class="detalhes-filtro-obras">
-      <summary class="subtitulo-perfil">Filtros</summary>
+      <summary class="subtitulo-perfil">Filtros
+        <svg class="seta-filtro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
       <div class="campos-filtro-perfil">
-        <input type="text" id="filtro-perfil-os" placeholder="OS">
-        <input type="text" id="filtro-perfil-contratante" list="lista-contratantes-perfil" placeholder="Contratante">
+        <label for="filtro-perfil-os">OS</label>
+        <input type="text" id="filtro-perfil-os" placeholder="Número da OS">
+        <label for="filtro-perfil-contratante">Contratante</label>
+        <input type="text" id="filtro-perfil-contratante" list="lista-contratantes-perfil" placeholder="Digite ou escolha">
         <datalist id="lista-contratantes-perfil"></datalist>
-        <input type="text" id="filtro-perfil-obra" list="lista-obras-perfil" placeholder="Obra">
+        <label for="filtro-perfil-obra">Obra</label>
+        <input type="text" id="filtro-perfil-obra" list="lista-obras-perfil" placeholder="Digite ou escolha">
         <datalist id="lista-obras-perfil"></datalist>
-        <label>Execução de <input type="date" id="filtro-perfil-data-ini"></label>
-        <label>até <input type="date" id="filtro-perfil-data-fim"></label>
+        <div class="linha-2col">
+          <div>
+            <label for="filtro-perfil-data-ini">Execução de</label>
+            <input type="date" id="filtro-perfil-data-ini">
+          </div>
+          <div>
+            <label for="filtro-perfil-data-fim">até</label>
+            <input type="date" id="filtro-perfil-data-fim">
+          </div>
+        </div>
         <button type="button" id="btn-limpar-filtros-perfil" class="botao-mini">Limpar filtros</button>
       </div>
     </details>
