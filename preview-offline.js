@@ -261,11 +261,10 @@ const RdoPreviewOffline = (function () {
     }
   }
 
-  // Gera o PDF ilustrativo (offline) e devolve { base64, fileName } -
-  // MESMO formato de retorno que RdoExcel.gerarWorkbook (base64 puro, sem
-  // prefixo "data:"), pra poder passar direto pra abrirPdfParaVisualizar_/
-  // compartilharPdf_ já existentes, sem precisar de nenhum tratamento
-  // especial.
+  // Gera o PDF ilustrativo (offline) e devolve { base64, fileName,
+  // totalPaginas } - base64 puro, sem prefixo "data:", pra poder passar
+  // direto pra abrirPdfParaVisualizar_/compartilharPdf_ já existentes,
+  // sem precisar de nenhum tratamento especial.
   async function gerarPdfOffline_(state, numero) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: [LARGURA_PAGINA_PT, ALTURA_PAGINA_PT], orientation: 'portrait' });
@@ -273,13 +272,26 @@ const RdoPreviewOffline = (function () {
     const imgBinStr = await carregarImagemBaseBinStr_();
     doc.addImage(imgBinStr, 'JPEG', 0, 0, LARGURA_PAGINA_PT, ALTURA_PAGINA_PT);
 
+    // Paginação automática (17/07/2026) - a prévia offline NUNCA desenhou
+    // mais de 1 página e continua sem desenhar (a imagem de fundo é um
+    // bitmap único da folha inteira, sem asset gráfico pra uma "página de
+    // continuação" - ver [[project_rdo_app]]). Só detecta quando o RDO
+    // REAL vai precisar de mais de 1 (mesmo algoritmo de
+    // RdoExcel.particionarAtividades_, usado pelo gerador de verdade) e
+    // avisa claramente - antes disso, o excesso era descartado em
+    // silêncio (`break` sem aviso nenhum).
+    const temRdoExcel = typeof RdoExcel !== 'undefined';
+    const particaoContratada = temRdoExcel ? RdoExcel.particionarAtividades_(state.atividadesContratada, RdoExcel.CAPACIDADE_CONTRATADA) : { paginas: [] };
+    const particaoContratante = temRdoExcel ? RdoExcel.particionarAtividades_(state.atividadesContratante, RdoExcel.CAPACIDADE_CONTRATANTE) : { paginas: [] };
+    const totalPaginas = Math.max(particaoContratada.paginas.length, particaoContratante.paginas.length, 1);
+
     // Modelo novo de 13/07/2026: rótulo (linha 3) e valor (linha 4) agora
     // são células separadas - antes ficavam juntos na linha 3. Todas as 3
     // são bold=true no modelo de verdade (conferido via openpyxl).
     const numeroTexto = (numero != null) ? String(numero) : '(provisório)';
     escreverTexto_(doc, numeroTexto, 'L', 4, 9, 0, { negrito: true, centralizarAteColuna: 'R', centralizarVerticalmente: true });
     escreverTexto_(doc, '0', 'R', 4, 9, 0, { negrito: true, centralizarAteColuna: 'U', centralizarVerticalmente: true });
-    escreverTexto_(doc, '1/1', 'U', 4, 9, 0, { negrito: true, centralizarAteColuna: 'FIM', centralizarVerticalmente: true });
+    escreverTexto_(doc, `1/${totalPaginas}`, 'U', 4, 9, 0, { negrito: true, centralizarAteColuna: 'FIM', centralizarVerticalmente: true });
 
     // Contratante/Obra/Objeto/Local/OS: rótulo (linha de cima) e valor
     // (linha de baixo) na MESMA célula mesclada, alinhados ao topo de
@@ -310,7 +322,10 @@ const RdoPreviewOffline = (function () {
 
     desenharEfetivoEquipVeiculos_(doc, state.efetivo, state.equipamentos);
     const mostrarAprovador = Boolean(state.assinaturaAprovadorNome && state.assinaturaAprovadorNome.trim());
-    desenharAtividades_(doc, 30, 27, state.atividadesContratada);
+    // Antes usava "27" cravado em vez de RdoExcel.CAPACIDADE_CONTRATADA -
+    // corrigido junto (17/07/2026, mesma leva da paginação) pra nunca
+    // dessincronizar se a capacidade mudar de novo em excel-fill.js.
+    desenharAtividades_(doc, 30, RdoExcel.CAPACIDADE_CONTRATADA, state.atividadesContratada);
     desenharAtividades_(doc, 57, RdoExcel.CAPACIDADE_CONTRATANTE, state.atividadesContratante);
 
     // Assinatura em texto (14/07/2026 - ninguém mais desenha, ver
@@ -330,10 +345,26 @@ const RdoPreviewOffline = (function () {
     }
     desenharLinhaAssinatura_(74, state.assinaturaFuncao, state.assinaturaNome, state.assinaturaDataHora);
 
+    // Aviso de múltiplas páginas (17/07/2026) - desenhado por cima do
+    // rodapé da folha, cor de alerta, só quando de fato vai precisar de
+    // mais de 1 página. Usa a API crua do jsPDF (não escreverTexto_,
+    // pensada pra coordenadas de célula do modelo) porque este texto não
+    // corresponde a nenhuma célula real.
+    if (totalPaginas > 1) {
+      doc.setTextColor(178, 106, 0); // mesmo tom de --alerta do app
+      doc.setFontSize(8);
+      doc.text(
+        `Este RDO vai ter ${totalPaginas} páginas - esta prévia offline mostra só a página 1. O documento final sai completo com internet.`,
+        20, ALTURA_PAGINA_PT - 14,
+        { maxWidth: LARGURA_PAGINA_PT - 40 }
+      );
+      doc.setTextColor(0, 0, 0);
+    }
+
     const base64 = doc.output('datauristring').split(',')[1];
     const numeroTextoArquivo = numero != null ? String(numero) : 'provisorio';
     const fileName = `RDO_${numeroTextoArquivo}_${state.obra || 'obra'}_${state.data || ''}_offline.pdf`.replace(/[\\/:*?"<>|]/g, '-');
-    return { base64, fileName };
+    return { base64, fileName, totalPaginas };
   }
 
   return { gerarPdfOffline_ };

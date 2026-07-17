@@ -20,7 +20,7 @@ const RdoExcel = (function () {
   // inline) - Contratante/Obra/Objeto/Local agora usam rótulo+valor em
   // DUAS linhas dentro da mesma célula (o modelo já veio com wrapText
   // ligado e a linha alta o bastante pra 2 linhas de texto - ver
-  // gerarWorkbook).
+  // preencherCabecalhoEAssinaturas_).
   // Modelo trocado de novo em 13/07/2026 (Paulo ajustou o layout - ver
   // project_rdo_app release da troca de modelo): nº/Rev./Página separaram
   // rótulo (linha 3, texto estático do modelo, intocado pelo código) de
@@ -305,16 +305,6 @@ const RdoExcel = (function () {
     return estimarLinhasTexto_(texto, CHARS_POR_LINHA_ATIVIDADE);
   }
 
-  // Paginação automática (11/07) foi TENTADA e depois ABANDONADA no mesmo
-  // dia - a folha extra saía errada em uso real (ver memória do projeto
-  // pro histórico completo) e o Paulo preferiu voltar pro modelo mais
-  // simples de sempre-1-página, com a UI (app.js) impedindo de digitar
-  // além da capacidade em vez de descartar depois. Mantido aqui só o
-  // comportamento antigo/estável: preenche o que couber, descarta
-  // (com aviso) o que não coube - a UI já bloqueia esse caso antes de
-  // chegar aqui (botão "+ Adicionar" desabilitado e digitação bloqueada
-  // no limite), então na prática `itensDescartados` não deveria mais
-  // acontecer, é só uma rede de segurança.
   // Iniciais de autoria (15/07/2026, pedido do Paulo) - toda atividade da
   // CONTRATADA com `item.autor` preenchido ganha as iniciais de quem
   // escreveu ao final, entre colchetes - "[P.M.C.C.C]", SEMPRE (não só
@@ -324,28 +314,71 @@ const RdoExcel = (function () {
   // 2º grupo de iniciais: "[P.M.C.C.C] ; [F.L.M]". Bloco CONTRATANTE nunca
   // tem `item.autor` preenchido (vem exclusivamente do link), então nunca
   // ganha sufixo nenhum aqui - não precisa de parâmetro pra desligar.
-  function preencherAtividades_(sh, linhaInicio, capacidadeSlots, itens) {
+  // Extraído (17/07/2026) de dentro de preencherAtividades_ pra ser
+  // reaproveitado por particionarAtividades_ - a estimativa de linhas de
+  // um item PRECISA considerar o texto COM o sufixo de iniciais (é o que
+  // realmente vai pra célula), senão o corte de página ficaria
+  // inconsistente com a altura de linha real escrita depois.
+  function montarTextoAtividade_(item) {
+    let texto = (item.discriminacao || '').trim();
+    if (item.autor) {
+      texto += ' [' + iniciaisNome_(item.autor) + ']';
+      if (item.editorAutor && item.editorAutor !== item.autor) {
+        texto += ' ; [' + iniciaisNome_(item.editorAutor) + ']';
+      }
+    }
+    return texto;
+  }
+
+  // Paginação automática (17/07/2026) - refeita depois de uma 1ª tentativa
+  // em 11/07 que foi ABANDONADA no mesmo dia ("saía errada em uso real",
+  // ver histórico do projeto) - o modelo mudou completamente desde então
+  // (remapeado pelo menos 3x) e a causa raiz suspeita era a abordagem de
+  // conversão (N xlsx → N PDFs → junção client-side com pdf-lib), não o
+  // algoritmo de particionamento em si, que é reaproveitado aqui quase
+  // igual. MAX_PAGINAS é válvula de segurança - um item cujo texto
+  // sozinho já estoura a capacidade inteira de uma página nunca caberia
+  // em NENHUMA (sem isso o loop giraria pra sempre).
+  const MAX_PAGINAS = 6;
+
+  function particionarAtividades_(itens, capacidadeSlots) {
     const naoVazios = itens.filter(item => (item.discriminacao || '').trim() || item.inicio || item.fim);
+    const paginas = [];
+    let idx = 0;
+    while (idx < naoVazios.length && paginas.length < MAX_PAGINAS) {
+      let slots = 0;
+      const itensDaPagina = [];
+      while (idx < naoVazios.length) {
+        const nLinhas = estimarLinhasAtividade(montarTextoAtividade_(naoVazios[idx]));
+        if (slots + nLinhas > capacidadeSlots) break;
+        slots += nLinhas;
+        itensDaPagina.push(naoVazios[idx]);
+        idx += 1;
+      }
+      if (itensDaPagina.length === 0) break; // item maior que a página inteira - nunca vai caber
+      paginas.push({ itens: itensDaPagina, slotsUsados: slots });
+    }
+    return { paginas, itensDescartados: naoVazios.length - idx };
+  }
 
-    let slotsUsados = 0;
+  // Escreve NUMA página só a fatia (chunk) de atividades que coube nela -
+  // chunk já vem pronto de particionarAtividades_ (undefined/vazio quando
+  // essa seção já não tem mais nada pra essa página, ex: Contratante
+  // terminou na página 1 mas a Contratada precisou de uma página 2).
+  // numeroInicial numera de forma CONTÍNUA entre páginas (pedido do
+  // Paulo: se a Contratante foi até o item 12 na página 1, a página 2
+  // continua no 13 - nunca reinicia em 1). As linhas que sobrarem SEM
+  // atividade continuam numeradas em sequência (mesmo que fique em
+  // branco) - mesmo padrão de um talão de papel picotado, igual o modelo
+  // impresso original já fazia com números fixos.
+  function preencherAtividades_(sh, linhaInicio, capacidadeSlots, chunk, numeroInicial) {
+    const itens = chunk ? chunk.itens : [];
     let linhaAtual = linhaInicio;
-    let itensColocados = 0;
 
-    for (const item of naoVazios) {
-      let texto = (item.discriminacao || '').trim();
-      if (item.autor) {
-        texto += ' [' + iniciaisNome_(item.autor) + ']';
-        if (item.editorAutor && item.editorAutor !== item.autor) {
-          texto += ' ; [' + iniciaisNome_(item.editorAutor) + ']';
-        }
-      }
+    itens.forEach((item, i) => {
+      const texto = montarTextoAtividade_(item);
       const nLinhas = estimarLinhasAtividade(texto);
-      if (slotsUsados + nLinhas > capacidadeSlots) {
-        // não coube mais - para aqui (mantém a ordem cronológica das
-        // atividades em vez de pular pra um item menor mais adiante).
-        break;
-      }
-
+      sh.getCell(`B${linhaAtual}`).value = numeroInicial + i;
       // Item com discriminação mas sem horário preenchido (14/07/2026,
       // pedido do Paulo) mostra um traço em vez de deixar a célula em
       // branco - deixa claro que o campo foi visto e ficou mesmo vazio.
@@ -359,10 +392,16 @@ const RdoExcel = (function () {
       // com o VALOR gravado mas invisível (linha continuava escondida).
       sh.getRow(linhaAtual).hidden = false;
       sh.getRow(linhaAtual).height = ALTURA_POR_LINHA_PT * nLinhas;
-
-      slotsUsados += nLinhas;
       linhaAtual += 1;
-      itensColocados += 1;
+    });
+
+    // Coluna B (número do item) é texto ESTÁTICO no modelo (nunca escrita
+    // por código antes de 17/07/2026) - funcionava por acaso na página 1
+    // porque ela sempre começa em 1, mas quebraria a numeração contínua
+    // da página 2+. Agora sempre escrita: linhas sem atividade continuam
+    // a sequência em branco.
+    for (let r = linhaAtual; r <= linhaInicio + capacidadeSlots - 1; r++) {
+      sh.getCell(`B${r}`).value = numeroInicial + (r - linhaInicio);
     }
 
     // IMPORTANTE: só as linhas "roubadas" pelo excesso de altura de itens
@@ -377,12 +416,11 @@ const RdoExcel = (function () {
     // (spliceRows) mexeria nas mesclas verticais dos rótulos
     // "CONTRATADA"/"CONTRATANTE" e em toda referência de célula fixa do
     // resto do documento - por isso OCULTAR (row.hidden) em vez de apagar.
-    const linhasRoubadas = slotsUsados - itensColocados;
+    const slotsUsados = chunk ? chunk.slotsUsados : 0;
+    const linhasRoubadas = slotsUsados - itens.length;
     for (let r = linhaInicio + capacidadeSlots - linhasRoubadas; r <= linhaInicio + capacidadeSlots - 1; r++) {
       sh.getRow(r).hidden = true;
     }
-
-    return { itensColocados, itensDescartados: naoVazios.length - itensColocados, slotsUsados, capacidadeSlots };
   }
 
   // Modelo novo de 13/07/2026: área de assinatura virou 3 blocos lado a
@@ -476,10 +514,12 @@ const RdoExcel = (function () {
     });
   }
 
-  async function gerarWorkbook(state, numero, opts) {
-    const workbook = await carregarTemplate_();
-    const sh = workbook.getWorksheet('RDO');
-
+  // Preenche em UMA página tudo que é IDÊNTICO em toda página (cabeçalho/
+  // identificação/tempo/observações/efetivo/equipamentos/assinaturas) -
+  // extraído (17/07/2026) de dentro do que era gerarWorkbook pra virar
+  // paginação: chamado 1x por página gerada, com o MESMO `state`, só
+  // variando `numPagina`/`totalPaginas` no rótulo "Página X/Y".
+  function preencherCabecalhoEAssinaturas_(sh, state, numero, numPagina, totalPaginas) {
     // RDO nº/Rev./Página: rótulo já é texto estático do modelo (linha 3),
     // aqui só escreve o VALOR na mescla de baixo (linha 4/5) - modelo novo
     // de 13/07/2026 separou rótulo de valor (antes ficavam juntos na
@@ -495,7 +535,9 @@ const RdoExcel = (function () {
     };
     celCentralizada(CELULAS.numero, String(numero));
     celCentralizada(CELULAS.rev, '0');
-    celCentralizada(CELULAS.pagina, '1/1'); // RDO sempre cabe em 1 página (área de impressão fixa) - paginação automática abandonada em 11/07
+    // Página X/Y dinâmico (17/07/2026) - até então sempre '1/1' fixo
+    // ("RDO sempre cabe em 1 página"), agora reflete a paginação real.
+    celCentralizada(CELULAS.pagina, `${numPagina}/${totalPaginas}`);
 
     // Contratante/Obra/Objeto do Contrato/Local: rótulo na 1ª linha, valor
     // na 2ª (mesma célula, quebra de linha manual) - pedido do Paulo
@@ -520,46 +562,83 @@ const RdoExcel = (function () {
     // Linha do Aprovador só faz sentido quando o RDO passou pela revisão
     // interna (existe um Aprovador de verdade) - um RDO de autor único
     // (admin/admin_master enviando direto) nunca mostra a linha 73 (fica
-    // oculta). Sufixação de iniciais nas atividades é independente disso
-    // (ver preencherAtividades_) - sempre aparece quando há `item.autor`.
+    // oculta). Repetido em TODA página (pedido do Paulo, 17/07/2026: o
+    // bloco de assinaturas repete igual em toda folha, não só na última).
     const mostrarAprovador = Boolean(state.assinaturaAprovadorNome && state.assinaturaAprovadorNome.trim());
-    const resContratada = preencherAtividades_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, state.atividadesContratada);
-    const resContratante = preencherAtividades_(sh, LINHA_ATIV_CONTRATANTE_INICIO, CAPACIDADE_CONTRATANTE, state.atividadesContratante);
-
     inserirElaborador_(sh, state.assinaturaContratadaFuncao, state.assinaturaContratadaNome, state.assinaturaContratadaDataHora);
     inserirAprovador_(sh, state.assinaturaAprovadorFuncao, state.assinaturaAprovadorNome, state.assinaturaAprovadorDataHora, mostrarAprovador);
     inserirContratante_(sh, state.assinaturaFuncao, state.assinaturaNome, state.assinaturaDataHora);
+  }
 
-    if (opts && opts.apenasPreview) {
-      await inserirMarcaDaguaPreview_(workbook, sh);
+  // Numeração nova (14/07/2026) já vem no formato "OS-AAAAMMDD" (com
+  // sufixo "-2"/"-3" se houver mais de 1 no mesmo dia, ver
+  // montarNumeroRdo_ no Code.gs) - não precisa mais de padStart, era só
+  // pro contador sequencial antigo (ex: "1" -> "001").
+  function montarNomeArquivo_(numero, state) {
+    return `RDO_${numero}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
+  }
+
+  // Gera N páginas (17/07/2026, substitui gerarWorkbook - ver histórico
+  // do projeto pro contexto completo da paginação automática) - cada
+  // página é um workbook INDEPENDENTE (template carregado do zero,
+  // igual sempre foi pra 1 página só), com cabeçalho/identificação/
+  // efetivo/equipamentos/assinaturas IDÊNTICOS e só a fatia de atividades
+  // mudando. Contratada e Contratante paginam de forma independente
+  // (`particionarAtividades_` separado pra cada uma) - o total de páginas
+  // do RDO é o maior dos dois, e a seção que termina antes simplesmente
+  // não tem mais itens nas páginas seguintes (fica com as linhas em
+  // branco, numeração pausada de onde parou).
+  async function gerarPaginas_(state, numero, opts) {
+    const particaoContratada = particionarAtividades_(state.atividadesContratada, CAPACIDADE_CONTRATADA);
+    const particaoContratante = particionarAtividades_(state.atividadesContratante, CAPACIDADE_CONTRATANTE);
+    const totalPaginas = Math.max(particaoContratada.paginas.length, particaoContratante.paginas.length, 1);
+
+    const paginas = [];
+    let numeroInicialContratada = 1;
+    let numeroInicialContratante = 1;
+
+    for (let p = 1; p <= totalPaginas; p++) {
+      const workbook = await carregarTemplate_();
+      const sh = workbook.getWorksheet('RDO');
+
+      preencherCabecalhoEAssinaturas_(sh, state, numero, p, totalPaginas);
+
+      const chunkContratada = particaoContratada.paginas[p - 1];
+      const chunkContratante = particaoContratante.paginas[p - 1];
+      preencherAtividades_(sh, LINHA_ATIV_CONTRATADA_INICIO, CAPACIDADE_CONTRATADA, chunkContratada, numeroInicialContratada);
+      preencherAtividades_(sh, LINHA_ATIV_CONTRATANTE_INICIO, CAPACIDADE_CONTRATANTE, chunkContratante, numeroInicialContratante);
+      if (chunkContratada) numeroInicialContratada += chunkContratada.itens.length;
+      if (chunkContratante) numeroInicialContratante += chunkContratante.itens.length;
+
+      if (opts && opts.apenasPreview) {
+        await inserirMarcaDaguaPreview_(workbook, sh);
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const { base64, blob } = await bufferParaBase64_(buffer);
+      paginas.push({ base64, blob });
     }
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    const { base64, blob } = await bufferParaBase64_(buffer);
-
-    // Numeração nova (14/07/2026) já vem no formato "OS-AAAAMMDD" (com
-    // sufixo "-2"/"-3" se houver mais de 1 no mesmo dia, ver
-    // montarNumeroRdo_ no Code.gs) - não precisa mais de padStart, era só
-    // pro contador sequencial antigo (ex: "1" -> "001").
-    const fileName = `RDO_${numero}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
-
+    const fileName = montarNomeArquivo_(numero, state);
     const avisos = [];
-    if (resContratada.itensDescartados > 0) {
-      avisos.push(`${resContratada.itensDescartados} atividade(s) da CONTRATADA não coube(ram) no RDO (espaço da página esgotado).`);
+    if (particaoContratada.itensDescartados > 0) {
+      avisos.push(`${particaoContratada.itensDescartados} atividade(s) da CONTRATADA não coube(ram) no RDO (limite de ${MAX_PAGINAS} páginas atingido).`);
     }
-    if (resContratante.itensDescartados > 0) {
-      avisos.push(`${resContratante.itensDescartados} atividade(s) da CONTRATANTE não coube(ram) no RDO (espaço da página esgotado).`);
+    if (particaoContratante.itensDescartados > 0) {
+      avisos.push(`${particaoContratante.itensDescartados} atividade(s) da CONTRATANTE não coube(ram) no RDO (limite de ${MAX_PAGINAS} páginas atingido).`);
     }
 
-    return { base64, blob, fileName, avisos };
+    return { paginas, fileName, avisos, totalPaginas };
   }
 
   return {
-    gerarWorkbook,
+    gerarPaginas_,
+    particionarAtividades_,
     estimarLinhasAtividade,
     abreviarDescricaoEquipamento_,
     CAPACIDADE_CONTRATADA,
     CAPACIDADE_CONTRATANTE,
+    MAX_PAGINAS,
     LINHAS_QUANT
   };
 })();

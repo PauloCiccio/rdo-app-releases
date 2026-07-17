@@ -113,11 +113,21 @@ function calcularLinhasUsadas(itens) {
   }, 0);
 }
 
+// Paginação automática (17/07/2026) - mesma mudança de www/app.js (cópia
+// funcional deste arquivo, ver comentário no topo) - "cheio"/desabilitado
+// só no teto de segurança (RdoExcel.MAX_PAGINAS páginas), passar de 1
+// página vira continuação automática, não bloqueia mais.
 function atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd) {
   const usados = calcularLinhasUsadas(itens);
-  elOrcamento.textContent = `${usados} / ${capacidade}`;
-  elOrcamento.parentElement.classList.toggle('cheio', usados >= capacidade);
-  btnAdd.disabled = usados >= capacidade;
+  const capacidadeMaxima = capacidade * RdoExcel.MAX_PAGINAS;
+  if (usados > capacidade) {
+    const pagina = Math.min(Math.floor(usados / capacidade) + 1, RdoExcel.MAX_PAGINAS);
+    elOrcamento.textContent = `${usados} / ${capacidade} (página ${pagina})`;
+  } else {
+    elOrcamento.textContent = `${usados} / ${capacidade}`;
+  }
+  elOrcamento.parentElement.classList.toggle('cheio', usados >= capacidadeMaxima);
+  btnAdd.disabled = usados >= capacidadeMaxima;
 }
 
 // Algoritmo padrão de validação de CPF (dígitos verificadores) - só pra
@@ -250,6 +260,7 @@ function renderizarListaAtividades(cfg) {
     });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
     let valorAnterior = item.discriminacao || '';
+    // Paginação automática (17/07/2026) - mesma mudança de www/app.js.
     areaDiscriminacao.addEventListener('input', e => {
       const textoNovo = e.target.value;
       const contribuicaoAnterior = temConteudoAtividade(item) ? RdoExcel.estimarLinhasAtividade(item.discriminacao) : 0;
@@ -257,10 +268,11 @@ function renderizarListaAtividades(cfg) {
       const nLinhasNovo = RdoExcel.estimarLinhasAtividade(textoNovo);
       const temInicioOuFim = Boolean(item.inicio || item.fim);
       const contribuicaoNova = (textoNovo.trim() || temInicioOuFim) ? nLinhasNovo : 0;
+      const capacidadeMaxima = capacidade * RdoExcel.MAX_PAGINAS;
 
-      if (usadosSemEste + contribuicaoNova > capacidade) {
+      if (usadosSemEste + contribuicaoNova > capacidadeMaxima) {
         e.target.value = valorAnterior;
-        elEstimativa.textContent = 'Limite de linhas da página atingido - apague algo pra continuar.';
+        elEstimativa.textContent = `Limite de ${RdoExcel.MAX_PAGINAS} páginas atingido - apague algo pra continuar.`;
         elEstimativa.classList.add('estimativa-bloqueada');
         return;
       }
@@ -644,8 +656,8 @@ async function atualizarPreviewFinalInline_() {
       el.avisoPreviaOfflineFinal.style.display = 'none';
       el.btnAbrirPreviaOfflineFinal.style.display = 'none';
 
-      const { base64: xlsxPreviaBase64, fileName: fileNamePrevia } = await RdoExcel.gerarWorkbook(stateFinalAtual, numero, { apenasPreview: true });
-      const respLink = await RdoApi.gerarLinkPreview({ xlsxBase64: xlsxPreviaBase64, fileName: fileNamePrevia });
+      const { paginas: paginasPrevia, fileName: fileNamePrevia } = await RdoExcel.gerarPaginas_(stateFinalAtual, numero, { apenasPreview: true });
+      const respLink = await RdoApi.gerarLinkPreview({ paginasXlsxBase64: paginasPrevia.map(p => p.base64), fileName: fileNamePrevia });
       if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
 
       el.visualizadorFinal.style.display = 'block';
@@ -658,11 +670,16 @@ async function atualizarPreviewFinalInline_() {
       // de verdade só é gerado/enviado quando a conexão voltar.
       el.visualizadorFinal.style.display = 'none';
       el.wrapVisualizadorFinal.style.display = 'none';
-      const { base64: pdfBase64Offline, fileName: fileNameOffline } = await RdoPreviewOffline.gerarPdfOffline_(stateFinalAtual, numero);
+      const { base64: pdfBase64Offline, fileName: fileNameOffline, totalPaginas } = await RdoPreviewOffline.gerarPdfOffline_(stateFinalAtual, numero);
       previewPdfOfflineFinalAtual = pdfBase64Offline;
       previewPdfOfflineFinalFileNameAtual = fileNameOffline;
       el.avisoPreviaOfflineFinal.style.display = 'block';
       el.btnAbrirPreviaOfflineFinal.style.display = 'block';
+      // Paginação automática (17/07/2026) - ver mesmo aviso em www/app.js.
+      if (totalPaginas > 1) {
+        el.statusConfirmacao.textContent = `Este RDO vai ter ${totalPaginas} páginas - a prévia offline mostra só a 1ª. O documento final sai completo quando enviar com internet.`;
+        return;
+      }
     }
     el.statusConfirmacao.textContent = '';
   } catch (err) {
@@ -726,13 +743,14 @@ el.btnConcluir.addEventListener('click', async () => {
     // prévia (evita mandar uma versão desatualizada se a pessoa editou
     // algo entre pré-visualizar e concluir).
     const stateFinal = montarStateFinal_();
-    const { base64: xlsxFinalBase64, fileName: fileNameFinal } = await RdoExcel.gerarWorkbook(stateFinal, numero);
-    const respPdfFinal = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxFinalBase64, fileName: fileNameFinal });
+    const { paginas: paginasFinal, fileName: fileNameFinal } = await RdoExcel.gerarPaginas_(stateFinal, numero);
+    const paginasXlsxBase64Final = paginasFinal.map(p => p.base64);
+    const respPdfFinal = await RdoApi.previsualizarRDO({ paginasXlsxBase64: paginasXlsxBase64Final, fileName: fileNameFinal });
 
     el.statusConfirmacao.textContent = 'Enviando RDO final...';
     const resp = await RdoApi.finalizarAprovacao({
       token,
-      xlsxBase64: xlsxFinalBase64,
+      paginasXlsxBase64: paginasXlsxBase64Final,
       pdfBase64: respPdfFinal.pdfBase64,
       fileName: fileNameFinal,
       assinaturaNome: stateFinal.assinaturaNome,

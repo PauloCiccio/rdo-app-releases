@@ -460,11 +460,22 @@ function calcularLinhasUsadas(itens) {
   }, 0);
 }
 
+// Paginação automática (17/07/2026) - "cheio"/desabilitado só no teto de
+// segurança (RdoExcel.MAX_PAGINAS páginas), não mais na capacidade de 1
+// página só (`capacidade`) - passar disso já é esperado, vira página
+// nova. O indicador mostra em que página o próximo item cairia, só como
+// informação (nunca trava o botão "+ Adicionar" até o teto de verdade).
 function atualizarOrcamento(itens, capacidade, elOrcamento, btnAdd) {
   const usados = calcularLinhasUsadas(itens);
-  elOrcamento.textContent = `${usados} / ${capacidade}`;
-  elOrcamento.parentElement.classList.toggle('cheio', usados >= capacidade);
-  btnAdd.disabled = usados >= capacidade;
+  const capacidadeMaxima = capacidade * RdoExcel.MAX_PAGINAS;
+  if (usados > capacidade) {
+    const pagina = Math.min(Math.floor(usados / capacidade) + 1, RdoExcel.MAX_PAGINAS);
+    elOrcamento.textContent = `${usados} / ${capacidade} (página ${pagina})`;
+  } else {
+    elOrcamento.textContent = `${usados} / ${capacidade}`;
+  }
+  elOrcamento.parentElement.classList.toggle('cheio', usados >= capacidadeMaxima);
+  btnAdd.disabled = usados >= capacidadeMaxima;
 }
 
 // Campo de horário com máscara (11/07 tarde, 2ª volta) - depois de tentar
@@ -590,15 +601,15 @@ function renderizarListaAtividades(cfg) {
     });
     const areaDiscriminacao = linha.querySelector('.input-discriminacao');
     let valorAnterior = item.discriminacao || '';
-    // Não basta desabilitar "+ Adicionar" quando o orçamento de linhas
-    // enche (isso já existia) - um item JÁ existente ainda podia estourar
-    // o limite digitando/colando mais texto ou dando Enter (quebra de
-    // linha manual), e só descobria isso depois, na hora de gerar o RDO
-    // (pedido do Paulo, 11/07 à noite: "não deve permitir... nem pular
-    // linha no teclado"). Aqui a checagem é no RESULTADO (linhas totais
-    // após a edição), não só na tecla Enter especificamente - cobre
-    // digitação normal que também quebra linha sozinha ao encher a largura
-    // do bloco, não só o Enter manual.
+    // Paginação automática (17/07/2026) - passar da capacidade de 1
+    // página (`capacidade`) agora é NORMAL, vira continuação na página
+    // seguinte (ver RdoExcel.gerarPaginas_/particionarAtividades_). Só
+    // trava mesmo no teto de segurança de `RdoExcel.MAX_PAGINAS` páginas
+    // (6 - bem acima de qualquer RDO real), pra proteger só contra
+    // entrada patológica (texto absurdamente longo colado), não o uso
+    // normal. Antes disso (até 15/07) travava já na 1ª página - "não
+    // deve permitir... nem pular linha no teclado" foi o pedido original,
+    // mas isso agora é resolvido gerando página nova, não bloqueando.
     areaDiscriminacao.addEventListener('input', e => {
       const textoNovo = e.target.value;
       const contribuicaoAnterior = temConteudoAtividade(item) ? RdoExcel.estimarLinhasAtividade(item.discriminacao) : 0;
@@ -606,10 +617,11 @@ function renderizarListaAtividades(cfg) {
       const nLinhasNovo = RdoExcel.estimarLinhasAtividade(textoNovo);
       const temInicioOuFim = Boolean(item.inicio || item.fim);
       const contribuicaoNova = (textoNovo.trim() || temInicioOuFim) ? nLinhasNovo : 0;
+      const capacidadeMaxima = capacidade * RdoExcel.MAX_PAGINAS;
 
-      if (usadosSemEste + contribuicaoNova > capacidade) {
-        e.target.value = valorAnterior; // reverte - não deixa a edição estourar o orçamento da página
-        elEstimativa.textContent = 'Limite de linhas da página atingido - apague algo pra continuar.';
+      if (usadosSemEste + contribuicaoNova > capacidadeMaxima) {
+        e.target.value = valorAnterior;
+        elEstimativa.textContent = `Limite de ${RdoExcel.MAX_PAGINAS} páginas atingido - apague algo pra continuar.`;
         elEstimativa.classList.add('estimativa-bloqueada');
         return;
       }
@@ -2663,12 +2675,15 @@ async function atualizarPreviewInline_() {
       const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra, state.data, state.os);
       previewNumeroAtual = numero;
 
-      const { base64: xlsxPreviewBase64, fileName: fileNamePreview, avisos } = await RdoExcel.gerarWorkbook(state, numero, { apenasPreview: true });
+      const { paginas: paginasPreview, fileName: fileNamePreview, avisos } = await RdoExcel.gerarPaginas_(state, numero, { apenasPreview: true });
       // previsualizarRDO (não gerarLinkPreview) - devolve o PDF pronto em
       // base64 em vez de salvar no Drive e apontar pro visualizador do
       // Google, que é pesado pra carregar num iframe (era o gargalo real
       // da prévia). Um Blob local abre na hora, sem depender do Drive.
-      const respPreview = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxPreviewBase64, fileName: fileNamePreview });
+      // paginasXlsxBase64 (17/07/2026, paginação automática) - array de 1
+      // string por página; o backend combina e devolve 1 PDF multi-página
+      // (respPreview.pdfBase64 continua sendo 1 string só, igual sempre foi).
+      const respPreview = await RdoApi.previsualizarRDO({ paginasXlsxBase64: paginasPreview.map(p => p.base64), fileName: fileNamePreview });
       if (!respPreview.ok) throw new Error(respPreview.erro || 'Não consegui gerar a prévia.');
 
       // O WebView do Android (app instalado via Capacitor) não tem
@@ -2714,12 +2729,17 @@ async function atualizarPreviewInline_() {
       el.wrapVisualizadorApp.style.display = 'none';
       el.avisoPreviaAppNativo.style.display = 'none';
       el.btnAbrirPreviaAppNativo.style.display = 'none';
-      const { base64: pdfBase64Offline, fileName: fileNameOffline } = await RdoPreviewOffline.gerarPdfOffline_(state, null);
+      const { base64: pdfBase64Offline, fileName: fileNameOffline, totalPaginas } = await RdoPreviewOffline.gerarPdfOffline_(state, null);
       previewPdfOfflineAtual = pdfBase64Offline;
       previewPdfOfflineFileNameAtual = fileNameOffline;
       el.avisoPreviaOffline.style.display = 'block';
       el.btnAbrirPreviaOffline.style.display = 'block';
-      el.statusConfirmacao.textContent = '';
+      // Paginação automática (17/07/2026) - a prévia offline só desenha a
+      // página 1 (ver preview-offline.js); avisa aqui também, fora do PDF,
+      // pra ficar visível mesmo sem abrir o arquivo.
+      el.statusConfirmacao.textContent = totalPaginas > 1
+        ? `Este RDO vai ter ${totalPaginas} páginas - a prévia offline mostra só a 1ª. O documento final sai completo quando enviar com internet.`
+        : '';
     }
 
     atualizarBalaoSemAprovacao_();
@@ -2843,8 +2863,9 @@ async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoIn
     ? numeroJaReservado
     : (await RdoApi.reservarNumero(stateParaEnviar.contratante, stateParaEnviar.obra, stateParaEnviar.data, stateParaEnviar.os)).numero;
 
-  const { base64: xlsxFinalBase64, fileName: fileNameFinal } = await RdoExcel.gerarWorkbook(stateParaEnviar, numero);
-  const respPdfFinal = await RdoApi.previsualizarRDO({ xlsxBase64: xlsxFinalBase64, fileName: fileNameFinal });
+  const { paginas: paginasFinal, fileName: fileNameFinal } = await RdoExcel.gerarPaginas_(stateParaEnviar, numero);
+  const paginasXlsxBase64Final = paginasFinal.map(p => p.base64);
+  const respPdfFinal = await RdoApi.previsualizarRDO({ paginasXlsxBase64: paginasXlsxBase64Final, fileName: fileNameFinal });
   const pdfBase64 = respPdfFinal.pdfBase64;
 
   // tokenAprovacaoInterna (revisão antes do primeiro envio) OU
@@ -2874,7 +2895,7 @@ async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoIn
       cliente: stateParaEnviar.contratante,
       obra: stateParaEnviar.obra,
       data: stateParaEnviar.data,
-      xlsxBase64: xlsxFinalBase64,
+      paginasXlsxBase64: paginasXlsxBase64Final,
       pdfBase64,
       fileName: fileNameFinal,
       stateJSON: JSON.stringify(stateParaEnviar),
@@ -2887,7 +2908,7 @@ async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoIn
       cliente: stateParaEnviar.contratante,
       obra: stateParaEnviar.obra,
       data: stateParaEnviar.data,
-      xlsxBase64: xlsxFinalBase64,
+      paginasXlsxBase64: paginasXlsxBase64Final,
       pdfBase64,
       fileName: fileNameFinal,
       emailContratante: stateParaEnviar.emailContratante,

@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.10.6';
+const VERSAO_APP = 'BETA 0.11.0';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
@@ -358,26 +358,29 @@ const RdoApi = (function () {
   // (14/07/2026) - base da numeração nova.
   // stateJSON (15/07/2026) - guardado em RDOs.StateJSON, permite reabrir
   // este RDO pra revisão depois (ver liberarRdoParaRevisao_ no Code.gs).
-  function enviarRDO({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os, stateJSON, reaberturaOrigem, reaberturaIdentificador }) {
-    return postJson_({ action: 'enviarRDO', cliente, obra, data, xlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os, stateJSON, reaberturaOrigem, reaberturaIdentificador });
+  // paginasXlsxBase64 (17/07/2026, paginação automática) - array com 1
+  // string por página gerada (`RdoExcel.gerarPaginas_`), nunca mais um
+  // xlsxBase64 único - até RDO de 1 página só manda um array de 1 item.
+  function enviarRDO({ cliente, obra, data, paginasXlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os, stateJSON, reaberturaOrigem, reaberturaIdentificador }) {
+    return postJson_({ action: 'enviarRDO', cliente, obra, data, paginasXlsxBase64, pdfBase64, fileName, emailContratante, token, tokenAprovacaoInterna, os, stateJSON, reaberturaOrigem, reaberturaIdentificador });
   }
 
-  function previsualizarRDO({ xlsxBase64, fileName }) {
-    return postJson_({ action: 'previsualizarRDO', xlsxBase64, fileName });
+  function previsualizarRDO({ paginasXlsxBase64, fileName }) {
+    return postJson_({ action: 'previsualizarRDO', paginasXlsxBase64, fileName });
   }
 
   // Salva o PDF de prévia no Drive e devolve um link embutível (iframe) -
   // usado pelo botão "Exibir Prévia" (mostra na hora, com zoom, em vez de
   // baixar - ver app.js/aprovacao.js).
-  function gerarLinkPreview({ xlsxBase64, fileName }) {
-    return postJson_({ action: 'gerarLinkPreview', xlsxBase64, fileName });
+  function gerarLinkPreview({ paginasXlsxBase64, fileName }) {
+    return postJson_({ action: 'gerarLinkPreview', paginasXlsxBase64, fileName });
   }
 
   // Aprovação do Contratante por e-mail (11/07) - ver www/aprovacao.html.
   // tokenAprovacaoInterna: mesmo significado de enviarRDO acima. os
   // (14/07/2026): base da numeração nova.
-  function enviarParaAprovacao({ cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os, reaberturaOrigem, reaberturaIdentificador }) {
-    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, xlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os, reaberturaOrigem, reaberturaIdentificador });
+  function enviarParaAprovacao({ cliente, obra, data, paginasXlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os, reaberturaOrigem, reaberturaIdentificador }) {
+    return postJson_({ action: 'enviarParaAprovacao', cliente, obra, data, paginasXlsxBase64, pdfBase64, fileName, stateJSON, emailResponsavel, token, tokenAprovacaoInterna, os, reaberturaOrigem, reaberturaIdentificador });
   }
 
   // Aprovação INTERNA (14/07/2026) - ver [[project_rdo_app]].
@@ -431,8 +434,8 @@ const RdoApi = (function () {
   // [[project_rdo_app]] 14/07/2026) e manda o RDO final direto (FN +
   // Contratante) na resposta desta mesma chamada - ver finalizarAprovacao_
   // no Code.gs.
-  function finalizarAprovacao({ token, xlsxBase64, pdfBase64, fileName, assinaturaNome, cpf, ipCliente, userAgent }) {
-    return postJson_({ action: 'finalizarAprovacao', token, xlsxBase64, pdfBase64, fileName, assinaturaNome, cpf, ipCliente, userAgent });
+  function finalizarAprovacao({ token, paginasXlsxBase64, pdfBase64, fileName, assinaturaNome, cpf, ipCliente, userAgent }) {
+    return postJson_({ action: 'finalizarAprovacao', token, paginasXlsxBase64, pdfBase64, fileName, assinaturaNome, cpf, ipCliente, userAgent });
   }
 
   // Cadastro do responsável da Contratante (CPF/Nome/Função/Empresa,
