@@ -79,9 +79,30 @@ const el = {
   btnConcluir: document.getElementById('btn-concluir'),
   btnEditar: document.getElementById('btn-editar'),
   statusConfirmacao: document.getElementById('status-confirmacao'),
+  barraProgressoWrap: document.getElementById('barra-progresso-wrap'),
+  barraProgresso: document.getElementById('barra-progresso'),
 
   sucesso: document.getElementById('cartao-sucesso')
 };
+
+// Barra de progresso (17/07/2026) - mesmo padrão de www/app.js: determinada
+// enquanto gera as páginas localmente (N conhecido), indeterminada durante
+// a conversão/envio no backend (duração desconhecida).
+function mostrarBarraProgresso_() {
+  el.barraProgressoWrap.style.display = 'block';
+  el.barraProgresso.classList.remove('indeterminada');
+  el.barraProgresso.style.width = '0%';
+}
+function atualizarBarraProgressoDeterminada_(fracao) {
+  el.barraProgresso.classList.remove('indeterminada');
+  el.barraProgresso.style.width = Math.round(Math.min(fracao, 1) * 100) + '%';
+}
+function marcarBarraProgressoIndeterminada_() {
+  el.barraProgresso.classList.add('indeterminada');
+}
+function esconderBarraProgresso_() {
+  el.barraProgressoWrap.style.display = 'none';
+}
 
 function mostrarErro_(msg) {
   el.carregando.style.display = 'none';
@@ -650,13 +671,18 @@ async function atualizarPreviewFinalInline_() {
   try {
     el.statusConfirmacao.textContent = 'Atualizando prévia...';
     el.statusConfirmacao.className = 'status';
+    mostrarBarraProgresso_();
     stateFinalAtual = montarStateFinal_();
 
     if (RdoConectividade.estaOnline()) {
       el.avisoPreviaOfflineFinal.style.display = 'none';
       el.btnAbrirPreviaOfflineFinal.style.display = 'none';
 
-      const { paginas: paginasPrevia, fileName: fileNamePrevia } = await RdoExcel.gerarPaginas_(stateFinalAtual, numero, { apenasPreview: true });
+      const { paginas: paginasPrevia, fileName: fileNamePrevia } = await RdoExcel.gerarPaginas_(stateFinalAtual, numero, {
+        apenasPreview: true,
+        aoProgredir: (p, total) => atualizarBarraProgressoDeterminada_((p / total) * 0.5),
+      });
+      marcarBarraProgressoIndeterminada_();
       const respLink = await RdoApi.gerarLinkPreview({ paginasXlsxBase64: paginasPrevia.map(p => p.base64), fileName: fileNamePrevia });
       if (!respLink.ok) throw new Error(respLink.erro || 'Não consegui gerar a prévia.');
 
@@ -690,6 +716,7 @@ async function atualizarPreviewFinalInline_() {
   } finally {
     atualizandoPreviewFinal_ = false;
     el.btnConcluir.disabled = false;
+    esconderBarraProgresso_();
   }
 }
 
@@ -737,14 +764,18 @@ el.btnConcluir.addEventListener('click', async () => {
   try {
     el.statusConfirmacao.textContent = 'Gerando RDO final...';
     el.statusConfirmacao.className = 'status';
+    mostrarBarraProgresso_();
 
     // Gera o xlsx/PDF de verdade (SEM marca d'água) na hora, a partir do
     // estado ATUAL - nunca reaproveita o que foi gerado só pra exibir a
     // prévia (evita mandar uma versão desatualizada se a pessoa editou
     // algo entre pré-visualizar e concluir).
     const stateFinal = montarStateFinal_();
-    const { paginas: paginasFinal, fileName: fileNameFinal } = await RdoExcel.gerarPaginas_(stateFinal, numero);
+    const { paginas: paginasFinal, fileName: fileNameFinal } = await RdoExcel.gerarPaginas_(stateFinal, numero, {
+      aoProgredir: (p, total) => atualizarBarraProgressoDeterminada_((p / total) * 0.5),
+    });
     const paginasXlsxBase64Final = paginasFinal.map(p => p.base64);
+    marcarBarraProgressoIndeterminada_();
     const respPdfFinal = await RdoApi.previsualizarRDO({ paginasXlsxBase64: paginasXlsxBase64Final, fileName: fileNameFinal });
 
     el.statusConfirmacao.textContent = 'Enviando RDO final...';
@@ -773,6 +804,7 @@ el.btnConcluir.addEventListener('click', async () => {
     RdoApi.logErro('finalizar_aprovacao', err && err.message ? err.message : String(err), { token });
   } finally {
     el.btnConcluir.disabled = false;
+    esconderBarraProgresso_();
   }
 });
 

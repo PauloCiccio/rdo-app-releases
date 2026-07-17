@@ -617,6 +617,12 @@ const RdoExcel = (function () {
       const buffer = await workbook.xlsx.writeBuffer();
       const { base64, blob } = await bufferParaBase64_(buffer);
       paginas.push({ base64, blob });
+
+      // Callback de progresso (17/07/2026, pedido do Paulo - RDO de
+      // várias páginas demora mais, precisa de indicação visual de que
+      // tem algo rodando) - avisa depois de CADA página terminar, pra
+      // quem chama poder mostrar "página X de Y" numa barra.
+      if (opts && opts.aoProgredir) opts.aoProgredir(p, totalPaginas);
     }
 
     const fileName = montarNomeArquivo_(numero, state);

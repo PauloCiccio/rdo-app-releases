@@ -308,6 +308,8 @@ const el = {
   btnCompartilhar: document.getElementById('btn-compartilhar'),
   btnConfirmarEnvio: document.getElementById('btn-confirmar-envio'),
   btnCancelarPreview: document.getElementById('btn-cancelar-preview'),
+  barraProgressoWrap: document.getElementById('barra-progresso-wrap'),
+  barraProgresso: document.getElementById('barra-progresso'),
   statusConfirmacao: document.getElementById('status-confirmacao'),
 
   formRdo: document.getElementById('form-rdo'),
@@ -2272,6 +2274,28 @@ function mostrarStatus(texto, tipo) {
   el.status.className = 'status' + (tipo ? ' ' + tipo : '');
 }
 
+// Barra de progresso (17/07/2026, pedido do Paulo - RDO de várias
+// páginas demora mais pra gerar/converter, precisa de indicação visual
+// de que tem algo rodando, não só o texto de status). "Determinada"
+// enquanto dá pra saber quantas páginas faltam gerar (client-side,
+// rápido); "indeterminada" (faixa animada) pro trecho que depende só da
+// resposta do backend (conversão/envio), sem jeito de saber quanto falta.
+function mostrarBarraProgresso_() {
+  el.barraProgressoWrap.style.display = 'block';
+  el.barraProgresso.classList.remove('indeterminada');
+  el.barraProgresso.style.width = '0%';
+}
+function atualizarBarraProgressoDeterminada_(fracao) {
+  el.barraProgresso.classList.remove('indeterminada');
+  el.barraProgresso.style.width = Math.round(Math.min(fracao, 1) * 100) + '%';
+}
+function marcarBarraProgressoIndeterminada_() {
+  el.barraProgresso.classList.add('indeterminada');
+}
+function esconderBarraProgresso_() {
+  el.barraProgressoWrap.style.display = 'none';
+}
+
 // Checagens básicas (14/07/2026) - as únicas exigidas pra PRÉ-VISUALIZAR
 // (validarParaPreview_). A confirmação do Contratante (e-mail pro link de
 // aprovação) só é cobrada na hora de ENVIAR de verdade (validarParaEnvio_) -
@@ -2665,6 +2689,7 @@ async function atualizarPreviewInline_() {
   try {
     el.statusConfirmacao.textContent = 'Atualizando prévia...';
     el.statusConfirmacao.className = 'status';
+    mostrarBarraProgresso_();
 
     if (RdoConectividade.estaOnline()) {
       el.avisoPreviaOffline.style.display = 'none';
@@ -2675,7 +2700,15 @@ async function atualizarPreviewInline_() {
       const { numero } = await RdoApi.reservarNumero(state.contratante, state.obra, state.data, state.os);
       previewNumeroAtual = numero;
 
-      const { paginas: paginasPreview, fileName: fileNamePreview, avisos } = await RdoExcel.gerarPaginas_(state, numero, { apenasPreview: true });
+      const { paginas: paginasPreview, fileName: fileNamePreview, avisos } = await RdoExcel.gerarPaginas_(state, numero, {
+        apenasPreview: true,
+        // Enquanto gera as páginas localmente (rápido, quantidade
+        // conhecida) a barra fica determinada; a fatia de geração local
+        // conta como metade do progresso, a outra metade é a conversão/
+        // envio no backend (duração desconhecida, ver abaixo).
+        aoProgredir: (p, total) => atualizarBarraProgressoDeterminada_((p / total) * 0.5),
+      });
+      marcarBarraProgressoIndeterminada_();
       // previsualizarRDO (não gerarLinkPreview) - devolve o PDF pronto em
       // base64 em vez de salvar no Drive e apontar pro visualizador do
       // Google, que é pesado pra carregar num iframe (era o gargalo real
@@ -2751,6 +2784,7 @@ async function atualizarPreviewInline_() {
   } finally {
     atualizandoPreview_ = false;
     el.btnConfirmarEnvio.disabled = false;
+    esconderBarraProgresso_();
   }
 }
 
@@ -2858,13 +2892,23 @@ el.btnAbrirPreviaAppNativo.addEventListener('click', async () => {
 // revisão de aprovação interna (ver [[project_rdo_app]]). `loginParaEnviar`
 // continua sendo o dono/elaborador original do RDO nesse caso (não quem
 // está revisando) - preserva a atribuição em Meu Perfil/pasta do Drive.
-async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoInterna) {
+async function enviarRdoAoBackend_(stateParaEnviar, numeroJaReservado, revisaoInterna, mostrarProgresso) {
   const numero = numeroJaReservado != null
     ? numeroJaReservado
     : (await RdoApi.reservarNumero(stateParaEnviar.contratante, stateParaEnviar.obra, stateParaEnviar.data, stateParaEnviar.os)).numero;
 
-  const { paginas: paginasFinal, fileName: fileNameFinal } = await RdoExcel.gerarPaginas_(stateParaEnviar, numero);
+  // mostrarProgresso (17/07/2026) - true só quando chamado pelo clique de
+  // "Confirmar e Enviar" (usuário parado esperando na tela); a chamada de
+  // sincronizarFilaOffline_ (fila em segundo plano, sem tela de envio
+  // aberta pra essa RDO específica) não passa esse flag, então não mexe
+  // na barra.
+  const { paginas: paginasFinal, fileName: fileNameFinal } = await RdoExcel.gerarPaginas_(stateParaEnviar, numero, {
+    aoProgredir: mostrarProgresso
+      ? (p, total) => atualizarBarraProgressoDeterminada_((p / total) * 0.5)
+      : undefined,
+  });
   const paginasXlsxBase64Final = paginasFinal.map(p => p.base64);
+  if (mostrarProgresso) marcarBarraProgressoIndeterminada_(); // conversão/envio no backend, duração desconhecida
   const respPdfFinal = await RdoApi.previsualizarRDO({ paginasXlsxBase64: paginasXlsxBase64Final, fileName: fileNameFinal });
   const pdfBase64 = respPdfFinal.pdfBase64;
 
@@ -3321,6 +3365,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
 
     el.statusConfirmacao.textContent = 'Gerando RDO final...';
     el.statusConfirmacao.className = 'status';
+    mostrarBarraProgresso_();
 
     // Carimbo de Data/Hora do Elaborador (14/07/2026, bloco de assinatura em
     // texto) - só falta setar aqui quando o RDO nunca passou pelo branch de
@@ -3354,7 +3399,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     // Gera a partir do state ATUAL - nunca reaproveita o que foi gerado só
     // pra exibir a prévia (evita mandar uma versão desatualizada se a
     // pessoa editou algo entre pré-visualizar e confirmar).
-    const { resp, pdfBase64, fileNameFinal } = await enviarRdoAoBackend_(state, previewNumeroAtual, revisaoInterna);
+    const { resp, pdfBase64, fileNameFinal } = await enviarRdoAoBackend_(state, previewNumeroAtual, revisaoInterna, true);
     previewPdfBase64 = pdfBase64;
     previewFileName = fileNameFinal;
 
@@ -3389,6 +3434,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     RdoApi.logErro('enviar_rdo', err && err.message ? err.message : String(err), { contratante: state.contratante, obra: state.obra });
   } finally {
     el.btnConfirmarEnvio.disabled = false;
+    esconderBarraProgresso_();
   }
 });
 
