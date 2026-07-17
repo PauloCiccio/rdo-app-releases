@@ -1768,7 +1768,7 @@ function montarLinhaAprovado_(item) {
   const mostrarReabrir = ehAdmin && identificadorReabertura;
   const mostrarEnviarSemRevisao = ehAdmin && item.origem === 'direto';
   linha.innerHTML = `
-    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg><span>RDO nº ${item.numero} - ${item.data || ''}</span></div>
+    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg><span>RDO nº ${item.numero} - ${item.data || ''}${item.elaborador ? ' - Elaborado por ' + item.elaborador : ''}</span></div>
     <div class="botoes-rdo-perfil">
       <button type="button" class="botao-mini btn-ver-perfil">Visualizar PDF</button>
       <button type="button" class="botao-mini btn-compartilhar-perfil">Compartilhar</button>
@@ -1898,7 +1898,7 @@ function montarLinhaPendente_(item) {
   const linha = document.createElement('div');
   linha.className = 'linha-rdo-perfil pendente';
   linha.innerHTML = `
-    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg><span>RDO nº ${item.numero} - ${item.data || ''} - aguardando aprovação de <strong class="email-pendente-perfil">${item.emailResponsavel}</strong></span></div>
+    <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg><span>RDO nº ${item.numero} - ${item.data || ''}${item.elaborador ? ' - Elaborado por ' + item.elaborador : ''} - aguardando aprovação de <strong class="email-pendente-perfil">${item.emailResponsavel}</strong></span></div>
     <div class="botoes-rdo-perfil">
       <button type="button" class="botao-mini btn-reenviar-perfil">Reenviar link por e-mail</button>
     </div>
