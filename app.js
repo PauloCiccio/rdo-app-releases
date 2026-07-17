@@ -159,9 +159,12 @@ const state = {
   // Adicionar", igual Atividades - pedido do Paulo, 10/07 tarde) em vez
   // de mostrar as 12/24 linhas do modelo de uma vez só. Efetivo começa
   // com as 6 funções padrão já "adicionadas" (Engenheiro...Motorista);
-  // Equipamentos começa vazio, sem nenhum item padrão.
+  // Equipamentos começa com 1 linha em branco (17/07/2026, pedido do
+  // Paulo - antes começava com 0 linhas, só o botão "+ Adicionar"
+  // visível, "ficava limpo demais") - mesmo padrão de atividades (1
+  // linha em branco pronta pra digitar, cresce com "+ Adicionar").
   efetivo: EFETIVO_PADRAO.map(descricao => ({ descricao, quant: '' })),
-  equipamentos: [],
+  equipamentos: [{ descricao: '', quant: '' }],
   // atividades comecam com 1 linha em branco - crescem com o botao "+
   // Adicionar atividade" (ver renderizarListaAtividades), em vez de
   // mostrar as 23/10 linhas do modelo de uma vez (formulario ficava
@@ -389,9 +392,10 @@ function atualizarOrcamentoQuant_(itens, capacidade, elOrcamento, btnAdd) {
 }
 
 function renderizarListaQuantCrescente(cfg) {
-  const { itens, container, elOrcamento, btnAdd, capacidade, datalistId } = cfg;
+  const { itens, container, elOrcamento, btnAdd, capacidade, datalistId, placeholderDescricao } = cfg;
   container.innerHTML = '';
   const listAttr = datalistId ? `list="${datalistId}"` : '';
+  const placeholderAttr = placeholderDescricao ? ` placeholder="${placeholderDescricao}"` : '';
 
   itens.forEach((item, i) => {
     const linha = document.createElement('div');
@@ -399,7 +403,7 @@ function renderizarListaQuantCrescente(cfg) {
     linha.innerHTML = `
       <div class="campo-descricao">
         <label>Descrição</label>
-        <input type="text" class="input-descricao" ${listAttr} autocomplete="off" value="${item.descricao || ''}">
+        <input type="text" class="input-descricao" ${listAttr}${placeholderAttr} autocomplete="off" value="${item.descricao || ''}">
       </div>
       <div class="campo-quant">
         <label>Quant</label>
@@ -709,7 +713,12 @@ const cfgEquipamentos = {
   elOrcamento: el.orcamentoEquipamentos,
   btnAdd: el.btnAddEquipamentos,
   capacidade: N_EQUIPAMENTOS,
-  datalistId: 'dl-equipamentos'
+  datalistId: 'dl-equipamentos',
+  // Exemplo no campo (17/07/2026, pedido do Paulo, mesmo padrão do
+  // "email@exemplo.com" no e-mail da Contratante) - some sozinho assim
+  // que a pessoa digitar algo, é só placeholder, nunca vira valor de
+  // verdade.
+  placeholderDescricao: 'Ex: Perfuratriz hélice contínua EM 800/24'
 };
 el.btnAddEfetivo.addEventListener('click', () => {
   state.efetivo.push({ descricao: '', quant: '' });
@@ -993,11 +1002,12 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   preencherDatalist(el.dlServico, []);
 
   // Efetivo/Equipamentos voltam ao mesmo estado de um app recém-aberto
-  // (6 funções padrão pré-preenchidas / lista de equipamentos vazia) -
-  // igual à definição inicial de `state` lá em cima.
+  // (6 funções padrão pré-preenchidas / 1 linha em branco de equipamento)
+  // - igual à definição inicial de `state` lá em cima.
   state.efetivo.length = 0;
   EFETIVO_PADRAO.forEach(descricao => state.efetivo.push({ descricao, quant: '' }));
   state.equipamentos.length = 0;
+  state.equipamentos.push({ descricao: '', quant: '' });
   renderizarListaQuantCrescente(cfgEfetivo);
   renderizarListaQuantCrescente(cfgEquipamentos);
 
