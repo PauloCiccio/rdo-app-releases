@@ -481,6 +481,16 @@ textarea { resize: vertical; overflow: hidden; }
   align-items: center;
   gap: 6px;
 }
+/* Linha separando o cabeçalho clicável do conteúdo, só quando aberto -
+   mesmo padrão de .secao-formulario[open] > summary (formulário de RDO) -
+   reforça visualmente onde "Filtros"/"Obras que acompanho" termina e o
+   conteúdo começa (17/07/2026, campo OS ficava colado embaixo do
+   cabeçalho sem essa linha). */
+.detalhes-filtro-obras[open] summary {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--borda);
+}
 .detalhes-filtro-obras summary::-webkit-details-marker { display: none; }
 /* Seta indicando abrir/fechar (17/07/2026, pedido do Paulo) - mesmo
    padrão visual de .seta-secao no formulário de RDO: aponta pra baixo
