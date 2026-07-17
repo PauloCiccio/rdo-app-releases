@@ -1089,13 +1089,35 @@ async function atualizarSessaoDoServidor_() {
   if (!sessaoAtual || !RdoConectividade.estaOnline() || emRevisaoDeOutrem_()) return;
   try {
     const resp = await RdoApi.validarSessao(sessaoAtual.token);
-    // Falha silenciosa (token expirado, revogado, ou qualquer erro de
-    // aplicação) - mesma filosofia de antes: mantém os dados em cache,
-    // sem forçar logout numa checagem de segundo plano. Uma sessão de
-    // verdade inválida vai aparecer como erro na próxima ação real
-    // (enviar RDO, abrir Perfil, etc.), onde faz sentido tratar o logout.
-    if (!resp.ok) return;
+    // Sessão confirmada inválida pelo servidor (token ausente, linha
+    // apagada da aba Sessoes, expirada, ou usuário removido da aba
+    // Usuarios) - pedido do Paulo (16/07/2026): revogar a sessão (ex:
+    // apagar a linha manualmente na planilha) deve derrubar o usuário de
+    // volta pra tela de login automaticamente, não só na próxima ação
+    // real. Erro de REDE/transporte cai no catch abaixo, não aqui, então
+    // "!resp.ok" aqui só acontece por uma causa de sessão de verdade -
+    // seguro forçar logout.
+    if (!resp.ok) { forcarLogoutSessaoInvalida_(resp.erro); return; }
     const sessaoAtualizada = { token: sessaoAtual.token, login: resp.login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil, obrasFiltro: resp.obrasFiltro || [] };
+    // Corrige nome ficando desatualizado nas iniciais das atividades
+    // (16/07/2026, bug real reportado pelo Paulo) - `item.autor` é
+    // carimbado com o nome em cache no MOMENTO em que a atividade ganha
+    // conteúdo (preencherAutorPadrao_) e nunca mais é tocado depois, ao
+    // contrário de state.assinaturaContratadaNome (que já era atualizado
+    // aqui). Se o nome do usuário logado mudou desde então (ex: Paulo
+    // corrigiu um erro de digitação na aba Usuarios), qualquer linha já
+    // carimbada com o nome ANTIGO fica com as iniciais erradas pra sempre
+    // (Assinado por sai certo, discriminação sai errada) - propaga a
+    // correção pras linhas ainda no rascunho local sempre que os nomes
+    // divergem.
+    if (sessaoAtual.nome && sessaoAtualizada.nome && sessaoAtual.nome !== sessaoAtualizada.nome) {
+      [state.atividadesContratada, state.atividadesContratante].forEach(lista => {
+        (lista || []).forEach(item => {
+          if (item.autor === sessaoAtual.nome) item.autor = sessaoAtualizada.nome;
+          if (item.editorAutor === sessaoAtual.nome) item.editorAutor = sessaoAtualizada.nome;
+        });
+      });
+    }
     salvarSessaoUsuario_(sessaoAtualizada);
     state.assinaturaContratadaNome = sessaoAtualizada.nome;
     state.assinaturaContratadaFuncao = sessaoAtualizada.funcao || '';
@@ -1159,6 +1181,19 @@ function mostrarTelaLogin_() {
   el.cartaoPerfil.style.display = 'none';
   el.barraAbas.style.display = 'none';
   el.btnSair.style.display = 'none';
+}
+
+// Derruba a sessão local e volta pra tela de login (16/07/2026, pedido do
+// Paulo) - usado quando o servidor confirma que o token não é mais válido
+// (ver atualizarSessaoDoServidor_). Não mexe no rascunho de RDO em
+// andamento (state.atividadesContratada/Contratante) - só a AUTENTICAÇÃO
+// expira, o texto já digitado continua no formulário pra a pessoa só
+// logar de novo e seguir de onde parou.
+function forcarLogoutSessaoInvalida_(motivo) {
+  localStorage.removeItem(CHAVE_SESSAO_USUARIO);
+  mostrarTelaLogin_();
+  el.statusLogin.textContent = motivo || 'Sua sessão foi encerrada. Faça login novamente.';
+  el.statusLogin.className = 'status erro';
 }
 
 function mostrarAba_(aba) {
@@ -2866,6 +2901,17 @@ RdoConectividade.aoMudar(online => { if (online) verificarAtualizacaoApp_(false)
 // atualizarSessaoDoServidor_) - mesmo padrão de "roda de novo quando tiver
 // internet" já usado acima pra atualização do app e fila offline.
 RdoConectividade.aoMudar(online => { if (online) atualizarSessaoDoServidor_(); });
+
+// Idem sempre que o app volta a ficar visível (usuário trocou de app e
+// voltou, ou desbloqueou o celular com o app já aberto em segundo plano -
+// 16/07/2026, junto com o force-logout acima). No Android/Capacitor isso é
+// o gatilho mais realista pra pegar uma sessão revogada manualmente na
+// planilha (linha apagada da aba Sessoes) sem esperar o app ser
+// fechado/reaberto de verdade - não precisa de um setInterval rodando o
+// tempo todo em segundo plano.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') atualizarSessaoDoServidor_();
+});
 
 el.btnConfirmarEnvio.addEventListener('click', async () => {
   el.btnConfirmarEnvio.disabled = true;
