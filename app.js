@@ -1759,10 +1759,19 @@ function montarLinhaAprovado_(item) {
   // aparece se este RDO tiver um xlsxFileId salvo (RDOs enviados ANTES
   // dessa mudança não têm o arquivo guardado no Drive, só o PDF).
   const mostrarBotaoXlsx = perfilAtual_() === 'admin_master' && item.xlsxFileId;
-  // Reabrir/enviar sem revisão (15/07/2026) - só administrador/admin_master,
+  // Reabrir/enviar à Contratante (15/07/2026) - só administrador/admin_master,
   // e só funciona pra RDOs com StateJSON guardado (ver liberarRdoParaRevisao_
   // no Code.gs) - RDOs enviados antes dessa coluna existir simplesmente não
-  // mostram os botões (falha silenciosa e explícita, não erro).
+  // mostram os botões (falha silenciosa e explícita, não erro). O nome
+  // interno "SemRevisao" (variável/função/action) se refere a pular a
+  // revisão INTERNA do administrador (não precisa passar por ninguém antes
+  // de sair) - o texto exibido pro usuário (17/07/2026, pedido do Paulo)
+  // foi corrigido pra "Enviar à Contratante para assinatura" porque o nome
+  // antigo ("Enviar ao Cliente sem revisão") dava a entender, ao contrário
+  // do que realmente acontece, que a Contratante também não revisaria/
+  // assinaria - só serve pra RDOs `origem:'direto'` (emitidos sem
+  // assinatura), dando a chance de mandar um desses pro Cliente assinar
+  // depois, sem precisar reenviar do zero.
   const ehAdmin = perfilAtual_() === 'administrador' || perfilAtual_() === 'admin_master';
   const identificadorReabertura = item.origem === 'direto' ? item.pdfFileId : item.token;
   const mostrarReabrir = ehAdmin && identificadorReabertura;
@@ -1774,7 +1783,7 @@ function montarLinhaAprovado_(item) {
       <button type="button" class="botao-mini btn-compartilhar-perfil">Compartilhar</button>
       ${mostrarBotaoXlsx ? '<button type="button" class="botao-mini btn-baixar-xlsx-perfil">Baixar .xlsx</button>' : ''}
       ${mostrarReabrir ? '<button type="button" class="botao-mini btn-reabrir-perfil">Reabrir para revisão</button>' : ''}
-      ${mostrarEnviarSemRevisao ? '<button type="button" class="botao-mini btn-enviar-sem-revisao-perfil">Enviar ao Cliente sem revisão</button>' : ''}
+      ${mostrarEnviarSemRevisao ? '<button type="button" class="botao-mini btn-enviar-sem-revisao-perfil">Enviar à Contratante para assinatura</button>' : ''}
     </div>
     <div class="status status-linha-perfil"></div>`;
 
