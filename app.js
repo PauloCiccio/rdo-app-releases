@@ -1088,16 +1088,21 @@ async function atualizarSessaoDoServidor_() {
   const sessaoAtual = carregarSessaoUsuario_();
   if (!sessaoAtual || !RdoConectividade.estaOnline() || emRevisaoDeOutrem_()) return;
   try {
-    const resp = await RdoApi.validarSessao(sessaoAtual.token);
     // Sessão confirmada inválida pelo servidor (token ausente, linha
     // apagada da aba Sessoes, expirada, ou usuário removido da aba
     // Usuarios) - pedido do Paulo (16/07/2026): revogar a sessão (ex:
     // apagar a linha manualmente na planilha) deve derrubar o usuário de
     // volta pra tela de login automaticamente, não só na próxima ação
-    // real. Erro de REDE/transporte cai no catch abaixo, não aqui, então
-    // "!resp.ok" aqui só acontece por uma causa de sessão de verdade -
-    // seguro forçar logout.
-    if (!resp.ok) { forcarLogoutSessaoInvalida_(resp.erro); return; }
+    // real. `RdoApi.validarSessao` LANÇA exceção nesse caso (não retorna
+    // {ok:false} pra cá) - o force-logout de verdade acontece no callback
+    // registrado via RdoApi.definirCallbackSessaoInvalida (ver
+    // forcarLogoutSessaoInvalida_ abaixo), disparado de DENTRO de
+    // postJson_ antes de lançar. Bug real (16/07/2026 → 17/07/2026): a
+    // 1ª versão desta função checava "if (!resp.ok)" aqui, que nunca era
+    // alcançado (código morto) porque a exceção já tinha sido lançada -
+    // corrigido centralizando a detecção no funil único de chamadas
+    // (api.js), não em cada call site.
+    const resp = await RdoApi.validarSessao(sessaoAtual.token);
     const sessaoAtualizada = { token: sessaoAtual.token, login: resp.login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil, obrasFiltro: resp.obrasFiltro || [] };
     // Corrige nome ficando desatualizado nas iniciais das atividades
     // (16/07/2026, bug real reportado pelo Paulo) - `item.autor` é
@@ -1195,6 +1200,16 @@ function forcarLogoutSessaoInvalida_(motivo) {
   el.statusLogin.textContent = motivo || 'Sua sessão foi encerrada. Faça login novamente.';
   el.statusLogin.className = 'status erro';
 }
+
+// Registra o callback (17/07/2026) - api.js detecta a sessão inválida
+// (funil único, ver ERROS_SESSAO_INVALIDA_/postJson_) mas não pode mexer
+// na tela diretamente (separação API/UI), então chama isso aqui de volta.
+// Cobre TODOS os pontos que usam token (Perfil, enviar RDO, etc.), não só
+// atualizarSessaoDoServidor_ - antes só esse único caminho tentava forçar
+// logout, então revogar a sessão enquanto a pessoa estava no Perfil, por
+// exemplo, só mostrava "Erro: sessão inválida" escrito na tela em vez de
+// voltar pro login.
+RdoApi.definirCallbackSessaoInvalida(forcarLogoutSessaoInvalida_);
 
 function mostrarAba_(aba) {
   const ehRdo = aba === 'rdo';

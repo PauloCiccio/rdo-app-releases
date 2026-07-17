@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.9.22';
+const VERSAO_APP = 'BETA 0.9.23';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
@@ -287,6 +287,24 @@ const RdoApi = (function () {
     return buscarListaSimples_('veiculos', CACHE_KEY_VEICULOS, VEICULOS_FALLBACK);
   }
 
+  // Mensagens EXATAS que autenticarPorToken_/validarSessao_ (Code.gs)
+  // devolvem quando o token não vale mais - por linha apagada na aba
+  // Sessoes (revogação manual), expiração, ou usuário removido da aba
+  // Usuarios. Nenhuma outra função de negócio do backend usa essas frases,
+  // então dá pra detectar com segurança (16/07/2026: 1ª tentativa de
+  // force-logout checava `resp.ok` depois de `await RdoApi.validarSessao`,
+  // mas postJson_ já lança exceção nesse caso - o `if (!resp.ok)` nunca
+  // era alcançado, era código morto. Corrigido interceptando aqui, no
+  // funil único de toda chamada POST autenticada, não em cada call site).
+  const ERROS_SESSAO_INVALIDA_ = new Set([
+    'sessão ausente - faça login novamente',
+    'sessão inválida - faça login novamente',
+    'sessão expirada - faça login novamente',
+    'usuário da sessão não existe mais'
+  ]);
+  let aoSessaoInvalida_ = null;
+  function definirCallbackSessaoInvalida(fn) { aoSessaoInvalida_ = fn; }
+
   // Injeta versaoApp em todo POST automaticamente (um ponto só, não precisa
   // repetir em cada função wrapper abaixo) - o backend usa esse campo pra
   // decidir se o cliente está desatualizado demais pra continuar operando.
@@ -313,7 +331,16 @@ const RdoApi = (function () {
     }
     RdoConectividade.marcarSucessoDeRede();
     const json = await resp.json();
-    if (!json.ok) throw new Error(json.erro || 'erro desconhecido');
+    if (!json.ok) {
+      // Só dispara o force-logout se a própria chamada CARREGAVA um token
+      // (login/trocarSenhaObrigatoria não têm, e não fazem sentido aqui) -
+      // evita qualquer risco de disparar por engano numa mensagem igual
+      // vinda de outro contexto.
+      if (payload.token && aoSessaoInvalida_ && ERROS_SESSAO_INVALIDA_.has(json.erro)) {
+        aoSessaoInvalida_(json.erro);
+      }
+      throw new Error(json.erro || 'erro desconhecido');
+    }
     return json;
   }
 
@@ -500,6 +527,6 @@ const RdoApi = (function () {
     buscarCliente, buscarNomeCliente, cadastrarCliente, login, trocarSenhaObrigatoria, validarSessao, logout,
     meusRdos, buscarPdfPorId, buscarXlsxPorId, reenviarLinkAprovacao, corrigirEmailAprovacao,
     salvarParaAprovacaoInterna, listarAprovacoesInternas, buscarAprovacaoInterna, salvarObrasFiltro,
-    liberarRdoParaRevisao, enviarParaAprovacaoSemRevisao
+    liberarRdoParaRevisao, enviarParaAprovacaoSemRevisao, definirCallbackSessaoInvalida
   };
 })();
