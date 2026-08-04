@@ -42,6 +42,10 @@
       <span class="quadrado-numero" id="qtd-sem-aprovacao">0</span>
       <span class="quadrado-rotulo">RDOs sem aprovação do Cliente</span>
     </button>
+    <button type="button" class="quadrado-perfil quadrado-aguardando" id="quad-aguardando">
+      <span class="quadrado-numero" id="qtd-aguardando">0</span>
+      <span class="quadrado-rotulo">Aguardando aprovação de um responsável</span>
+    </button>
     <button type="button" class="quadrado-perfil quadrado-rascunhos" id="quad-rascunhos">
       <span class="quadrado-numero" id="qtd-rascunhos">0</span>
       <span class="quadrado-rotulo">Meus rascunhos</span>
@@ -137,7 +141,25 @@
     <input type="password" id="campo-nova-senha" autocomplete="new-password">
     <label for="campo-nova-senha-confirmar">Confirme a nova senha</label>
     <input type="password" id="campo-nova-senha-confirmar" autocomplete="new-password">
+    <button type="button" id="btn-balao-email-copia-senha" class="balao-opcao">
+      Quero receber cópia de cada RDO que eu fizer no meu e-mail
+    </button>
+    <div id="bloco-campo-email-copia-senha" style="display:none;">
+      <label for="campo-email-copia-senha">Seu e-mail</label>
+      <input type="email" id="campo-email-copia-senha" placeholder="seuemail@exemplo.com" inputmode="email" autocomplete="email">
+    </div>
     <button type="button" id="btn-trocar-senha" class="botao-principal">Definir nova senha e entrar</button>
+  </div>
+  <div id="bloco-escolher-email-copia" style="display:none;">
+    <p>Antes de continuar: você quer receber uma cópia de cada RDO que fizer no seu e-mail pessoal?</p>
+    <button type="button" id="btn-balao-email-copia-standalone" class="balao-opcao">
+      Quero receber cópia de cada RDO que eu fizer no meu e-mail
+    </button>
+    <div id="bloco-campo-email-copia-standalone" style="display:none;">
+      <label for="campo-email-copia-standalone">Seu e-mail</label>
+      <input type="email" id="campo-email-copia-standalone" placeholder="seuemail@exemplo.com" inputmode="email" autocomplete="email">
+    </div>
+    <button type="button" id="btn-salvar-email-copia" class="botao-principal">Salvar e continuar</button>
   </div>
   <div id="status-login" class="status" aria-live="polite"></div>
 </section>
@@ -340,6 +362,7 @@
     <p id="aviso-previa-app-nativo" class="orcamento-info" style="display:none;">Prévia pronta - o app não consegue mostrar o PDF embutido na tela, toque abaixo pra abrir num leitor de PDF.</p>
     <button type="button" id="btn-abrir-previa-app-nativo" class="botao-secundario" style="display:none;">📄 Abrir prévia em PDF</button>
     <button type="button" id="btn-compartilhar" class="botao-secundario" style="display:none;">Compartilhar PDF</button>
+    <button type="button" id="btn-copiar-resumo" class="botao-secundario" style="display:none;">📋 Copiar Resumo do RDO</button>
     <button type="button" id="btn-confirmar-envio" class="botao-principal">Confirmar e Enviar por E-mail</button>
     <button type="button" id="btn-cancelar-preview" class="botao-secundario">Cancelar / Editar</button>
     <div class="barra-progresso-wrap" id="barra-progresso-wrap" style="display:none;">

@@ -142,6 +142,7 @@ select, input[type="text"], input[type="date"], input[type="time"], input[type="
   color: var(--texto);
 }
 select:disabled { background: var(--desabilitado-bg); color: var(--desabilitado-texto); }
+input:disabled { background: var(--desabilitado-bg); color: var(--desabilitado-texto); cursor: not-allowed; }
 textarea { resize: vertical; overflow: hidden; }
 
 .linha-2col { display: flex; gap: 12px; }
@@ -488,6 +489,7 @@ textarea { resize: vertical; overflow: hidden; }
 .quadrado-revisar .quadrado-numero { color: var(--dourado-escuro); }
 .quadrado-aprovados .quadrado-numero { color: var(--sucesso); }
 .quadrado-sem-aprovacao .quadrado-numero { color: var(--alerta); }
+.quadrado-aguardando .quadrado-numero { color: var(--dourado-escuro); }
 .quadrado-rascunhos .quadrado-numero { color: var(--vinho); }
 
 /* Campos com <label> de verdade acima de cada um (mesmo padrão do
@@ -803,6 +805,7 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-rdo-perfil.aprovado .icone-linha { color: var(--sucesso); }
 .linha-rdo-perfil.sem-assinatura .icone-linha { color: var(--alerta); }
 .linha-rdo-perfil.rascunho .icone-linha { color: var(--vinho); }
+.linha-rdo-perfil.aguardando .icone-linha { color: var(--dourado-escuro); }
 .linha-rdo-perfil .botoes-rdo-perfil {
   display: flex;
   gap: 6px;

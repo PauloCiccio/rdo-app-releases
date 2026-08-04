@@ -306,6 +306,7 @@ const el = {
   btnZoomMenosApp: document.getElementById('btn-zoom-menos-app'),
   btnAtualizarPreviaApp: document.getElementById('btn-atualizar-previa-app'),
   btnCompartilhar: document.getElementById('btn-compartilhar'),
+  btnCopiarResumo: document.getElementById('btn-copiar-resumo'),
   btnConfirmarEnvio: document.getElementById('btn-confirmar-envio'),
   btnCancelarPreview: document.getElementById('btn-cancelar-preview'),
   barraProgressoWrap: document.getElementById('barra-progresso-wrap'),
@@ -326,6 +327,14 @@ const el = {
   campoNovaSenha: document.getElementById('campo-nova-senha'),
   campoNovaSenhaConfirmar: document.getElementById('campo-nova-senha-confirmar'),
   btnTrocarSenha: document.getElementById('btn-trocar-senha'),
+  btnBalaoEmailCopiaSenha: document.getElementById('btn-balao-email-copia-senha'),
+  blocoCampoEmailCopiaSenha: document.getElementById('bloco-campo-email-copia-senha'),
+  campoEmailCopiaSenha: document.getElementById('campo-email-copia-senha'),
+  blocoEscolherEmailCopia: document.getElementById('bloco-escolher-email-copia'),
+  btnBalaoEmailCopiaStandalone: document.getElementById('btn-balao-email-copia-standalone'),
+  blocoCampoEmailCopiaStandalone: document.getElementById('bloco-campo-email-copia-standalone'),
+  campoEmailCopiaStandalone: document.getElementById('campo-email-copia-standalone'),
+  btnSalvarEmailCopia: document.getElementById('btn-salvar-email-copia'),
   statusLogin: document.getElementById('status-login'),
   cartaoPerfil: document.getElementById('cartao-perfil'),
   perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
@@ -339,6 +348,8 @@ const el = {
   qtdAprovados: document.getElementById('qtd-aprovados'),
   quadSemAprovacao: document.getElementById('quad-sem-aprovacao'),
   qtdSemAprovacao: document.getElementById('qtd-sem-aprovacao'),
+  quadAguardando: document.getElementById('quad-aguardando'),
+  qtdAguardando: document.getElementById('qtd-aguardando'),
   quadRascunhos: document.getElementById('quad-rascunhos'),
   qtdRascunhos: document.getElementById('qtd-rascunhos'),
 
@@ -1501,6 +1512,30 @@ async function atualizarPreviewNumero() {
 // persistido, só em memória durante essa troca pontual.
 let trocaSenhaPendente_ = null;
 
+// Sessão já criada mas ainda "presa" na tela de escolha do e-mail de
+// cópia pessoal (04/08/2026, usuário já migrado marcado com
+// PedirEscolhaEmailCopia='SIM' na planilha pelo Paulo, ver login_ no
+// Code.gs) - guarda o objeto de sessão pronto pra aplicar assim que a
+// pessoa responder (btnSalvarEmailCopia), sem precisar logar de novo.
+let sessaoAguardandoEscolhaEmailCopia_ = null;
+
+// Balão "Quero receber cópia..." (04/08/2026) - mesmo padrão visual/
+// comportamental do balão "Gerar RDO sem assinatura da Contratante"
+// (ver atualizarBalaoSemAprovacao_), só que aqui aparece em 2 telas
+// diferentes (embutido na troca de senha obrigatória / standalone pra
+// quem já tem senha), então a lógica de toggle vira uma função genérica
+// em vez de duplicar tudo.
+function configurarBalaoEmailCopia_(btnBalao, blocoCampo, campoEmail) {
+  btnBalao.addEventListener('click', () => {
+    const ativo = !btnBalao.classList.contains('marcado');
+    btnBalao.classList.toggle('marcado', ativo);
+    blocoCampo.style.display = ativo ? 'block' : 'none';
+    if (!ativo) campoEmail.value = '';
+  });
+}
+configurarBalaoEmailCopia_(el.btnBalaoEmailCopiaSenha, el.blocoCampoEmailCopiaSenha, el.campoEmailCopiaSenha);
+configurarBalaoEmailCopia_(el.btnBalaoEmailCopiaStandalone, el.blocoCampoEmailCopiaStandalone, el.campoEmailCopiaStandalone);
+
 el.btnEntrar.addEventListener('click', async () => {
   const login = el.loginUsuario.value.trim();
   const senha = el.senhaUsuario.value;
@@ -1532,6 +1567,19 @@ el.btnEntrar.addEventListener('click', async () => {
 
     const sessao = { token: resp.token, login, nome: resp.nome, funcao: resp.funcao, perfil: resp.perfil, obrasFiltro: resp.obrasFiltro || [] };
     salvarSessaoUsuario_(sessao);
+
+    // PedirEscolhaEmailCopia='SIM' na planilha (04/08/2026, ver login_ no
+    // Code.gs) - sessão já é válida (login normal aconteceu), só intercepta
+    // a entrada no app pra pedir a escolha do e-mail de cópia antes.
+    if (resp.precisaEscolherEmailCopia) {
+      sessaoAguardandoEscolhaEmailCopia_ = sessao;
+      el.senhaUsuario.value = '';
+      el.blocoLoginNormal.style.display = 'none';
+      el.blocoEscolherEmailCopia.style.display = '';
+      el.statusLogin.textContent = '';
+      return;
+    }
+
     aplicarSessaoNoFormulario_(sessao);
   } catch (err) {
     console.error(err);
@@ -1556,12 +1604,19 @@ el.btnTrocarSenha.addEventListener('click', async () => {
     el.statusLogin.className = 'status erro';
     return;
   }
+  const emailCopiaAtivo = el.btnBalaoEmailCopiaSenha.classList.contains('marcado');
+  const emailCopiaEndereco = el.campoEmailCopiaSenha.value.trim();
+  if (emailCopiaAtivo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailCopiaEndereco)) {
+    el.statusLogin.textContent = 'Digite um e-mail válido pra receber a cópia, ou desmarque a opção.';
+    el.statusLogin.className = 'status erro';
+    return;
+  }
 
   el.btnTrocarSenha.disabled = true;
   try {
     el.statusLogin.textContent = 'Definindo nova senha...';
     el.statusLogin.className = 'status';
-    const resp = await RdoApi.trocarSenhaObrigatoria(trocaSenhaPendente_.login, trocaSenhaPendente_.senhaAntiga, novaSenha);
+    const resp = await RdoApi.trocarSenhaObrigatoria(trocaSenhaPendente_.login, trocaSenhaPendente_.senhaAntiga, novaSenha, emailCopiaAtivo, emailCopiaEndereco);
     if (!resp.ok) {
       el.statusLogin.textContent = resp.erro || 'Não consegui trocar a senha.';
       el.statusLogin.className = 'status erro';
@@ -1572,6 +1627,9 @@ el.btnTrocarSenha.addEventListener('click', async () => {
     trocaSenhaPendente_ = null;
     el.campoNovaSenha.value = '';
     el.campoNovaSenhaConfirmar.value = '';
+    el.btnBalaoEmailCopiaSenha.classList.remove('marcado');
+    el.blocoCampoEmailCopiaSenha.style.display = 'none';
+    el.campoEmailCopiaSenha.value = '';
     el.blocoTrocarSenha.style.display = 'none';
     el.blocoLoginNormal.style.display = '';
     salvarSessaoUsuario_(sessao);
@@ -1582,6 +1640,49 @@ el.btnTrocarSenha.addEventListener('click', async () => {
     el.statusLogin.className = 'status erro';
   } finally {
     el.btnTrocarSenha.disabled = false;
+  }
+});
+
+// Tela standalone de escolha do e-mail de cópia (04/08/2026) - sessão já
+// existe (sessaoAguardandoEscolhaEmailCopia_, criada no login normal),
+// só grava a preferência e libera o app. ativo=false é uma resposta
+// válida ("não quero") - só bloqueia se marcou o balão mas não deu um
+// e-mail válido.
+el.btnSalvarEmailCopia.addEventListener('click', async () => {
+  if (!sessaoAguardandoEscolhaEmailCopia_) return;
+  const ativo = el.btnBalaoEmailCopiaStandalone.classList.contains('marcado');
+  const email = el.campoEmailCopiaStandalone.value.trim();
+  if (ativo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    el.statusLogin.textContent = 'Digite um e-mail válido pra receber a cópia, ou desmarque a opção.';
+    el.statusLogin.className = 'status erro';
+    return;
+  }
+
+  el.btnSalvarEmailCopia.disabled = true;
+  try {
+    el.statusLogin.textContent = 'Salvando...';
+    el.statusLogin.className = 'status';
+    const resp = await RdoApi.salvarPreferenciaEmailCopia(sessaoAguardandoEscolhaEmailCopia_.token, ativo, email);
+    if (!resp.ok) {
+      el.statusLogin.textContent = resp.erro || 'Não consegui salvar essa preferência.';
+      el.statusLogin.className = 'status erro';
+      return;
+    }
+
+    const sessao = sessaoAguardandoEscolhaEmailCopia_;
+    sessaoAguardandoEscolhaEmailCopia_ = null;
+    el.btnBalaoEmailCopiaStandalone.classList.remove('marcado');
+    el.blocoCampoEmailCopiaStandalone.style.display = 'none';
+    el.campoEmailCopiaStandalone.value = '';
+    el.blocoEscolherEmailCopia.style.display = 'none';
+    el.blocoLoginNormal.style.display = '';
+    aplicarSessaoNoFormulario_(sessao);
+  } catch (err) {
+    console.error(err);
+    el.statusLogin.textContent = 'Erro ao salvar: ' + (err && err.message ? err.message : err);
+    el.statusLogin.className = 'status erro';
+  } finally {
+    el.btnSalvarEmailCopia.disabled = false;
   }
 });
 
@@ -1619,13 +1720,20 @@ el.btnSair.addEventListener('click', async () => {
 // sem rebuscar no servidor a cada mudança de filtro.
 let perfilDadosAtuais = null;
 let perfilRevisar_ = [];
+// RDOs que EU mandei pra revisão interna e ainda esperam um administrador
+// (04/08/2026, pedido do Paulo - quadro novo "Aguardando aprovação de um
+// responsável", visível pra qualquer perfil, principal beneficiário é o
+// elaborador). Vem junto na mesma chamada de meusRdos_ (sem round-trip
+// novo ao servidor) - ver [[project_rdo_app]].
+let perfilAguardandoRevisao_ = [];
 let perfilRascunhosRemotos_ = [];
-let categoriaAberta_ = null; // 'revisar' | 'aprovados' | 'sem-aprovacao' | 'rascunhos'
+let categoriaAberta_ = null; // 'revisar' | 'aprovados' | 'sem-aprovacao' | 'aguardando' | 'rascunhos'
 
 const TITULOS_CATEGORIA_PERFIL_ = {
   revisar: 'RDOs para revisar',
   aprovados: 'RDOs aprovados',
   'sem-aprovacao': 'RDOs sem aprovação do Cliente',
+  aguardando: 'Aguardando aprovação de um responsável',
   rascunhos: 'Meus rascunhos'
 };
 
@@ -1648,6 +1756,7 @@ function itensBrutosDaCategoriaPerfil_(categoria) {
     return [...perfilDadosAtuais.aprovados.filter(item => item.origem === 'direto'), ...perfilDadosAtuais.pendentes]
       .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
   }
+  if (categoria === 'aguardando') return perfilAguardandoRevisao_;
   if (categoria === 'rascunhos') return combinarRascunhos_(carregarRascunhosLocais_(), perfilRascunhosRemotos_);
   return [];
 }
@@ -1656,6 +1765,7 @@ function atualizarContadoresPerfil_() {
   el.qtdRevisar.textContent = String(perfilRevisar_.length);
   el.qtdAprovados.textContent = String(itensBrutosDaCategoriaPerfil_('aprovados').length);
   el.qtdSemAprovacao.textContent = String(itensBrutosDaCategoriaPerfil_('sem-aprovacao').length);
+  el.qtdAguardando.textContent = String(perfilAguardandoRevisao_.length);
   el.qtdRascunhos.textContent = String(itensBrutosDaCategoriaPerfil_('rascunhos').length);
 }
 
@@ -1692,6 +1802,7 @@ function renderizarListaPerfilAtual_() {
   filtrados.forEach(item => {
     let linha;
     if (categoriaAberta_ === 'revisar') linha = montarLinhaRevisar_(item);
+    else if (categoriaAberta_ === 'aguardando') linha = montarLinhaAguardando_(item);
     else if (categoriaAberta_ === 'rascunhos') linha = montarLinhaRascunho_(item);
     else if (item.origem) linha = montarLinhaAprovado_(item);
     else linha = montarLinhaPendente_(item);
@@ -1773,6 +1884,7 @@ el.btnLimparFiltrosPerfil.addEventListener('click', () => {
 el.quadRevisar.addEventListener('click', () => abrirCategoriaPerfil_('revisar'));
 el.quadAprovados.addEventListener('click', () => abrirCategoriaPerfil_('aprovados'));
 el.quadSemAprovacao.addEventListener('click', () => abrirCategoriaPerfil_('sem-aprovacao'));
+el.quadAguardando.addEventListener('click', () => abrirCategoriaPerfil_('aguardando'));
 el.quadRascunhos.addEventListener('click', () => abrirCategoriaPerfil_('rascunhos'));
 el.btnVoltarQuadrados.addEventListener('click', () => fecharCategoriaPerfil_());
 
@@ -1927,6 +2039,22 @@ function montarLinhaAprovado_(item) {
   return linha;
 }
 
+// Quadro "Aguardando aprovação de um responsável" (04/08/2026) - só
+// leitura, sem botão nenhum: o elaborador não tem nada pra fazer aqui a
+// não ser esperar um administrador abrir e revisar (quadro "RDOs para
+// revisar", do lado dele). Item vem de meusRdos_/aguardandoRevisaoInterna
+// (shape: cliente/obra/data/os/criadoEm - sem numero/token, porque ainda
+// não virou um RDO enviado de verdade).
+function montarLinhaAguardando_(item) {
+  const linha = document.createElement('div');
+  linha.className = 'linha-rdo-perfil aguardando';
+  const partes = [];
+  if (item.os) partes.push('OS ' + item.os);
+  partes.push(item.data || 'sem data');
+  linha.innerHTML = `<div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg><span>${item.obra || '(obra não preenchida)'}${item.cliente ? ' (' + item.cliente + ')' : ''} - ${partes.join(' · ')} - aguardando revisão de um administrador</span></div>`;
+  return linha;
+}
+
 function montarLinhaPendente_(item) {
   const linha = document.createElement('div');
   linha.className = 'linha-rdo-perfil pendente';
@@ -2033,6 +2161,7 @@ async function carregarPerfil_() {
     perfilDadosAtuais = { aprovados: respMeusRdos.aprovados, pendentes: respMeusRdos.pendentes };
     perfilRascunhosRemotos_ = respRascunhos.ok ? respRascunhos.rascunhos : [];
     perfilRevisar_ = respInternas.ok ? respInternas.pendentes : [];
+    perfilAguardandoRevisao_ = respMeusRdos.aguardandoRevisaoInterna || [];
 
     atualizarContadoresPerfil_();
     el.perfilCarregando.style.display = 'none';
@@ -2472,6 +2601,123 @@ let previewPdfOnlineAppFileNameAtual = null;
 // agendarFechamentoAutomaticoPreview_.
 let timerFecharPreviewAuto_ = null;
 
+// "Copiar Resumo do RDO" (04/08/2026, pedido do Paulo) - monta um texto
+// corrido pronto pra colar num grupo de WhatsApp, com tudo que dá pra
+// tirar do `state` no momento do envio (não depende do PDF/backend).
+// *asteriscos* viram negrito nativo do WhatsApp - aproveitado nos
+// títulos. Chamada com o `state` de ANTES do resetarParaProximoRdo_
+// (mesma lógica de previewPdfBase64/previewFileName, ver
+// enviarRdoAoBackend_ e o handler de btnConfirmarEnvio).
+function formatarDataResumoBR_(isoYyyyMmDd) {
+  if (!isoYyyyMmDd) return '(data não preenchida)';
+  const partes = isoYyyyMmDd.split('-');
+  return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : isoYyyyMmDd;
+}
+
+function resumirTempoResumo_(tempo) {
+  const turnos = [['manha', 'manhã'], ['tarde', 'tarde'], ['noite', 'noite']];
+  const partes = [];
+  turnos.forEach(([chave, rotulo]) => {
+    if (tempo.bom[chave]) partes.push('☀️ ' + rotulo);
+    if (tempo.chuva[chave]) partes.push('🌧️ ' + rotulo);
+  });
+  return partes.length ? partes.join(', ') : 'não informado';
+}
+
+function montarResumoTextoRdo_(s, numero) {
+  const linhas = [];
+  linhas.push(`📋 *RESUMO DO RDO nº ${numero}*`);
+  linhas.push(`🏗️ *Obra:* ${s.obra || ''}${s.contratante ? ' (' + s.contratante + ')' : ''}`);
+  if (s.frente) linhas.push(`📍 *Frente:* ${s.frente}`);
+  linhas.push(`📅 *Data:* ${formatarDataResumoBR_(s.data)}`);
+  if (s.os) linhas.push(`🔖 *OS:* ${s.os}`);
+  linhas.push(`🌤️ *Clima:* ${resumirTempoResumo_(s.tempo)}`);
+
+  const efetivoPreenchido = (s.efetivo || [])
+    .filter(i => i.descricao && i.descricao.trim() && i.quant !== '' && i.quant != null && Number(i.quant) > 0);
+  if (efetivoPreenchido.length) {
+    linhas.push('');
+    linhas.push('👷 *Efetivo:*');
+    efetivoPreenchido.forEach(i => linhas.push(`• ${i.descricao}: ${i.quant}`));
+  }
+
+  // equipamentos[0..11] = Equipamentos, [12..23] = Veículos (mesma
+  // divisão de excel-fill.js, ver preencherEfetivoEquipVeiculos_).
+  const todosEquip = s.equipamentos || [];
+  const equipPreenchido = todosEquip.slice(0, 12).filter(i => i.descricao && i.descricao.trim());
+  const veicPreenchido = todosEquip.slice(12, 24).filter(i => i.descricao && i.descricao.trim());
+  if (equipPreenchido.length || veicPreenchido.length) {
+    linhas.push('');
+    linhas.push('🚜 *Equipamentos/Veículos:*');
+    equipPreenchido.forEach(i => linhas.push(`• ${i.descricao}${i.quant ? ' (' + i.quant + ')' : ''}`));
+    veicPreenchido.forEach(i => linhas.push(`• ${i.descricao}${i.quant ? ' (' + i.quant + ')' : ''}`));
+  }
+
+  const ativContratada = (s.atividadesContratada || []).filter(a => a.discriminacao && a.discriminacao.trim());
+  if (ativContratada.length) {
+    linhas.push('');
+    linhas.push('✅ *Atividades executadas (Contratada):*');
+    ativContratada.forEach((a, i) => {
+      const horario = (a.inicio || a.fim) ? ` (${a.inicio || '?'}–${a.fim || '?'})` : '';
+      linhas.push(`${i + 1}. ${a.discriminacao}${horario}`);
+    });
+  }
+
+  const ativContratante = (s.atividadesContratante || []).filter(a => a.discriminacao && a.discriminacao.trim());
+  if (ativContratante.length) {
+    linhas.push('');
+    linhas.push('📌 *Atividades da Contratante:*');
+    ativContratante.forEach((a, i) => {
+      const horario = (a.inicio || a.fim) ? ` (${a.inicio || '?'}–${a.fim || '?'})` : '';
+      linhas.push(`${i + 1}. ${a.discriminacao}${horario}`);
+    });
+  }
+
+  if (s.observacoes && s.observacoes.trim()) {
+    linhas.push('');
+    linhas.push('📝 *Observações:*');
+    linhas.push(s.observacoes.trim());
+  }
+
+  linhas.push('');
+  linhas.push(`_Elaborado por ${s.assinaturaContratadaNome || '(não identificado)'}_`);
+
+  return linhas.join('\n');
+}
+
+// navigator.clipboard exige contexto seguro, mas o WebView do Capacitor
+// roda sob https://localhost/capacitor:// (conta como seguro) - funciona
+// sem plugin nativo nenhum, e por isso sai direto no próximo OTA (ver
+// [[feedback_capacitor_updater_ota]] - diferente de mexer em plugin
+// nativo, que exigiria gerar e reinstalar um .apk novo). Fallback com
+// textarea+execCommand só por segurança, pra WebView antigo/fora de
+// contexto seguro.
+async function copiarTexto_(texto) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    } catch (err) {
+      console.error('navigator.clipboard falhou, tentando fallback:', err);
+    }
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = texto;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let sucesso = false;
+  try {
+    sucesso = document.execCommand('copy');
+  } catch (err) {
+    console.error('Fallback de cópia também falhou:', err);
+  }
+  document.body.removeChild(textarea);
+  return sucesso;
+}
+
 // Mostra a contagem regressiva de 10s junto da mensagem de sucesso e
 // fecha a prévia sozinha no final, deixando o formulário (já resetado por
 // resetarParaProximoRdo_ antes disso) pronto pro próximo RDO sem precisar
@@ -2803,7 +3049,21 @@ async function atualizarPreviewInline_() {
 function atualizarBalaoSemAprovacao_() {
   const semAprovacao = !state.aprovacaoContratante;
   el.btnSemAprovacaoContratante.classList.toggle('marcado', semAprovacao);
+  // Trava o e-mail da Contratante nesse modo (04/08/2026, pedido do Paulo)
+  // - "gerar sem assinatura" significa que ninguém deve receber o RDO por
+  // e-mail ainda (falta colher a assinatura em papel); antes dava pra
+  // digitar um e-mail aqui mesmo nesse modo e o backend mandava pro
+  // Contratante do mesmo jeito (era tratado como CC "informativo", ver
+  // enviarRDO_ no Code.gs - que também parou de aceitar isso, ver lá).
+  // Desativa o campo e limpa qualquer valor deixado de uma tentativa
+  // anterior, pra não sobrar escondido atrás do campo cinza.
+  el.emailContratante.disabled = semAprovacao;
+  el.emailContratante.title = semAprovacao
+    ? 'Desativado no modo "sem aprovação da Contratante" - ninguém recebe o RDO por e-mail aqui.'
+    : '';
   if (semAprovacao) {
+    state.emailContratante = '';
+    el.emailContratante.value = '';
     const sessaoAtual = carregarSessaoUsuario_();
     const nome = (sessaoAtual && sessaoAtual.nome) || state.assinaturaContratadaNome || 'quem está enviando';
     el.avisoSemAprovacaoContratante.textContent = 'Eu, ' + nome + ', assumo a responsabilidade por ' +
@@ -2830,6 +3090,7 @@ el.btnGerar.addEventListener('click', async () => {
   el.btnGerar.disabled = true;
   el.btnConfirmarEnvio.disabled = true;
   el.btnCompartilhar.style.display = 'none';
+  el.btnCopiarResumo.style.display = 'none';
   mostrarStatus('');
   el.cartaoPreview.style.display = 'block';
   el.cartaoPreview.scrollIntoView({ behavior: 'smooth' });
@@ -3402,6 +3663,18 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     const { resp, pdfBase64, fileNameFinal } = await enviarRdoAoBackend_(state, previewNumeroAtual, revisaoInterna, true);
     previewPdfBase64 = pdfBase64;
     previewFileName = fileNameFinal;
+    // Resumo pro WhatsApp (04/08/2026) - monta ANTES do resetarParaProximoRdo_
+    // (mesma lógica de previewPdfBase64/previewFileName acima), senão o
+    // `state` já estaria limpo pro próximo RDO na hora de copiar.
+    const resumoTexto = montarResumoTextoRdo_(state, resp.numero);
+    el.btnCopiarResumo.style.display = 'block';
+    el.btnCopiarResumo.onclick = async () => {
+      const ok = await copiarTexto_(resumoTexto);
+      const textoOriginalBotao = el.btnCopiarResumo.textContent;
+      el.btnCopiarResumo.textContent = ok ? '✓ Copiado! Já pode colar no WhatsApp.' : 'Erro ao copiar - tente de novo';
+      if (!ok) RdoApi.logErro('copiar_resumo_rdo', 'copiarTexto_ retornou false');
+      setTimeout(() => { el.btnCopiarResumo.textContent = textoOriginalBotao; }, 2500);
+    };
 
     let mensagemSucesso;
     if (state.aprovacaoContratante) {

@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.11.1';
+const VERSAO_APP = 'BETA 0.12.0';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
@@ -466,8 +466,19 @@ const RdoApi = (function () {
   // Chamada uma única vez por usuário, só quando login() devolver
   // precisaTrocarSenha:true - troca a senha em texto puro pelo hash
   // definitivo e devolve o token de sessão, igual login() normal.
-  function trocarSenhaObrigatoria(login, senhaAntiga, novaSenha) {
-    return postJson_({ action: 'trocarSenhaObrigatoria', login, senhaAntiga, novaSenha, userAgent: navigator.userAgent });
+  // emailCopiaAtivo/emailCopiaEndereco (04/08/2026) - escolha opcional de
+  // receber cópia de cada RDO no e-mail pessoal, feita na mesma tela.
+  function trocarSenhaObrigatoria(login, senhaAntiga, novaSenha, emailCopiaAtivo, emailCopiaEndereco) {
+    return postJson_({ action: 'trocarSenhaObrigatoria', login, senhaAntiga, novaSenha, emailCopiaAtivo, emailCopiaEndereco, userAgent: navigator.userAgent });
+  }
+
+  // Tela standalone de escolha/troca do e-mail de cópia pessoal
+  // (04/08/2026) - usada por quem já tem sessão válida (login normal, sem
+  // precisar trocar senha) mas foi marcado com PedirEscolhaEmailCopia na
+  // planilha (ver login_ no Code.gs). ativo=false desativa e limpa o
+  // e-mail salvo.
+  function salvarPreferenciaEmailCopia(token, ativo, email) {
+    return postJson_({ action: 'salvarPreferenciaEmailCopia', token, ativo, email });
   }
 
   // Confere se o token de sessão salvo no aparelho ainda é válido e
@@ -546,7 +557,7 @@ const RdoApi = (function () {
   return {
     getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO, gerarLinkPreview,
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
-    buscarCliente, buscarNomeCliente, cadastrarCliente, login, trocarSenhaObrigatoria, validarSessao, logout,
+    buscarCliente, buscarNomeCliente, cadastrarCliente, login, trocarSenhaObrigatoria, salvarPreferenciaEmailCopia, validarSessao, logout,
     meusRdos, buscarPdfPorId, buscarXlsxPorId, reenviarLinkAprovacao, corrigirEmailAprovacao,
     salvarParaAprovacaoInterna, listarAprovacoesInternas, buscarAprovacaoInterna, salvarObrasFiltro,
     liberarRdoParaRevisao, enviarParaAprovacaoSemRevisao, definirCallbackSessaoInvalida,
