@@ -1854,14 +1854,20 @@ function montarLinhaUltimoRdo_(item) {
   const linha = document.createElement('div');
   linha.className = 'linha-rdo-dashboard';
   const aguardando = !item.origem;
+  // RDO superado (05/08/2026) - mesmo aviso do balão detalhado
+  // (montarLinhaAprovado_), sem espaço aqui pra mostrar as duas coisas -
+  // "Superado" importa mais que "Aprovado/Aguardando" nesse resumo curto.
+  const superado = Boolean(item.superadaPor);
+  const pillClasse = superado ? 'pill-superado' : (aguardando ? 'pill-aguardando-cliente' : 'pill-aprovado');
+  const pillTexto = superado ? 'Superado' : (aguardando ? 'Aguardando Cliente' : 'Aprovado');
   linha.innerHTML = `
-    <span class="ponto-status" style="background:${aguardando ? 'var(--alerta)' : 'var(--sucesso)'}"></span>
+    <span class="ponto-status" style="background:${superado ? 'var(--alerta)' : (aguardando ? 'var(--alerta)' : 'var(--sucesso)')}"></span>
     <div class="info-rdo-dashboard">
       <strong>${item.obra || '(obra não preenchida)'}</strong>
       <span>${item.cliente || ''}${item.elaborador ? ' · ' + item.elaborador : ''}</span>
     </div>
     <div class="meta-rdo-dashboard">
-      <span class="pill-status ${aguardando ? 'pill-aguardando-cliente' : 'pill-aprovado'}">${aguardando ? 'Aguardando Cliente' : 'Aprovado'}</span>
+      <span class="pill-status ${pillClasse}">${pillTexto}</span>
       <span class="data-rdo-dashboard">${formatarDataResumoBR_(item.data)}</span>
     </div>`;
   return linha;
@@ -2161,14 +2167,26 @@ function montarLinhaAprovado_(item) {
   const identificadorReabertura = item.origem === 'direto' ? item.pdfFileId : item.token;
   const mostrarReabrir = ehAdmin && identificadorReabertura;
   const mostrarEnviarSemRevisao = ehAdmin && item.origem === 'direto';
+  // RDO superado (05/08/2026, pedido do Paulo) - quando um administrador
+  // reabre este RDO pra revisão e reenvia, o backend marca ESTA linha com
+  // o número da revisão nova (superadaPor, ver marcarRdoSuperado_ no
+  // Code.gs). A partir daí só "Visualizar PDF" continua funcionando -
+  // "Reabrir para revisão"/"Enviar à Contratante" ficam cinza (o Code.gs
+  // já rejeita essas duas ações pra uma versão superada mesmo se alguém
+  // burlar o front-end - isso aqui é só a UI refletindo a mesma regra).
+  // "Compartilhar"/"Baixar .xlsx" desabilitados também, por pedido
+  // explícito ("a única opção possível deveria ser visualizar pdf").
+  const superado = Boolean(item.superadaPor);
+  if (superado) linha.classList.add('superado');
   linha.innerHTML = `
     <div class="info-rdo-perfil"><svg class="icone-linha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg><span>RDO nº ${item.numero} - ${item.data || ''}${item.elaborador ? ' - Elaborado por ' + item.elaborador : ''}</span></div>
+    ${superado ? `<span class="aviso-superado">RDO superado pela revisão nº ${item.superadaPor}</span>` : ''}
     <div class="botoes-rdo-perfil">
       <button type="button" class="botao-mini btn-ver-perfil">Visualizar PDF</button>
-      <button type="button" class="botao-mini btn-compartilhar-perfil">Compartilhar</button>
-      ${mostrarBotaoXlsx ? '<button type="button" class="botao-mini btn-baixar-xlsx-perfil">Baixar .xlsx</button>' : ''}
-      ${mostrarReabrir ? '<button type="button" class="botao-mini btn-reabrir-perfil">Reabrir para revisão</button>' : ''}
-      ${mostrarEnviarSemRevisao ? '<button type="button" class="botao-mini btn-enviar-sem-revisao-perfil">Enviar à Contratante para assinatura</button>' : ''}
+      <button type="button" class="botao-mini btn-compartilhar-perfil"${superado ? ' disabled' : ''}>Compartilhar</button>
+      ${mostrarBotaoXlsx ? `<button type="button" class="botao-mini btn-baixar-xlsx-perfil"${superado ? ' disabled' : ''}>Baixar .xlsx</button>` : ''}
+      ${mostrarReabrir ? `<button type="button" class="botao-mini btn-reabrir-perfil"${superado ? ' disabled' : ''}>Reabrir para revisão</button>` : ''}
+      ${mostrarEnviarSemRevisao ? `<button type="button" class="botao-mini btn-enviar-sem-revisao-perfil"${superado ? ' disabled' : ''}>Enviar à Contratante para assinatura</button>` : ''}
     </div>
     <div class="status status-linha-perfil"></div>`;
 

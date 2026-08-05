@@ -662,6 +662,7 @@ textarea { resize: vertical; overflow: hidden; }
 }
 .pill-status.pill-aprovado { background: var(--sucesso-claro); color: var(--sucesso); }
 .pill-status.pill-aguardando-cliente { background: var(--alerta-claro); color: var(--alerta); }
+.pill-status.pill-superado { background: var(--alerta-claro); color: var(--alerta); border: 1px solid var(--alerta); }
 .data-rdo-dashboard { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 4px; }
 
 .grafico-rdos-wrap { margin: 4px 0 10px; position: relative; }
@@ -1003,6 +1004,21 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-rdo-perfil.sem-assinatura .icone-linha { color: var(--alerta); }
 .linha-rdo-perfil.rascunho .icone-linha { color: var(--vinho); }
 .linha-rdo-perfil.aguardando .icone-linha { color: var(--dourado-escuro); }
+/* RDO superado por uma revisão mais nova (05/08/2026) - fundo levemente
+   tingido pra destacar na lista, sem apagar a legibilidade (só os
+   botões desabilitados é que ficam de fato cinza, ver .botao-mini:disabled). */
+.linha-rdo-perfil.superado { background: var(--alerta-claro); border-color: #F0DBAE; }
+.aviso-superado {
+  display: inline-block;
+  margin: -2px 0 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--alerta);
+  color: var(--alerta);
+  font-size: 11.5px;
+  font-weight: 700;
+}
 .linha-rdo-perfil .botoes-rdo-perfil {
   display: flex;
   gap: 6px;
