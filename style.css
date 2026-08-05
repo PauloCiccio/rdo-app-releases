@@ -273,6 +273,43 @@ textarea { resize: vertical; overflow: hidden; }
 .linha-atividade label { margin: 0 0 4px; }
 .linha-atividade textarea { min-height: 40px; }
 
+/* Ditado por voz (05/08/2026) - botão só aparece onde o navegador
+   suporta SpeechRecognition (ver configurarDitadoPorVoz_ em app.js, que
+   esconde com display:none quando não suporta - Safari/iOS não tem essa
+   API, mas lá o ditado nativo do teclado do sistema já resolve). */
+.campo-discriminacao-wrap { position: relative; }
+.campo-discriminacao-wrap textarea { padding-right: 42px; }
+.btn-ditado-voz {
+  position: absolute;
+  top: 7px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  color: var(--texto-suave);
+}
+.btn-ditado-voz svg { width: 16px; height: 16px; }
+.btn-ditado-voz:disabled { opacity: .5; cursor: not-allowed; }
+.btn-ditado-voz.gravando {
+  background: var(--erro);
+  border-color: var(--erro);
+  color: #fff;
+  animation: pulso-ditado-voz 1.2s ease-in-out infinite;
+}
+@keyframes pulso-ditado-voz {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(192,57,43,.45); }
+  50% { box-shadow: 0 0 0 7px rgba(192,57,43,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-ditado-voz.gravando { animation: none; }
+}
+
 .botao-secundario,
 .botao-principal {
   margin-bottom: 8px;

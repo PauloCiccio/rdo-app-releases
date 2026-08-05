@@ -772,8 +772,86 @@ function carimbarEditorSeMudou_(item, container) {
   }
 }
 
+// Ditado por voz na Discriminação das atividades (05/08/2026, pedido do
+// Paulo) - usa a Web Speech API do navegador (SpeechRecognition), que só
+// existe em Chrome/Edge/Android - Safari/iOS NÃO suporta (confirmado com
+// o Paulo: quer o botão mesmo assim, útil pra quem usa Android; no
+// iPhone o ditado nativo do teclado do próprio iOS já resolve, funciona
+// em QUALQUER campo de texto do app sem precisar de nada daqui). A
+// checagem de suporte esconde o botão inteiro onde não funciona, em vez
+// de deixar um botão quebrado/sem efeito na tela.
+const SpeechRecognitionCtor_ = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+// Só uma gravação por vez faz sentido (não dá pra falar em duas
+// atividades ao mesmo tempo) - pararDitadoAtivo_ garante isso e também
+// evita deixar o microfone "escutando" sozinho depois que a lista inteira
+// é recriada (+Adicionar/remover atividade chama renderizarListaAtividades
+// de novo, descartando os botões antigos).
+let pararDitadoAtivo_ = null;
+
+function configurarDitadoPorVoz_(botao, textarea) {
+  if (!SpeechRecognitionCtor_) { botao.style.display = 'none'; return; }
+
+  const recognition = new SpeechRecognitionCtor_();
+  recognition.lang = 'pt-BR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  let gravando = false;
+  let textoBase = '';
+
+  function parar_() {
+    if (!gravando) return;
+    gravando = false;
+    botao.classList.remove('gravando');
+    botao.setAttribute('aria-label', 'Ditar por voz');
+    if (pararDitadoAtivo_ === parar_) pararDitadoAtivo_ = null;
+    try { recognition.stop(); } catch (err) { /* já parado, ignora */ }
+  }
+
+  botao.addEventListener('click', () => {
+    if (gravando) { parar_(); return; }
+    if (pararDitadoAtivo_) pararDitadoAtivo_(); // só 1 microfone ativo por vez
+    textoBase = textarea.value;
+    gravando = true;
+    pararDitadoAtivo_ = parar_;
+    botao.classList.add('gravando');
+    botao.setAttribute('aria-label', 'Parar ditado');
+    try {
+      recognition.start();
+    } catch (err) {
+      parar_();
+    }
+  });
+
+  recognition.addEventListener('result', (e) => {
+    let final = '';
+    let interino = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const trecho = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += trecho;
+      else interino += trecho;
+    }
+    if (final) textoBase = (textoBase + ' ' + final).trim();
+    textarea.value = (textoBase + ' ' + interino).trim();
+    // Dispara o mesmo evento 'input' de sempre - reaproveita a checagem
+    // de limite de páginas, auto-grow e estimativa de linhas que o
+    // listener normal do campo já faz, sem duplicar nada aqui.
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  recognition.addEventListener('error', (e) => {
+    console.warn('Ditado por voz falhou:', e.error);
+    parar_();
+  });
+  // 'continuous' pode encerrar sozinho depois de uma pausa longa, mesmo
+  // sem erro - reflete no botão pra não ficar "gravando" fantasma.
+  recognition.addEventListener('end', () => { if (gravando) parar_(); });
+}
+
 function renderizarListaAtividades(cfg) {
   const { itens, container, elOrcamento, btnAdd, capacidade } = cfg;
+  if (pararDitadoAtivo_) pararDitadoAtivo_(); // a linha sendo recriada pode ser a que está gravando
   container.innerHTML = '';
 
   itens.forEach((item, i) => {
@@ -796,9 +874,16 @@ function renderizarListaAtividades(cfg) {
         </div>
       </div>
       <label>Discriminação da Atividade</label>
-      <textarea class="input-discriminacao auto-grow" rows="2" maxlength="600">${item.discriminacao || ''}</textarea>
+      <div class="campo-discriminacao-wrap">
+        <textarea class="input-discriminacao auto-grow" rows="2" maxlength="600">${item.discriminacao || ''}</textarea>
+        <button type="button" class="btn-ditado-voz" aria-label="Ditar por voz" title="Ditar por voz">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/><path d="M8 22h8"/></svg>
+        </button>
+      </div>
       <div class="linhas-estimadas"></div>`;
     container.appendChild(linha);
+
+    configurarDitadoPorVoz_(linha.querySelector('.btn-ditado-voz'), linha.querySelector('.input-discriminacao'));
 
     const elEstimativa = linha.querySelector('.linhas-estimadas');
     function atualizarEstimativa() {
