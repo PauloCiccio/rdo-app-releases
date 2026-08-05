@@ -484,17 +484,21 @@ function escolherAutocomplete_(valor) {
   input.value = valor;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
-  input.focus();
 }
 
-// mousedown/touchstart com preventDefault na LISTA (não no campo) - impede
-// o blur do campo de disparar antes do toque na opção terminar de
-// registrar (a ordem padrão do navegador é mousedown -> blur -> click, o
-// que fecharia a lista antes dela conseguir capturar a escolha). Precisa
-// dos dois eventos porque touchstart não vira mousedown de verdade no
-// Safari/iOS a tempo de evitar o blur só com um dos dois.
+// mousedown com preventDefault na LISTA (não no campo) - impede o blur do
+// campo de disparar antes do toque na opção terminar de registrar (a
+// ordem padrão do navegador é mousedown -> blur -> click, o que fecharia
+// a lista antes dela conseguir capturar a escolha). NÃO faz o mesmo com
+// touchstart (05/08/2026, bug real reportado pelo Paulo no iPhone: com
+// preventDefault no touchstart, o iOS trata QUALQUER toque na lista,
+// inclusive um arrasto pra rolar, como cancelado - a lista aparecia mas
+// "só os 3 primeiros itens, sem dar pra rolar"). Sem o preventDefault no
+// touch, o próprio atraso de 150ms no blur (ver configurarAutocompletePersonalizado_)
+// já é suficiente pra dar tempo do 'click' (disparado pelo navegador
+// depois de um toque sem arrastar, inclusive no Safari/iOS) rodar antes
+// da lista fechar.
 listaAutocomplete_.addEventListener('mousedown', e => e.preventDefault());
-listaAutocomplete_.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 listaAutocomplete_.addEventListener('click', e => {
   const li = e.target.closest('li');
   if (li) escolherAutocomplete_(li.textContent);

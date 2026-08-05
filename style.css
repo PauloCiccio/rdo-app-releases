@@ -1155,6 +1155,11 @@ img.iframe-visualizador-pdf {
   box-shadow: var(--sombra-flutuante);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* declara explicitamente que arrastar o dedo pra cima/baixo é rolagem
+     de verdade (05/08/2026) - reforça o fix do JS (não usar mais
+     preventDefault em touchstart), que corrigiu a lista aparecendo
+     "travada nos 3 primeiros itens, sem dar pra rolar" no iPhone. */
+  touch-action: pan-y;
 }
 .autocomplete-lista li {
   padding: 11px 12px;
