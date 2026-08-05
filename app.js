@@ -2760,13 +2760,24 @@ async function copiarTexto_(texto) {
 // pessoa clicar em "Cancelar / Editar" (fecharPreview_) ou tocar em
 // qualquer coisa no formulário (já resetado por resetarParaProximoRdo_
 // pro próximo RDO nesse momento) - ver listener delegado em el.formRdo.
+// Esconde "Confirmar e Enviar" (05/08/2026, bug real reportado pelo Paulo:
+// o RDO já tinha sido gerado/enviado - inclusive no modo "sem aprovação da
+// Contratante" - mas o botão continuava visível e reescrito com o rótulo
+// PADRÃO "ENVIAR À CONTRATANTE PARA APROVAÇÃO FINAL", porque
+// resetarParaProximoRdo_ já reseta state.aprovacaoContratante pro próximo
+// RDO e chama atualizarBalaoSemAprovacao_ de novo - fazia sentido sumir
+// sozinho quando a prévia fechava em 10s (antes de 0.12.1), mas ficou
+// exposto e sem sentido depois que a prévia passou a ficar aberta. Volta a
+// aparecer só quando uma prévia NOVA é gerada (ver btnGerar).
 function prepararFechamentoPreviewPosEnvio_(mensagemBase) {
   el.statusConfirmacao.textContent = mensagemBase;
   fecharPreviewAoEditarFormulario_ = true;
+  el.btnConfirmarEnvio.style.display = 'none';
 }
 
 function fecharPreview_() {
   fecharPreviewAoEditarFormulario_ = false;
+  el.btnConfirmarEnvio.style.display = '';
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
@@ -2930,8 +2941,10 @@ async function resetarParaProximoRdo_() {
 async function atualizarPreviewInline_() {
   if (el.cartaoPreview.style.display !== 'block') return; // só atualiza se a prévia já estiver aberta
   // Gerando uma prévia nova de propósito (pós-envio anterior) - não é mais
-  // o caso de "fechar sozinho ao editar" (ver prepararFechamentoPreviewPosEnvio_).
+  // o caso de "fechar sozinho ao editar" nem de esconder "Confirmar e
+  // Enviar" (ver prepararFechamentoPreviewPosEnvio_).
   fecharPreviewAoEditarFormulario_ = false;
+  el.btnConfirmarEnvio.style.display = '';
   if (atualizandoPreview_) return; // já tem uma atualização rodando, não empilha outra
   const erro = validarParaPreview_();
   if (erro) {
