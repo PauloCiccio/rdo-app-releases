@@ -132,15 +132,24 @@
     <label for="campo-login-usuario">Usuário</label>
     <input type="text" id="campo-login-usuario" autocomplete="username" autocapitalize="off" autocorrect="off">
     <label for="campo-senha-usuario">Senha</label>
-    <input type="password" id="campo-senha-usuario" autocomplete="current-password">
+    <div class="campo-senha-com-olho">
+      <input type="password" id="campo-senha-usuario" autocomplete="current-password">
+      <button type="button" class="botao-mostrar-senha" data-alvo="campo-senha-usuario" aria-label="Mostrar senha" aria-pressed="false"></button>
+    </div>
     <button type="button" id="btn-entrar" class="botao-principal">Entrar</button>
   </div>
   <div id="bloco-trocar-senha" style="display:none;">
     <p>Por segurança, defina uma senha nova antes de continuar (só precisa fazer isso uma vez).</p>
     <label for="campo-nova-senha">Nova senha (mínimo 8 caracteres)</label>
-    <input type="password" id="campo-nova-senha" autocomplete="new-password">
+    <div class="campo-senha-com-olho">
+      <input type="password" id="campo-nova-senha" autocomplete="new-password">
+      <button type="button" class="botao-mostrar-senha" data-alvo="campo-nova-senha" aria-label="Mostrar senha" aria-pressed="false"></button>
+    </div>
     <label for="campo-nova-senha-confirmar">Confirme a nova senha</label>
-    <input type="password" id="campo-nova-senha-confirmar" autocomplete="new-password">
+    <div class="campo-senha-com-olho">
+      <input type="password" id="campo-nova-senha-confirmar" autocomplete="new-password">
+      <button type="button" class="botao-mostrar-senha" data-alvo="campo-nova-senha-confirmar" aria-label="Mostrar senha" aria-pressed="false"></button>
+    </div>
     <button type="button" id="btn-balao-email-copia-senha" class="balao-opcao">
       Quero receber cópia de cada RDO que eu fizer no meu e-mail
     </button>

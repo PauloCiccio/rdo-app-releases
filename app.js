@@ -895,6 +895,9 @@ function carregarEstadoEmAndamento_() {
   el.formRdo.addEventListener(evento, (e) => {
     if (e.target.closest('summary')) return; // abrir/fechar seção não edita nada
     agendarSalvarEstadoEmAndamento_();
+    // Fecha a prévia pós-envio (ver prepararFechamentoPreviewPosEnvio_) assim
+    // que a pessoa começa a mexer no formulário já resetado pro próximo RDO.
+    if (fecharPreviewAoEditarFormulario_) fecharPreview_();
   });
 });
 
@@ -1535,6 +1538,22 @@ function configurarBalaoEmailCopia_(btnBalao, blocoCampo, campoEmail) {
 }
 configurarBalaoEmailCopia_(el.btnBalaoEmailCopiaSenha, el.blocoCampoEmailCopiaSenha, el.campoEmailCopiaSenha);
 configurarBalaoEmailCopia_(el.btnBalaoEmailCopiaStandalone, el.blocoCampoEmailCopiaStandalone, el.campoEmailCopiaStandalone);
+
+// Ícone de olho pra mostrar/ocultar senha (05/08/2026) - genérico, cobre
+// os 3 campos de senha do login (`.botao-mostrar-senha` + data-alvo).
+const SVG_OLHO_ABERTO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const SVG_OLHO_FECHADO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.6 18.6 0 0 1 4.22-5.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+document.querySelectorAll('.botao-mostrar-senha').forEach((botao) => {
+  const campo = document.getElementById(botao.dataset.alvo);
+  botao.innerHTML = SVG_OLHO_ABERTO;
+  botao.addEventListener('click', () => {
+    const mostrando = campo.type === 'text';
+    campo.type = mostrando ? 'password' : 'text';
+    botao.innerHTML = mostrando ? SVG_OLHO_ABERTO : SVG_OLHO_FECHADO;
+    botao.setAttribute('aria-pressed', String(!mostrando));
+    botao.setAttribute('aria-label', mostrando ? 'Mostrar senha' : 'Ocultar senha');
+  });
+});
 
 el.btnEntrar.addEventListener('click', async () => {
   const login = el.loginUsuario.value.trim();
@@ -2350,24 +2369,22 @@ async function abrirRdoParaRevisao_(origem, identificador) {
   }
 }
 
-// Trava (readonly/disabled) todos os campos de identificação/condições/
-// efetivo/atividades-Contratante do RDO carregado pra revisão - um
-// administrador comum só pode ACRESCENTAR atividades da Contratada (nunca
-// editar o que o elaborador escreveu); admin_master pode editar qualquer
-// coisa (bypass total). A seção 5 (assinaturas/envio) e a lista de
-// atividades da Contratada ficam sempre liberadas (é o único lugar onde um
-// administrador comum pode agir).
+// Trava (readonly/disabled) só os 3 campos que amarram o RDO ao registro
+// original (Contratante/Obra/Serviço) do RDO carregado pra revisão -
+// admin_master pode editar qualquer coisa (bypass total). Revisado em
+// 05/08/2026 (pedido do Paulo: administrador comum revisando só conseguia
+// mexer na lista de atividades da Contratada e na seção de assinaturas -
+// "precisa ter como revisar tudo menos a parte de contratante até
+// serviço") - antes disso, TODO o formulário ficava travado pra
+// administrador comum, exceto essas duas áreas.
+const IDS_TRAVADOS_REVISAO_INTERNA_ = ['campo-contratante', 'campo-obra', 'campo-servico'];
 function aplicarTravamentoRevisaoInterna_(travar, perfil) {
   const bypassTotal = perfil === 'admin_master';
   const form = el.formRdo;
   if (!form) return;
 
   form.querySelectorAll('input, select, textarea, button').forEach(campo => {
-    if (!travar || bypassTotal) { campo.disabled = false; return; }
-    if (campo.closest('#lista-atividades-contratada')) return; // linhas já colocadas - ver trava por linha abaixo
-    if (campo.id === 'btn-add-contratada') return;
-    if (campo.closest('#secao-assinaturas-envio')) return;
-    campo.disabled = true;
+    campo.disabled = travar && !bypassTotal && IDS_TRAVADOS_REVISAO_INTERNA_.includes(campo.id);
   });
 
   // Dentro da lista da Contratada: um administrador comum PODE editar o
@@ -2376,14 +2393,13 @@ function aplicarTravamentoRevisaoInterna_(travar, perfil) {
   // fica registrada via carimbarEditorSeMudou_, não precisa travar o
   // campo pra isso) - só não pode REMOVER a linha inteira (uma remoção
   // não tem como ser atribuída a ninguém, ao contrário de uma edição).
-  if (travar && !bypassTotal) {
-    document.querySelectorAll('#lista-atividades-contratada .linha-atividade').forEach((linha, i) => {
-      const item = state.atividadesContratada[i];
-      if (!item || !item.autor) return; // linha nova, ainda sem autor - sem restrição nenhuma
-      const btnRemover = linha.querySelector('.btn-remover-atividade');
-      if (btnRemover) btnRemover.style.display = 'none';
-    });
-  }
+  document.querySelectorAll('#lista-atividades-contratada .linha-atividade').forEach((linha, i) => {
+    const item = state.atividadesContratada[i];
+    const btnRemover = linha.querySelector('.btn-remover-atividade');
+    if (!btnRemover) return;
+    const esconder = travar && !bypassTotal && item && item.autor;
+    btnRemover.style.display = esconder ? 'none' : '';
+  });
 }
 
 el.abaRdo.addEventListener('click', () => mostrarAba_('rdo'));
@@ -2595,11 +2611,16 @@ let previewObjectUrlAtual_ = null;
 // mostrado embutido em navegador de verdade (ver atualizarPreviewInline_).
 let previewPdfOnlineAppAtual = null;
 let previewPdfOnlineAppFileNameAtual = null;
-// Fechamento automático da prévia depois de um envio concluído (16/07/2026,
-// pedido do Paulo: a prévia ficava aberta indefinidamente depois de
-// enviar, precisando fechar na mão pra começar o próximo RDO) - ver
-// agendarFechamentoAutomaticoPreview_.
-let timerFecharPreviewAuto_ = null;
+// Fechamento da prévia depois de um envio concluído (16/07/2026, pedido do
+// Paulo: a prévia ficava aberta indefinidamente depois de enviar - criada
+// contagem de 10s pra fechar sozinha). Revisado em 05/08/2026 (novo pedido
+// do Paulo: a contagem fixa fechava rápido demais pra quem ainda queria
+// ler a mensagem) - agora fica aberta até a pessoa clicar em "Cancelar /
+// Editar" (fecharPreview_, já existia) OU começar a mexer no formulário
+// (já resetado por resetarParaProximoRdo_ pro próximo RDO nesse momento) -
+// ver prepararFechamentoPreviewPosEnvio_ e o listener delegado em
+// el.formRdo mais abaixo.
+let fecharPreviewAoEditarFormulario_ = false;
 
 // "Copiar Resumo do RDO" (04/08/2026, pedido do Paulo) - monta um texto
 // corrido pronto pra colar num grupo de WhatsApp, com tudo que dá pra
@@ -2624,14 +2645,29 @@ function resumirTempoResumo_(tempo) {
   return partes.length ? partes.join(', ') : 'não informado';
 }
 
+// Ordem/formato revisados em 05/08/2026 (pedido do Paulo, pra bater com a
+// ordem/nomenclatura do RDO de verdade): OS antes de Obra; Contratante,
+// Obra, Objeto do Contrato e Local nessa ordem fixa; Observações logo
+// depois do Clima (mesmo campo único de "Observações do dia" do
+// formulário, que fica na mesma seção 2 "Condições do Dia" - por isso
+// entra aqui, não separado no fim) com aviso explícito quando vazio, em
+// vez de sumir a linha; Equipamentos/Veículos com "Nome: quantidade" igual
+// o Efetivo (sem parênteses); e as duas listas de atividades renomeadas
+// pra "Discriminação das atividades" (nome da coluna no RDO de verdade,
+// ver corrigirCabecalhoHorario_ em excel-fill.js) com horário ANTES da
+// discriminação, e só a discriminação quando não há horário preenchido.
 function montarResumoTextoRdo_(s, numero) {
   const linhas = [];
   linhas.push(`📋 *RESUMO DO RDO nº ${numero}*`);
-  linhas.push(`🏗️ *Obra:* ${s.obra || ''}${s.contratante ? ' (' + s.contratante + ')' : ''}`);
-  if (s.frente) linhas.push(`📍 *Frente:* ${s.frente}`);
   linhas.push(`📅 *Data:* ${formatarDataResumoBR_(s.data)}`);
   if (s.os) linhas.push(`🔖 *OS:* ${s.os}`);
+  linhas.push(`🏢 *Contratante:* ${s.contratante || ''}`);
+  linhas.push(`🏗️ *Obra:* ${s.obra || ''}`);
+  linhas.push(`📄 *Objeto do Contrato:* ${s.objetoContrato || ''}`);
+  linhas.push(`📍 *Local:* ${s.local || ''}`);
+  if (s.frente) linhas.push(`📍 *Frente:* ${s.frente}`);
   linhas.push(`🌤️ *Clima:* ${resumirTempoResumo_(s.tempo)}`);
+  linhas.push(`📝 *Observações:* ${s.observacoes && s.observacoes.trim() ? s.observacoes.trim() : 'Sem observações.'}`);
 
   const efetivoPreenchido = (s.efetivo || [])
     .filter(i => i.descricao && i.descricao.trim() && i.quant !== '' && i.quant != null && Number(i.quant) > 0);
@@ -2649,34 +2685,28 @@ function montarResumoTextoRdo_(s, numero) {
   if (equipPreenchido.length || veicPreenchido.length) {
     linhas.push('');
     linhas.push('🚜 *Equipamentos/Veículos:*');
-    equipPreenchido.forEach(i => linhas.push(`• ${i.descricao}${i.quant ? ' (' + i.quant + ')' : ''}`));
-    veicPreenchido.forEach(i => linhas.push(`• ${i.descricao}${i.quant ? ' (' + i.quant + ')' : ''}`));
+    equipPreenchido.forEach(i => linhas.push(`• ${i.descricao}${i.quant ? ': ' + i.quant : ''}`));
+    veicPreenchido.forEach(i => linhas.push(`• ${i.descricao}${i.quant ? ': ' + i.quant : ''}`));
   }
 
   const ativContratada = (s.atividadesContratada || []).filter(a => a.discriminacao && a.discriminacao.trim());
   if (ativContratada.length) {
     linhas.push('');
-    linhas.push('✅ *Atividades executadas (Contratada):*');
+    linhas.push('✅ *Discriminação das atividades (Contratada):*');
     ativContratada.forEach((a, i) => {
-      const horario = (a.inicio || a.fim) ? ` (${a.inicio || '?'}–${a.fim || '?'})` : '';
-      linhas.push(`${i + 1}. ${a.discriminacao}${horario}`);
+      const horario = (a.inicio || a.fim) ? `${a.inicio || '?'}–${a.fim || '?'} - ` : '';
+      linhas.push(`${i + 1}. ${horario}${a.discriminacao}`);
     });
   }
 
   const ativContratante = (s.atividadesContratante || []).filter(a => a.discriminacao && a.discriminacao.trim());
   if (ativContratante.length) {
     linhas.push('');
-    linhas.push('📌 *Atividades da Contratante:*');
+    linhas.push('📌 *Discriminação das atividades (Contratante):*');
     ativContratante.forEach((a, i) => {
-      const horario = (a.inicio || a.fim) ? ` (${a.inicio || '?'}–${a.fim || '?'})` : '';
-      linhas.push(`${i + 1}. ${a.discriminacao}${horario}`);
+      const horario = (a.inicio || a.fim) ? `${a.inicio || '?'}–${a.fim || '?'} - ` : '';
+      linhas.push(`${i + 1}. ${horario}${a.discriminacao}`);
     });
-  }
-
-  if (s.observacoes && s.observacoes.trim()) {
-    linhas.push('');
-    linhas.push('📝 *Observações:*');
-    linhas.push(s.observacoes.trim());
   }
 
   linhas.push('');
@@ -2718,40 +2748,17 @@ async function copiarTexto_(texto) {
   return sucesso;
 }
 
-// Mostra a contagem regressiva de 10s junto da mensagem de sucesso e
-// fecha a prévia sozinha no final, deixando o formulário (já resetado por
-// resetarParaProximoRdo_ antes disso) pronto pro próximo RDO sem precisar
-// fechar na mão. Cancela sozinha se a prévia já tiver sido fechada por
-// outro motivo antes de completar (ver fecharPreview_/
-// atualizarPreviewInline_).
-function agendarFechamentoAutomaticoPreview_(mensagemBase) {
-  if (timerFecharPreviewAuto_) clearInterval(timerFecharPreviewAuto_);
-  let segundosRestantes = 10;
-  const classeAtual = el.statusConfirmacao.className;
-  el.statusConfirmacao.textContent = `${mensagemBase} Fechando em ${segundosRestantes}s...`;
-  timerFecharPreviewAuto_ = setInterval(() => {
-    if (el.cartaoPreview.style.display === 'none') {
-      clearInterval(timerFecharPreviewAuto_);
-      timerFecharPreviewAuto_ = null;
-      return;
-    }
-    segundosRestantes--;
-    if (segundosRestantes <= 0) {
-      clearInterval(timerFecharPreviewAuto_);
-      timerFecharPreviewAuto_ = null;
-      fecharPreview_();
-      return;
-    }
-    el.statusConfirmacao.textContent = `${mensagemBase} Fechando em ${segundosRestantes}s...`;
-    el.statusConfirmacao.className = classeAtual;
-  }, 1000);
+// Mostra a mensagem de sucesso e deixa a prévia aberta - fecha só quando a
+// pessoa clicar em "Cancelar / Editar" (fecharPreview_) ou tocar em
+// qualquer coisa no formulário (já resetado por resetarParaProximoRdo_
+// pro próximo RDO nesse momento) - ver listener delegado em el.formRdo.
+function prepararFechamentoPreviewPosEnvio_(mensagemBase) {
+  el.statusConfirmacao.textContent = mensagemBase;
+  fecharPreviewAoEditarFormulario_ = true;
 }
 
 function fecharPreview_() {
-  if (timerFecharPreviewAuto_) {
-    clearInterval(timerFecharPreviewAuto_);
-    timerFecharPreviewAuto_ = null;
-  }
+  fecharPreviewAoEditarFormulario_ = false;
   el.cartaoPreview.style.display = 'none';
   el.wrapVisualizadorApp.style.display = 'none';
   el.visualizadorApp.src = '';
@@ -2914,12 +2921,9 @@ async function resetarParaProximoRdo_() {
 // editar algo entre pré-visualizar e confirmar.
 async function atualizarPreviewInline_() {
   if (el.cartaoPreview.style.display !== 'block') return; // só atualiza se a prévia já estiver aberta
-  // Editou algo com o fechamento automático (pós-envio) ainda contando -
-  // cancela, a pessoa já está mexendo de novo, não faz sentido fechar sozinho.
-  if (timerFecharPreviewAuto_) {
-    clearInterval(timerFecharPreviewAuto_);
-    timerFecharPreviewAuto_ = null;
-  }
+  // Gerando uma prévia nova de propósito (pós-envio anterior) - não é mais
+  // o caso de "fechar sozinho ao editar" (ver prepararFechamentoPreviewPosEnvio_).
+  fecharPreviewAoEditarFormulario_ = false;
   if (atualizandoPreview_) return; // já tem uma atualização rodando, não empilha outra
   const erro = validarParaPreview_();
   if (erro) {
@@ -3590,7 +3594,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       if (!resp.ok) throw new Error(resp.erro || 'Não consegui salvar.');
       el.statusConfirmacao.className = 'status sucesso';
       await resetarParaProximoRdo_();
-      agendarFechamentoAutomaticoPreview_('RDO salvo! Um administrador vai revisar e enviar pro Contratante.');
+      prepararFechamentoPreviewPosEnvio_('RDO salvo! Um administrador vai revisar e enviar pro Contratante.');
       return;
     }
 
@@ -3620,7 +3624,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
 
       el.statusConfirmacao.className = 'status sucesso';
       await resetarParaProximoRdo_();
-      agendarFechamentoAutomaticoPreview_('Sem internet - RDO salvo no aparelho. Será enviado sozinho assim que a conexão voltar.');
+      prepararFechamentoPreviewPosEnvio_('Sem internet - RDO salvo no aparelho. Será enviado sozinho assim que a conexão voltar.');
       return;
     }
 
@@ -3699,7 +3703,7 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
     }
 
     await resetarParaProximoRdo_();
-    agendarFechamentoAutomaticoPreview_(mensagemSucesso);
+    prepararFechamentoPreviewPosEnvio_(mensagemSucesso);
   } catch (err) {
     console.error(err);
     el.statusConfirmacao.textContent = 'Erro ao enviar o RDO: ' + err.message;
