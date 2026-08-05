@@ -21,7 +21,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYyo1aUt0NdsHs
 // manualmente a cada release (o mesmo valor deve ser espelhado em
 // APP_VERSAO_ATUAL no Config.gs do backend, usado pela atualização
 // automática pra saber se tem versão nova pra baixar).
-const VERSAO_APP = 'BETA 0.14.2';
+const VERSAO_APP = 'BETA 0.14.3';
 
 // Cópia da lista inicial (obras ativas/recentes, OS 1294-1351, extraídas de
 // "Lista de serviços (OS).xls") embutida como fallback: usada enquanto
@@ -285,6 +285,26 @@ const RdoApi = (function () {
 
   function getVeiculos() {
     return buscarListaSimples_('veiculos', CACHE_KEY_VEICULOS, VEICULOS_FALLBACK);
+  }
+
+  // Leitura SÍNCRONA do cache local, sem tocar rede (05/08/2026, pedido
+  // do Paulo: no 1º acesso do dia/aparelho, antes do cache existir, dava
+  // um delay grande entre tocar um campo e a lista de sugestão aparecer -
+  // getObras()/getEquipamentos()/getVeiculos() sempre esperam a resposta
+  // do Apps Script primeiro, mesmo quando já existe um cache local usável
+  // pra mostrar na hora). Usado por carregarObras_()/
+  // carregarEquipamentosVeiculos_() em app.js pra popular a lista de
+  // sugestão IMEDIATAMENTE com o que já tem salvo, sem esperar a rede -
+  // a busca de verdade continua rodando em paralelo e atualiza a lista
+  // quando (se) a resposta chegar.
+  function getObrasCache() {
+    return obrasDoCache_();
+  }
+  function getEquipamentosCache() {
+    return listaDoCache_(CACHE_KEY_EQUIPAMENTOS);
+  }
+  function getVeiculosCache() {
+    return listaDoCache_(CACHE_KEY_VEICULOS);
   }
 
   // Mensagens EXATAS que autenticarPorToken_/validarSessao_ (Code.gs)
@@ -555,7 +575,8 @@ const RdoApi = (function () {
   }
 
   return {
-    getObras, getEquipamentos, getVeiculos, reservarNumero, enviarRDO, previsualizarRDO, gerarLinkPreview,
+    getObras, getEquipamentos, getVeiculos, getObrasCache, getEquipamentosCache, getVeiculosCache,
+    reservarNumero, enviarRDO, previsualizarRDO, gerarLinkPreview,
     getVersaoApp, logErro, enviarParaAprovacao, buscarAprovacao, finalizarAprovacao,
     buscarCliente, buscarNomeCliente, cadastrarCliente, login, trocarSenhaObrigatoria, salvarPreferenciaEmailCopia, validarSessao, logout,
     meusRdos, buscarPdfPorId, buscarXlsxPorId, reenviarLinkAprovacao, corrigirEmailAprovacao,

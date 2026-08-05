@@ -410,14 +410,15 @@ const el = {
 //
 // REGISTRO_LISTAS_CUSTOM_ guarda as opções de cada lista por um ID de
 // string (ex: 'dl-obra') em vez de um <datalist> do DOM - preencherDatalist
-// só grava nesse registro; se a lista atualizada é a que está aberta na
-// hora (ex: Equipamentos chega do backend com o campo já focado),
-// re-renderiza na hora.
+// só grava nesse registro; se a lista atualizada é a do campo com foco
+// AGORA, re-renderiza na hora (respeitando o texto já digitado, se
+// houver, igual o listener de 'input' faz).
 const REGISTRO_LISTAS_CUSTOM_ = {};
 function preencherDatalist(listaId, opcoes) {
   REGISTRO_LISTAS_CUSTOM_[listaId] = opcoes;
-  if (inputAutocompleteAtivo_ && inputAutocompleteAtivo_.dataset.listaId === listaId) {
-    renderizarOpcoesAutocomplete_(opcoes);
+  if (inputFocadoAutocomplete_ && inputFocadoAutocomplete_.dataset.listaId === listaId) {
+    const termo = inputFocadoAutocomplete_.value.trim().toLowerCase();
+    renderizarOpcoesAutocomplete_(termo ? opcoes.filter(o => o.toLowerCase().includes(termo)) : opcoes);
   }
 }
 
@@ -426,14 +427,23 @@ listaAutocomplete_.className = 'autocomplete-lista';
 listaAutocomplete_.setAttribute('role', 'listbox');
 document.body.appendChild(listaAutocomplete_);
 
-let inputAutocompleteAtivo_ = null;
+// inputFocadoAutocomplete_ (QUAL campo está com foco) é INDEPENDENTE de
+// "a lista está visível agora" (05/08/2026, bug real: com o cache-first
+// de carregarObras_/carregarEquipamentosVeiculos_, é comum o campo ser
+// focado ANTES da lista de opções existir - REGISTRO_LISTAS_CUSTOM_[id]
+// ainda vazio - fechando a lista visualmente; se essa variável fosse
+// zerada junto, quando os dados chegassem da rede alguns segundos depois
+// preencherDatalist não teria mais como saber que ESTE campo continua
+// focado esperando, e a lista nunca reabriria sozinha). Só troca em
+// foco/blur de verdade - nunca só por falta de opções pra mostrar.
+let inputFocadoAutocomplete_ = null;
 let indiceAtivoAutocomplete_ = -1;
+let ignorarProximoInputAutocomplete_ = false;
 
 function fecharAutocomplete_() {
   listaAutocomplete_.style.display = 'none';
   listaAutocomplete_.innerHTML = '';
-  if (inputAutocompleteAtivo_) inputAutocompleteAtivo_.setAttribute('aria-expanded', 'false');
-  inputAutocompleteAtivo_ = null;
+  if (inputFocadoAutocomplete_) inputFocadoAutocomplete_.setAttribute('aria-expanded', 'false');
   indiceAtivoAutocomplete_ = -1;
 }
 
@@ -452,10 +462,10 @@ function fecharAutocomplete_() {
 // não só "menos que em cima". GAP maior (8px) que antes, pra ficar
 // visualmente separada do campo, não colada.
 function posicionarAutocomplete_() {
-  if (!inputAutocompleteAtivo_) return;
+  if (!inputFocadoAutocomplete_ || listaAutocomplete_.style.display === 'none') return;
   const GAP = 8;
   const alturaVisivel = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  const r = inputAutocompleteAtivo_.getBoundingClientRect();
+  const r = inputFocadoAutocomplete_.getBoundingClientRect();
   const espacoAbaixo = alturaVisivel - r.bottom;
   const espacoAcima = r.top;
   const paraCima = espacoAbaixo < 90 && espacoAcima > espacoAbaixo;
@@ -472,11 +482,19 @@ function posicionarAutocomplete_() {
   }
 }
 
+// Só ESCONDE a lista quando não há opções (campo focado mas ainda sem
+// dado - típico logo após o foco, antes da rede/cache responder) - não
+// mexe em inputFocadoAutocomplete_, ver comentário grande acima dele.
 function renderizarOpcoesAutocomplete_(opcoes) {
-  if (!inputAutocompleteAtivo_ || !opcoes.length) { fecharAutocomplete_(); return; }
+  if (!inputFocadoAutocomplete_ || !opcoes.length) {
+    listaAutocomplete_.style.display = 'none';
+    listaAutocomplete_.innerHTML = '';
+    indiceAtivoAutocomplete_ = -1;
+    return;
+  }
   listaAutocomplete_.innerHTML = opcoes.map(o => `<li role="option">${o}</li>`).join('');
   listaAutocomplete_.style.display = 'block';
-  inputAutocompleteAtivo_.setAttribute('aria-expanded', 'true');
+  inputFocadoAutocomplete_.setAttribute('aria-expanded', 'true');
   indiceAtivoAutocomplete_ = -1;
   posicionarAutocomplete_();
 }
@@ -487,10 +505,15 @@ function atualizarItemAtivoAutocomplete_(itens) {
 }
 
 function escolherAutocomplete_(valor) {
-  const input = inputAutocompleteAtivo_;
-  fecharAutocomplete_();
+  const input = inputFocadoAutocomplete_;
   if (!input) return;
+  fecharAutocomplete_();
   input.value = valor;
+  // Dispara 'input'/'change' de verdade (outros listeners do campo, tipo
+  // state.contratante = ..., dependem disso) mas sem deixar ISSO reabrir
+  // a lista filtrada pelo valor que acabou de ser escolhido - ver o
+  // listener de 'input' em configurarAutocompletePersonalizado_.
+  ignorarProximoInputAutocomplete_ = true;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
 }
@@ -532,22 +555,27 @@ function configurarAutocompletePersonalizado_(input, listaId) {
   // Foco mostra a lista INTEIRA, mesmo com o campo já preenchido (pedido
   // original do Paulo, 10/07: linhas fixas do M.O.D. tipo "Engenheiro"
   // também precisam mostrar a lista completa ao tocar, não só as que
-  // "batem" com o texto atual) - digitar depois é que filtra.
+  // "batem" com o texto atual) - digitar depois é que filtra. Se
+  // REGISTRO_LISTAS_CUSTOM_[listaId] ainda não existe (cache/rede não
+  // chegaram) simplesmente não mostra nada por enquanto -
+  // preencherDatalist reabre sozinho assim que o dado chegar, porque
+  // inputFocadoAutocomplete_ continua marcado neste campo.
   input.addEventListener('focus', () => {
-    inputAutocompleteAtivo_ = input;
+    inputFocadoAutocomplete_ = input;
     renderizarOpcoesAutocomplete_(REGISTRO_LISTAS_CUSTOM_[listaId] || []);
   });
   input.addEventListener('input', () => {
-    if (inputAutocompleteAtivo_ !== input) return;
+    if (ignorarProximoInputAutocomplete_) { ignorarProximoInputAutocomplete_ = false; return; }
+    if (inputFocadoAutocomplete_ !== input) return;
     const termo = input.value.trim().toLowerCase();
     const todas = REGISTRO_LISTAS_CUSTOM_[listaId] || [];
     renderizarOpcoesAutocomplete_(termo ? todas.filter(o => o.toLowerCase().includes(termo)) : todas);
   });
   input.addEventListener('blur', () => {
-    setTimeout(() => { if (inputAutocompleteAtivo_ === input) fecharAutocomplete_(); }, 150);
+    setTimeout(() => { if (inputFocadoAutocomplete_ === input) { inputFocadoAutocomplete_ = null; fecharAutocomplete_(); } }, 150);
   });
   input.addEventListener('keydown', (e) => {
-    if (inputAutocompleteAtivo_ !== input) return;
+    if (inputFocadoAutocomplete_ !== input) return;
     const itens = [...listaAutocomplete_.querySelectorAll('li')];
     if (!itens.length) return;
     if (e.key === 'ArrowDown') {
@@ -1467,19 +1495,36 @@ function mostrarAba_(aba) {
 // constava na lista ainda.
 // ---------------------------------------------------------------------------
 
-async function carregarObras() {
-  try {
-    obrasDisponiveis = await RdoApi.getObras();
-  } catch (err) {
-    mostrarStatus('Não foi possível carregar a lista de obras (sem conexão e sem cache local).', 'erro');
-    obrasDisponiveis = [];
-  }
-  // linhas sem obra preenchida (planilha mal formatada/não dividida em
-  // colunas) são ignoradas aqui pra não quebrar a lista - mas não bloqueiam
-  // o preenchimento manual, já que os campos aceitam texto livre.
-  obrasDisponiveis = obrasDisponiveis.filter(o => o.cliente && o.obra);
+// linhas sem obra preenchida (planilha mal formatada/não dividida em
+// colunas) são ignoradas aqui pra não quebrar a lista - mas não bloqueiam
+// o preenchimento manual, já que os campos aceitam texto livre.
+function aplicarObrasCarregadas_(lista) {
+  obrasDisponiveis = (lista || []).filter(o => o.cliente && o.obra);
   const clientes = [...new Set(obrasDisponiveis.map(o => o.cliente))].sort();
   preencherDatalist('dl-contratante', clientes);
+}
+
+// Cache local primeiro, rede depois (05/08/2026, pedido do Paulo: no 1º
+// toque no campo Contratante do dia/aparelho, antes da resposta do Apps
+// Script chegar, a lista de sugestão ficava vazia por vários segundos -
+// getObrasCache() é síncrono, não espera rede nenhuma) - se já existe
+// cache, a lista de sugestão fica pronta ANTES mesmo desta função
+// terminar; a busca de verdade roda do mesmo jeito logo em seguida e
+// substitui pelo dado fresco (preencherDatalist já re-renderiza sozinho
+// se o campo estiver com a lista aberta na hora, ver
+// configurarAutocompletePersonalizado_).
+async function carregarObras() {
+  const doCache = RdoApi.getObrasCache();
+  if (doCache) aplicarObrasCarregadas_(doCache);
+
+  try {
+    aplicarObrasCarregadas_(await RdoApi.getObras());
+  } catch (err) {
+    if (!doCache) {
+      mostrarStatus('Não foi possível carregar a lista de obras (sem conexão e sem cache local).', 'erro');
+      aplicarObrasCarregadas_([]);
+    }
+  }
 }
 
 // Pré-preenche Contratante/Obra/Serviço/Objeto/Local com o que ficou salvo
@@ -1540,9 +1585,18 @@ async function preencherUltimaIdentificacao_() {
 // sugestões das duas fontes (abas "Equipamentos" e "Veiculos" no backend)
 // combinadas numa ÚNICA datalist, cada busca com seu próprio fallback
 // independente (se uma falhar, ainda mostra a outra).
+// Mesmo padrão "cache primeiro, rede depois" de carregarObras() (ver
+// comentário lá) - também sofria do delay grande no 1º toque no campo
+// Descrição de Equipamentos/Veículos antes do cache existir.
 async function carregarEquipamentosVeiculos() {
-  let equipamentos = [];
-  let veiculos = [];
+  const equipCache = RdoApi.getEquipamentosCache();
+  const veicCache = RdoApi.getVeiculosCache();
+  if (equipCache || veicCache) {
+    preencherDatalist('dl-equipamentos', [...(equipCache || []), ...(veicCache || [])]);
+  }
+
+  let equipamentos = equipCache || [];
+  let veiculos = veicCache || [];
   try {
     equipamentos = await RdoApi.getEquipamentos();
   } catch (err) {
