@@ -26,6 +26,11 @@
   --erro-claro: #fbeae8;
   --alerta: #B26A00;
   --alerta-claro: #FCEFD9;
+  /* Azul (05/08/2026, dashboard do Perfil) - só usado nos rascunhos, pra
+     dar uma 5ª cor distinta do resto da paleta vinho/dourado/verde/laranja. */
+  --info: #1D5FBF;
+  --info-claro: #E4EFFC;
+  --neutro-claro: #EFEAE8;
 
   --desabilitado-bg: #ECE7E6;
   --desabilitado-texto: #A69D9B;
@@ -458,18 +463,49 @@ textarea { resize: vertical; overflow: hidden; }
   vertical-align: middle;
 }
 
-/* Cabeçalho/resumo/rodapé do Meu Perfil (12/07) - "Perfil" virou também o
-   lugar de infos de conta/app (versão, atualizar, sair), migradas do
-   cabeçalho principal (que ficou só com logo+título, mais harmônico). */
+/* Cabeçalho/resumo/rodapé do Meu Perfil (12/07, reforma 05/08/2026 - virou
+   um dashboard: saudação, sino de pendências, cards com ícone/descrição/
+   link, lista dos últimos RDOs e gráfico de 30 dias). "Perfil" continua
+   também o lugar de infos de conta/app (versão, atualizar, sair). */
 .perfil-cabecalho {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.perfil-saudacao h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--texto);
+  letter-spacing: -.01em;
+}
+.perfil-data {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--texto-suave);
+}
+.perfil-topo-acoes { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.perfil-sino {
+  position: relative;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; border: 1px solid var(--borda); color: var(--texto-suave);
+  flex-shrink: 0; padding: 0; cursor: pointer;
+}
+.perfil-sino svg { width: 19px; height: 19px; }
+.badge-sino {
+  position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px;
+  background: var(--erro); color: #fff; font-size: 10px; font-weight: bold;
+  border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--fundo);
 }
 .perfil-avatar {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--vinho-claro);
   color: var(--vinho);
@@ -478,40 +514,171 @@ textarea { resize: vertical; overflow: hidden; }
   justify-content: center;
   flex-shrink: 0;
 }
-.perfil-avatar svg { width: 24px; height: 24px; }
+.perfil-avatar svg { width: 22px; height: 22px; }
 .perfil-nome { font-size: 16px; font-weight: bold; color: var(--texto); margin: 0; }
 
-/* Perfil reorganizado em 4 quadrados (17/07/2026) - substituiu o antigo
-   .perfil-resumo (4 números lado a lado, não clicáveis). */
+.perfil-acoes-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 18px;
+}
+.botao-novo-rdo {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 13px 18px;
+  background: var(--vinho);
+  color: #fff;
+  border: none;
+  border-radius: var(--raio-md);
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.botao-novo-rdo:active { background: var(--vinho-escuro); }
+.botao-novo-rdo svg { width: 17px; height: 17px; stroke: #fff; }
+.perfil-sessao-desde {
+  font-size: 12.5px;
+  color: var(--texto-suave);
+  display: flex; align-items: center; gap: 6px;
+}
+.perfil-sessao-desde svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--texto-suave); }
+.perfil-sessao-desde strong { color: var(--texto); font-weight: 600; }
+
+/* Perfil reorganizado em 4/5 quadrados (17/07/2026, ícone+descrição+link
+   acrescentados em 05/08/2026) - substituiu o antigo .perfil-resumo (só
+   números lado a lado, não clicáveis). */
 .grade-perfil {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 .quadrado-perfil {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 22px 8px;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px 16px 14px;
   border: 1px solid var(--borda);
   border-radius: var(--raio-lg);
   box-shadow: var(--sombra-cartao);
   background: var(--branco);
   cursor: pointer;
   font: inherit;
-  text-align: center;
+  text-align: left;
 }
 .quadrado-perfil:active { box-shadow: none; }
-.quadrado-numero { font-size: 28px; font-weight: bold; color: var(--texto); }
-.quadrado-rotulo { font-size: 12px; color: var(--texto-suave); }
-.quadrado-revisar .quadrado-numero { color: var(--dourado-escuro); }
-.quadrado-aprovados .quadrado-numero { color: var(--sucesso); }
-.quadrado-sem-aprovacao .quadrado-numero { color: var(--alerta); }
-.quadrado-aguardando .quadrado-numero { color: var(--dourado-escuro); }
-.quadrado-rascunhos .quadrado-numero { color: var(--vinho); }
+@media (hover: hover) {
+  .quadrado-perfil:hover { box-shadow: var(--sombra-flutuante); }
+}
+.quadrado-icone {
+  width: 36px; height: 36px;
+  border-radius: var(--raio-md);
+  display: flex; align-items: center; justify-content: center;
+}
+.quadrado-icone svg { width: 19px; height: 19px; }
+.quadrado-numero { font-size: 26px; font-weight: bold; color: var(--texto); line-height: 1; }
+.quadrado-rotulo { font-size: 13px; font-weight: 600; color: var(--texto); margin: 0; }
+.quadrado-descricao { font-size: 11.5px; color: var(--texto-suave); margin: -4px 0 0; }
+.quadrado-link {
+  margin-top: 4px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600;
+  padding-top: 8px; border-top: 1px solid var(--fundo);
+  width: 100%;
+}
+.quadrado-link svg { width: 13px; height: 13px; }
+
+.quadrado-revisar .quadrado-icone { background: var(--dourado-claro); color: var(--dourado-escuro); }
+.quadrado-revisar .quadrado-numero,
+.quadrado-revisar .quadrado-link { color: var(--dourado-escuro); }
+
+.quadrado-aprovados .quadrado-icone { background: var(--sucesso-claro); color: var(--sucesso); }
+.quadrado-aprovados .quadrado-numero,
+.quadrado-aprovados .quadrado-link { color: var(--sucesso); }
+
+.quadrado-sem-aprovacao .quadrado-icone { background: var(--alerta-claro); color: var(--alerta); }
+.quadrado-sem-aprovacao .quadrado-numero,
+.quadrado-sem-aprovacao .quadrado-link { color: var(--alerta); }
+
+.quadrado-aguardando .quadrado-icone { background: var(--neutro-claro); color: var(--texto-suave); }
+.quadrado-aguardando .quadrado-numero { color: var(--texto); }
+.quadrado-aguardando .quadrado-link { color: var(--texto-suave); }
+
+.quadrado-rascunhos .quadrado-icone { background: var(--info-claro); color: var(--info); }
+.quadrado-rascunhos .quadrado-numero,
+.quadrado-rascunhos .quadrado-link { color: var(--info); }
+
+/* Últimos RDOs + gráfico de 30 dias (05/08/2026) - sub-seções DENTRO do
+   mesmo .cartao do Perfil (não cards aninhados de novo - só um separador,
+   mesmo espírito de .subsecao no formulário de RDO). */
+.subsecao-dashboard {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--borda);
+}
+.subsecao-dashboard-cabecalho {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-bottom: 12px;
+}
+.subsecao-dashboard-cabecalho h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--texto); }
+.link-ver-todos {
+  font-size: 12.5px; font-weight: 600; color: var(--vinho);
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.link-ver-todos svg { width: 13px; height: 13px; }
+
+.linha-rdo-dashboard {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-md);
+  box-shadow: var(--sombra-cartao);
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.linha-rdo-dashboard .ponto-status { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.linha-rdo-dashboard .info-rdo-dashboard { flex: 1; min-width: 0; }
+.linha-rdo-dashboard .info-rdo-dashboard strong { display: block; font-size: 13.5px; font-weight: 700; color: var(--texto); }
+.linha-rdo-dashboard .info-rdo-dashboard span { display: block; font-size: 11.5px; color: var(--texto-suave); margin-top: 1px; }
+.linha-rdo-dashboard .meta-rdo-dashboard { text-align: right; flex-shrink: 0; }
+.pill-status {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; white-space: nowrap;
+}
+.pill-status.pill-aprovado { background: var(--sucesso-claro); color: var(--sucesso); }
+.pill-status.pill-aguardando-cliente { background: var(--alerta-claro); color: var(--alerta); }
+.data-rdo-dashboard { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 4px; }
+
+.grafico-rdos-wrap { margin: 4px 0 10px; position: relative; }
+#grafico-rdos-svg { width: 100%; height: auto; display: block; overflow: visible; }
+.grafico-barra { fill: var(--vinho); opacity: .38; transition: opacity .12s ease; }
+.grafico-barra.pico, .grafico-barra.ativa { opacity: 1; }
+.grafico-grade line { stroke: var(--borda); stroke-width: 1; }
+.grafico-eixo text { fill: var(--texto-suave); font-size: 10px; font-family: inherit; }
+.grafico-base { stroke: var(--borda); stroke-width: 1.2; }
+.grafico-rotulo-pico { fill: var(--texto); font-size: 11px; font-weight: 700; }
+.grafico-tooltip {
+  position: absolute; pointer-events: none;
+  background: var(--texto); color: #fff;
+  font-size: 11.5px; font-weight: 600; padding: 5px 9px; border-radius: 8px;
+  transform: translate(-50%,-115%); white-space: nowrap; opacity: 0; transition: opacity .1s ease;
+  box-shadow: var(--sombra-flutuante); z-index: 5;
+}
+.grafico-tooltip.mostrar { opacity: 1; }
+
+.grafico-stats {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--fundo);
+}
+.grafico-stats > div { text-align: center; padding: 0 4px; }
+.grafico-stats span { display: block; font-size: 10.5px; color: var(--texto-suave); }
+.grafico-stats strong { display: block; font-size: 17px; font-weight: 800; color: var(--texto); margin-top: 2px; }
 
 /* Campos com <label> de verdade acima de cada um (mesmo padrão do
    formulário de RDO) - a spacing vem do próprio `label { margin: 10px 0
@@ -905,4 +1072,37 @@ textarea { resize: vertical; overflow: hidden; }
    (.wrap-visualizador-pdf) já rola se passar de 75vh. */
 img.iframe-visualizador-pdf {
   height: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Dashboard do Perfil em telas largas (05/08/2026) - o app é mobile-first
+   (`<main>` já trava em 720px pro formulário de RDO), mas #cartao-perfil
+   fica FORA do `<main>` e nunca tinha um teto de largura - ficava
+   esticado a tela inteira em quem acessa pelo site/navegador. A partir de
+   720px, mesma largura do `<main>`, mais os cards em grade e a lista de
+   últimos RDOs lado a lado com o gráfico (em vez de empilhados).
+   --------------------------------------------------------------------------- */
+@media (min-width: 720px) {
+  #cartao-perfil {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 28px;
+  }
+  .grade-perfil {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .botao-novo-rdo {
+    width: auto;
+    padding: 12px 22px;
+  }
+  .dashboard-duas-colunas {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 26px;
+    align-items: start;
+  }
+}
+
+@media (min-width: 1000px) {
+  #cartao-perfil { max-width: 1080px; }
 }

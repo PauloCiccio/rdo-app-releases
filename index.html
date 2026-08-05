@@ -23,33 +23,93 @@
 
 <section class="cartao" id="cartao-perfil" style="display:none;">
   <div class="perfil-cabecalho">
-    <div class="perfil-avatar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+    <div class="perfil-saudacao">
+      <h2 id="perfil-saudacao-texto">Olá</h2>
+      <p class="perfil-data" id="perfil-data-hoje"></p>
     </div>
-    <p class="perfil-nome" id="perfil-nome-usuario"></p>
+    <div class="perfil-topo-acoes">
+      <button type="button" class="perfil-sino" id="perfil-sino" aria-label="Pendências">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 1 1 12 0c0 4.2 1.6 5.7 1.6 5.7H4.4S6 13.7 6 9.5z"/><path d="M10 19.8a2 2 0 0 0 4 0"/></svg>
+        <span class="badge-sino" id="perfil-sino-badge" style="display:none;"></span>
+      </button>
+      <div class="perfil-avatar" title="">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="perfil-acoes-topo">
+    <button type="button" class="botao-novo-rdo" id="btn-novo-rdo-perfil">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Novo RDO
+    </button>
+    <div class="perfil-sessao-desde">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      No app desde <strong id="perfil-hora-sessao">--:--</strong>
+    </div>
   </div>
 
   <div class="grade-perfil" id="grade-perfil" style="display:none;">
     <button type="button" class="quadrado-perfil quadrado-revisar" id="quad-revisar" style="display:none;">
+      <div class="quadrado-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
       <span class="quadrado-numero" id="qtd-revisar">0</span>
       <span class="quadrado-rotulo">RDOs para revisar</span>
+      <span class="quadrado-descricao">Aguardando revisão interna</span>
+      <span class="quadrado-link">Visualizar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
     </button>
     <button type="button" class="quadrado-perfil quadrado-aprovados" id="quad-aprovados">
+      <div class="quadrado-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.3l2.6 2.6L16 9.3"/></svg></div>
       <span class="quadrado-numero" id="qtd-aprovados">0</span>
       <span class="quadrado-rotulo">RDOs aprovados</span>
+      <span class="quadrado-descricao">Emitidos e confirmados</span>
+      <span class="quadrado-link">Visualizar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
     </button>
     <button type="button" class="quadrado-perfil quadrado-sem-aprovacao" id="quad-sem-aprovacao">
+      <div class="quadrado-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg></div>
       <span class="quadrado-numero" id="qtd-sem-aprovacao">0</span>
       <span class="quadrado-rotulo">RDOs sem aprovação do Cliente</span>
+      <span class="quadrado-descricao">Enviados, sem confirmação ainda</span>
+      <span class="quadrado-link">Visualizar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
     </button>
     <button type="button" class="quadrado-perfil quadrado-aguardando" id="quad-aguardando">
+      <div class="quadrado-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
       <span class="quadrado-numero" id="qtd-aguardando">0</span>
       <span class="quadrado-rotulo">Aguardando aprovação de um responsável</span>
+      <span class="quadrado-descricao">Sem revisão interna concluída</span>
+      <span class="quadrado-link">Visualizar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
     </button>
     <button type="button" class="quadrado-perfil quadrado-rascunhos" id="quad-rascunhos">
+      <div class="quadrado-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14 6.5l3 3"/></svg></div>
       <span class="quadrado-numero" id="qtd-rascunhos">0</span>
       <span class="quadrado-rotulo">Meus rascunhos</span>
+      <span class="quadrado-descricao">Salvos, ainda não enviados</span>
+      <span class="quadrado-link">Visualizar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></span>
     </button>
+  </div>
+
+  <div class="dashboard-duas-colunas">
+    <div class="subsecao-dashboard" id="secao-ultimos-rdos" style="display:none;">
+      <div class="subsecao-dashboard-cabecalho">
+        <h3>Últimos RDOs</h3>
+        <button type="button" class="link-ver-todos" id="btn-ver-todos-rdos">Ver todos<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div id="lista-ultimos-rdos"></div>
+      <p class="orcamento-info" id="ultimos-rdos-sem-itens" style="display:none;">Nenhum RDO enviado ainda.</p>
+    </div>
+
+    <div class="subsecao-dashboard" id="secao-grafico-rdos" style="display:none;">
+      <div class="subsecao-dashboard-cabecalho">
+        <h3>RDOs dos últimos 30 dias</h3>
+      </div>
+      <div class="grafico-rdos-wrap">
+        <svg id="grafico-rdos-svg" viewBox="0 0 320 150" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="grafico-stats">
+        <div><span>Total</span><strong id="grafico-total">0</strong></div>
+        <div><span>Média/dia</span><strong id="grafico-media">0</strong></div>
+        <div><span>Maior dia</span><strong id="grafico-maior">0</strong></div>
+      </div>
+    </div>
   </div>
 
   <div id="perfil-carregando" class="status">Carregando seus RDOs...</div>

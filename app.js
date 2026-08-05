@@ -343,9 +343,26 @@ const el = {
   btnSalvarEmailCopia: document.getElementById('btn-salvar-email-copia'),
   statusLogin: document.getElementById('status-login'),
   cartaoPerfil: document.getElementById('cartao-perfil'),
-  perfilNomeUsuario: document.getElementById('perfil-nome-usuario'),
   perfilCarregando: document.getElementById('perfil-carregando'),
   perfilErro: document.getElementById('perfil-erro'),
+
+  perfilSaudacaoTexto: document.getElementById('perfil-saudacao-texto'),
+  perfilDataHoje: document.getElementById('perfil-data-hoje'),
+  perfilSino: document.getElementById('perfil-sino'),
+  perfilSinoBadge: document.getElementById('perfil-sino-badge'),
+  perfilAvatarChip: document.querySelector('#cartao-perfil .perfil-avatar'),
+  btnNovoRdoPerfil: document.getElementById('btn-novo-rdo-perfil'),
+  perfilHoraSessao: document.getElementById('perfil-hora-sessao'),
+
+  secaoUltimosRdos: document.getElementById('secao-ultimos-rdos'),
+  listaUltimosRdos: document.getElementById('lista-ultimos-rdos'),
+  ultimosRdosSemItens: document.getElementById('ultimos-rdos-sem-itens'),
+  btnVerTodosRdos: document.getElementById('btn-ver-todos-rdos'),
+  secaoGraficoRdos: document.getElementById('secao-grafico-rdos'),
+  graficoSvg: document.getElementById('grafico-rdos-svg'),
+  graficoTotal: document.getElementById('grafico-total'),
+  graficoMedia: document.getElementById('grafico-media'),
+  graficoMaior: document.getElementById('grafico-maior'),
 
   gradePerfil: document.getElementById('grade-perfil'),
   quadRevisar: document.getElementById('quad-revisar'),
@@ -1767,7 +1784,8 @@ const TITULOS_CATEGORIA_PERFIL_ = {
   aprovados: 'RDOs aprovados',
   'sem-aprovacao': 'RDOs sem aprovação do Cliente',
   aguardando: 'Aguardando aprovação de um responsável',
-  rascunhos: 'Meus rascunhos'
+  rascunhos: 'Meus rascunhos',
+  todos: 'Últimos RDOs'
 };
 
 // Junta rascunhos locais com os que só existem na nuvem (salvos noutro
@@ -1791,6 +1809,14 @@ function itensBrutosDaCategoriaPerfil_(categoria) {
   }
   if (categoria === 'aguardando') return perfilAguardandoRevisao_;
   if (categoria === 'rascunhos') return combinarRascunhos_(carregarRascunhosLocais_(), perfilRascunhosRemotos_);
+  // 'todos' (05/08/2026, dashboard do Perfil) - todo RDO que já ganhou um
+  // número de verdade (aprovado por qualquer origem + ainda aguardando o
+  // Cliente), do mais recente pro mais antigo. Rascunhos e revisão
+  // interna ficam de fora de propósito - ainda não são um RDO emitido.
+  if (categoria === 'todos') {
+    return [...perfilDadosAtuais.aprovados, ...perfilDadosAtuais.pendentes]
+      .sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  }
   return [];
 }
 
@@ -1800,6 +1826,191 @@ function atualizarContadoresPerfil_() {
   el.qtdSemAprovacao.textContent = String(itensBrutosDaCategoriaPerfil_('sem-aprovacao').length);
   el.qtdAguardando.textContent = String(perfilAguardandoRevisao_.length);
   el.qtdRascunhos.textContent = String(itensBrutosDaCategoriaPerfil_('rascunhos').length);
+}
+
+// Sino de pendências (05/08/2026) - conta o que precisa de AÇÃO de quem
+// está logado: "para revisar" (só admin/admin_master) + "aguardando
+// aprovação de um responsável". Não soma aprovados/sem-aprovação/
+// rascunhos - esses não pedem ação nenhuma agora.
+function atualizarSinoPerfil_(ehAdmin) {
+  const total = (ehAdmin ? perfilRevisar_.length : 0) + perfilAguardandoRevisao_.length;
+  el.perfilSinoBadge.style.display = total > 0 ? 'flex' : 'none';
+  el.perfilSinoBadge.textContent = total > 9 ? '9+' : String(total);
+}
+el.perfilSino.addEventListener('click', () => {
+  const sessao = carregarSessaoUsuario_();
+  const ehAdmin = sessao && (sessao.perfil === 'administrador' || sessao.perfil === 'admin_master');
+  if (ehAdmin && perfilRevisar_.length) abrirCategoriaPerfil_('revisar');
+  else if (perfilAguardandoRevisao_.length) abrirCategoriaPerfil_('aguardando');
+});
+
+// "Últimos RDOs" (05/08/2026) - os 5 mais recentes da categoria 'todos'
+// (ver itensBrutosDaCategoriaPerfil_), com status derivado do mesmo jeito
+// que renderizarListaPerfilAtual_ já usa pra decidir a linha certa:
+// item.origem presente = já tem número final (aprovado, direto ou via
+// link); ausente = ainda pendente (aguardando o Cliente).
+function montarLinhaUltimoRdo_(item) {
+  const linha = document.createElement('div');
+  linha.className = 'linha-rdo-dashboard';
+  const aguardando = !item.origem;
+  linha.innerHTML = `
+    <span class="ponto-status" style="background:${aguardando ? 'var(--alerta)' : 'var(--sucesso)'}"></span>
+    <div class="info-rdo-dashboard">
+      <strong>${item.obra || '(obra não preenchida)'}</strong>
+      <span>${item.cliente || ''}${item.elaborador ? ' · ' + item.elaborador : ''}</span>
+    </div>
+    <div class="meta-rdo-dashboard">
+      <span class="pill-status ${aguardando ? 'pill-aguardando-cliente' : 'pill-aprovado'}">${aguardando ? 'Aguardando Cliente' : 'Aprovado'}</span>
+      <span class="data-rdo-dashboard">${formatarDataResumoBR_(item.data)}</span>
+    </div>`;
+  return linha;
+}
+
+function renderizarUltimosRdos_() {
+  const itens = itensBrutosDaCategoriaPerfil_('todos').slice(0, 5);
+  el.listaUltimosRdos.innerHTML = '';
+  itens.forEach(item => el.listaUltimosRdos.appendChild(montarLinhaUltimoRdo_(item)));
+  el.ultimosRdosSemItens.style.display = itens.length ? 'none' : 'block';
+}
+el.btnVerTodosRdos.addEventListener('click', () => abrirCategoriaPerfil_('todos'));
+el.btnNovoRdoPerfil.addEventListener('click', () => mostrarAba_('rdo'));
+
+// Gráfico "RDOs dos últimos 30 dias" (05/08/2026) - inteiramente client-
+// side, a partir dos mesmos dados já buscados pra grade de cards (sem
+// endpoint novo no backend): conta quantos itens de
+// perfilDadosAtuais.aprovados/pendentes caem em cada um dos últimos 30
+// dias corridos (hoje incluso). SVG desenhado na mão (mesmo padrão do
+// resto do app - sem lib de gráfico), com tooltip no hover/toque.
+function renderizarGraficoRdos_() {
+  const itens = [...perfilDadosAtuais.aprovados, ...perfilDadosAtuais.pendentes];
+  const hoje = new Date();
+  const dias = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i);
+    dias.push(d);
+  }
+  const chaveDia_ = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const contagemPorDia = {};
+  itens.forEach(item => {
+    const chave = String(item.data || '').slice(0, 10);
+    contagemPorDia[chave] = (contagemPorDia[chave] || 0) + 1;
+  });
+  const valores = dias.map(d => contagemPorDia[chaveDia_(d)] || 0);
+  const total = valores.reduce((a, b) => a + b, 0);
+  const maior = Math.max(0, ...valores);
+
+  el.graficoTotal.textContent = String(total);
+  el.graficoMedia.textContent = (total / 30).toFixed(1).replace('.', ',');
+  el.graficoMaior.textContent = String(maior);
+
+  desenharGraficoSvg_(dias, valores);
+}
+
+function desenharGraficoSvg_(dias, valores) {
+  const svg = el.graficoSvg;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const ns = 'http://www.w3.org/2000/svg';
+  const W = 320, H = 150;
+  const padL = 22, padR = 4, padT = 10, padB = 20;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const n = valores.length;
+  const maxVal = Math.max(4, ...valores);
+  const gap = 2;
+  const barW = (plotW / n) - gap;
+
+  const y = v => padT + plotH - (v / maxVal) * plotH;
+  const criar_ = (tag, attrs) => {
+    const e = document.createElementNS(ns, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  };
+  const caminhoTopoArredondado_ = (x, yTop, w, h, r) => {
+    if (h <= 0) return `M${x} ${yTop + h} h${w} v0 h-${w} Z`;
+    r = Math.min(r, w / 2, h);
+    const yBase = yTop + h;
+    return `M${x} ${yBase} L${x} ${yTop + r} Q${x} ${yTop} ${x + r} ${yTop} L${x + w - r} ${yTop} Q${x + w} ${yTop} ${x + w} ${yTop + r} L${x + w} ${yBase} Z`;
+  };
+
+  const gradeG = criar_('g', { class: 'grafico-grade' });
+  [0, maxVal / 2, maxVal].forEach(t => {
+    gradeG.appendChild(criar_('line', { x1: padL, x2: W - padR, y1: y(t), y2: y(t) }));
+  });
+  svg.appendChild(gradeG);
+
+  const eixoG = criar_('g', { class: 'grafico-eixo' });
+  [0, maxVal / 2, maxVal].forEach(t => {
+    const txt = criar_('text', { x: padL - 5, y: y(t) + 3, 'text-anchor': 'end' });
+    txt.textContent = String(Math.round(t));
+    eixoG.appendChild(txt);
+  });
+  svg.appendChild(eixoG);
+
+  const maiorValor = Math.max(0, ...valores);
+  const picoIdx = maiorValor > 0 ? valores.indexOf(maiorValor) : -1;
+  const barsG = criar_('g');
+  const hitsG = criar_('g');
+  valores.forEach((v, i) => {
+    const x = padL + i * (barW + gap);
+    const h = (v / maxVal) * plotH;
+    const yTop = padT + plotH - h;
+    const path = criar_('path', {
+      d: caminhoTopoArredondado_(x, yTop, barW, Math.max(h, 1), 2),
+      class: 'grafico-barra' + (i === picoIdx ? ' pico' : '')
+    });
+    barsG.appendChild(path);
+    const hit = criar_('rect', { x, y: padT, width: barW, height: plotH, fill: 'transparent', 'data-i': i });
+    hitsG.appendChild(hit);
+  });
+  svg.appendChild(barsG);
+
+  if (picoIdx > -1) {
+    const px = padL + picoIdx * (barW + gap) + barW / 2;
+    const py = y(valores[picoIdx]) - 6;
+    const rotulo = criar_('text', { x: px, y: py, class: 'grafico-rotulo-pico', 'text-anchor': 'middle' });
+    rotulo.textContent = String(valores[picoIdx]);
+    svg.appendChild(rotulo);
+  }
+
+  svg.appendChild(criar_('line', { x1: padL, x2: W - padR, y1: y(0), y2: y(0), class: 'grafico-base' }));
+
+  const eixoXG = criar_('g', { class: 'grafico-eixo' });
+  dias.forEach((d, i) => {
+    if (i % 6 === 0 || i === dias.length - 1) {
+      const x = padL + i * (barW + gap) + barW / 2;
+      const txt = criar_('text', { x, y: H - 5, 'text-anchor': 'middle' });
+      txt.textContent = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+      eixoXG.appendChild(txt);
+    }
+  });
+  svg.appendChild(eixoXG);
+  svg.appendChild(hitsG);
+
+  const wrap = svg.parentElement;
+  let tip = wrap.querySelector('.grafico-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'grafico-tooltip';
+    wrap.appendChild(tip);
+  }
+
+  const barras = barsG.querySelectorAll('.grafico-barra');
+  hitsG.querySelectorAll('rect').forEach(hit => {
+    const i = +hit.getAttribute('data-i');
+    hit.addEventListener('mouseenter', () => barras[i].classList.add('ativa'));
+    hit.addEventListener('mouseleave', () => { barras[i].classList.remove('ativa'); tip.classList.remove('mostrar'); });
+    hit.addEventListener('mousemove', () => {
+      const rectBox = svg.getBoundingClientRect();
+      const escala = rectBox.width / W;
+      const localX = (+hit.getAttribute('x')) * escala + (barW * escala) / 2;
+      const localY = y(valores[i]) * (rectBox.height / H);
+      tip.style.left = localX + 'px';
+      tip.style.top = localY + 'px';
+      const rotuloData = String(dias[i].getDate()).padStart(2, '0') + '/' + String(dias[i].getMonth() + 1).padStart(2, '0');
+      tip.innerHTML = rotuloData + ' — <b>' + valores[i] + '</b> RDO' + (valores[i] === 1 ? '' : 's');
+      tip.classList.add('mostrar');
+    });
+  });
 }
 
 function popularDatalistsFiltroPerfil_(itens) {
@@ -1848,6 +2059,8 @@ function abrirCategoriaPerfil_(categoria) {
   categoriaAberta_ = categoria;
   el.tituloDetalheCategoria.textContent = TITULOS_CATEGORIA_PERFIL_[categoria];
   el.gradePerfil.style.display = 'none';
+  el.secaoUltimosRdos.style.display = 'none';
+  el.secaoGraficoRdos.style.display = 'none';
   el.perfilDetalheCategoria.style.display = 'block';
   // "Obras que acompanho" (preferência do administrador) só faz sentido
   // dentro do quadrado "revisar" - é o que ela filtra.
@@ -1866,6 +2079,8 @@ function fecharCategoriaPerfil_() {
   categoriaAberta_ = null;
   el.perfilDetalheCategoria.style.display = 'none';
   el.gradePerfil.style.display = 'grid';
+  el.secaoUltimosRdos.style.display = 'block';
+  el.secaoGraficoRdos.style.display = 'block';
 }
 
 function montarLinhaRevisar_(item) {
@@ -2161,14 +2376,49 @@ function montarLinhaPendente_(item) {
   return linha;
 }
 
+// Cabeçalho do dashboard do Perfil (05/08/2026) - saudação por horário +
+// data por extenso, formatadas na mão (arrays PT-BR) em vez de
+// Intl.DateTimeFormat, mesmo padrão de formatarDataResumoBR_ - evita
+// depender do locale do WebView do aparelho.
+const DIAS_SEMANA_ = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+const MESES_ = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+function saudacaoPorHorario_() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function dataPorExtensoHoje_() {
+  const agora = new Date();
+  return `${DIAS_SEMANA_[agora.getDay()]}, ${agora.getDate()} de ${MESES_[agora.getMonth()]} de ${agora.getFullYear()}`;
+}
+
+// Marca o momento em que ESTA sessão do app foi aberta (login novo ou
+// sessão salva restaurada) - "No app desde HH:MM" no cabeçalho do Perfil.
+// Só precisa da hora atual, sem persistir nada entre aberturas do app.
+const horaAberturaSessao_ = new Date();
+
+function atualizarCabecalhoPerfil_(sessao) {
+  const primeiroNome = String(sessao.nome || '').trim().split(' ')[0] || sessao.nome;
+  el.perfilSaudacaoTexto.textContent = `${saudacaoPorHorario_()}, ${primeiroNome} `;
+  el.perfilSaudacaoTexto.insertAdjacentHTML('beforeend', '<span aria-hidden="true">👋</span>');
+  el.perfilDataHoje.textContent = dataPorExtensoHoje_();
+  el.perfilAvatarChip.title = sessao.nome + (sessao.funcao ? ' — ' + sessao.funcao : '');
+  el.perfilHoraSessao.textContent = horaAberturaSessao_.toTimeString().slice(0, 5);
+}
+
 async function carregarPerfil_() {
   const sessao = carregarSessaoUsuario_();
   if (!sessao) { mostrarTelaLogin_(); return; }
 
-  el.perfilNomeUsuario.textContent = sessao.nome;
+  atualizarCabecalhoPerfil_(sessao);
   el.perfilCarregando.style.display = 'block';
   el.perfilErro.style.display = 'none';
   el.gradePerfil.style.display = 'none';
+  el.secaoUltimosRdos.style.display = 'none';
+  el.secaoGraficoRdos.style.display = 'none';
   fecharCategoriaPerfil_();
 
   // Papéis de usuário (14/07/2026): só administrador/admin_master veem o
@@ -2197,8 +2447,13 @@ async function carregarPerfil_() {
     perfilAguardandoRevisao_ = respMeusRdos.aguardandoRevisaoInterna || [];
 
     atualizarContadoresPerfil_();
+    atualizarSinoPerfil_(ehAdmin);
+    renderizarUltimosRdos_();
+    renderizarGraficoRdos_();
     el.perfilCarregando.style.display = 'none';
     el.gradePerfil.style.display = 'grid';
+    el.secaoUltimosRdos.style.display = 'block';
+    el.secaoGraficoRdos.style.display = 'block';
 
     if (ehAdmin) renderizarFiltroObrasPerfil_(sessao);
   } catch (err) {
