@@ -443,23 +443,32 @@ function fecharAutocomplete_() {
 // visual já vem reduzida pela altura do teclado; a de layout não. É essa
 // diferença que garante a lista abrindo num espaço de verdade visível em
 // vez de atrás/em cima do teclado.
+//
+// Prioriza abrir EMBAIXO (pedido do Paulo, 05/08/2026: "seria bom se ela
+// abrisse um pouco abaixo pra, se for digitar, dar pra ver o que é
+// digitado" - com o campo tampado a pessoa perde a visão do que está
+// escrevendo) - só abre em cima quando sobra bem pouco espaço embaixo
+// mesmo (< 90px, ex: campo colado no rodapé da tela com teclado aberto),
+// não só "menos que em cima". GAP maior (8px) que antes, pra ficar
+// visualmente separada do campo, não colada.
 function posicionarAutocomplete_() {
   if (!inputAutocompleteAtivo_) return;
+  const GAP = 8;
   const alturaVisivel = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const r = inputAutocompleteAtivo_.getBoundingClientRect();
   const espacoAbaixo = alturaVisivel - r.bottom;
   const espacoAcima = r.top;
-  const paraCima = espacoAbaixo < 160 && espacoAcima > espacoAbaixo;
-  const alturaMax = Math.max(120, (paraCima ? espacoAcima : espacoAbaixo) - 12);
+  const paraCima = espacoAbaixo < 90 && espacoAcima > espacoAbaixo;
+  const alturaMax = Math.max(120, (paraCima ? espacoAcima : espacoAbaixo) - GAP - 4);
   listaAutocomplete_.style.left = r.left + 'px';
   listaAutocomplete_.style.width = r.width + 'px';
   listaAutocomplete_.style.maxHeight = alturaMax + 'px';
   if (paraCima) {
     listaAutocomplete_.style.top = '';
-    listaAutocomplete_.style.bottom = (alturaVisivel - r.top + 4) + 'px';
+    listaAutocomplete_.style.bottom = (alturaVisivel - r.top + GAP) + 'px';
   } else {
     listaAutocomplete_.style.bottom = '';
-    listaAutocomplete_.style.top = (r.bottom + 4) + 'px';
+    listaAutocomplete_.style.top = (r.bottom + GAP) + 'px';
   }
 }
 
