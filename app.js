@@ -896,8 +896,15 @@ function carregarEstadoEmAndamento_() {
     if (e.target.closest('summary')) return; // abrir/fechar seção não edita nada
     agendarSalvarEstadoEmAndamento_();
     // Fecha a prévia pós-envio (ver prepararFechamentoPreviewPosEnvio_) assim
-    // que a pessoa começa a mexer no formulário já resetado pro próximo RDO.
-    if (fecharPreviewAoEditarFormulario_) fecharPreview_();
+    // que a pessoa começa a mexer no formulário (passos 1 a 5) já resetado
+    // pro próximo RDO - MAS NÃO por cliques dentro do próprio card de
+    // prévia/resumo (#cartao-preview, ex: "Copiar Resumo do RDO",
+    // "Compartilhar PDF"), que fica DENTRO de el.formRdo no DOM mas não é
+    // edição nenhuma do RDO (bug real reportado pelo Paulo: clicar em
+    // "Copiar Resumo" fechava a prévia na hora). "Cancelar / Editar"
+    // continua fechando por conta própria (handler dedicado, ver
+    // btnCancelarPreview).
+    if (fecharPreviewAoEditarFormulario_ && !e.target.closest('#cartao-preview')) fecharPreview_();
   });
 });
 
@@ -2646,8 +2653,9 @@ function resumirTempoResumo_(tempo) {
 }
 
 // Ordem/formato revisados em 05/08/2026 (pedido do Paulo, pra bater com a
-// ordem/nomenclatura do RDO de verdade): OS antes de Obra; Contratante,
-// Obra, Objeto do Contrato e Local nessa ordem fixa; Observações logo
+// ordem/nomenclatura do RDO de verdade): OS antes de Data e antes de Obra
+// (ajuste de OS×Data veio numa 2ª rodada, depois de testar em uso real);
+// Contratante, Obra, Objeto do Contrato e Local nessa ordem fixa; Observações logo
 // depois do Clima (mesmo campo único de "Observações do dia" do
 // formulário, que fica na mesma seção 2 "Condições do Dia" - por isso
 // entra aqui, não separado no fim) com aviso explícito quando vazio, em
@@ -2659,8 +2667,8 @@ function resumirTempoResumo_(tempo) {
 function montarResumoTextoRdo_(s, numero) {
   const linhas = [];
   linhas.push(`📋 *RESUMO DO RDO nº ${numero}*`);
-  linhas.push(`📅 *Data:* ${formatarDataResumoBR_(s.data)}`);
   if (s.os) linhas.push(`🔖 *OS:* ${s.os}`);
+  linhas.push(`📅 *Data:* ${formatarDataResumoBR_(s.data)}`);
   linhas.push(`🏢 *Contratante:* ${s.contratante || ''}`);
   linhas.push(`🏗️ *Obra:* ${s.obra || ''}`);
   linhas.push(`📄 *Objeto do Contrato:* ${s.objetoContrato || ''}`);
