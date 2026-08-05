@@ -317,6 +317,7 @@ const el = {
   btnCancelarPreview: document.getElementById('btn-cancelar-preview'),
   barraProgressoWrap: document.getElementById('barra-progresso-wrap'),
   barraProgresso: document.getElementById('barra-progresso'),
+  barraProgressoTexto: document.getElementById('barra-progresso-texto'),
   statusConfirmacao: document.getElementById('status-confirmacao'),
 
   formRdo: document.getElementById('form-rdo'),
@@ -2697,21 +2698,54 @@ function mostrarStatus(texto, tipo) {
 // páginas demora mais pra gerar/converter, precisa de indicação visual
 // de que tem algo rodando, não só o texto de status). "Determinada"
 // enquanto dá pra saber quantas páginas faltam gerar (client-side,
-// rápido); "indeterminada" (faixa animada) pro trecho que depende só da
-// resposta do backend (conversão/envio), sem jeito de saber quanto falta.
+// rápido, sobe até 50%); depois disso entra a etapa de conversão/envio
+// no backend, cuja duração real não dá pra saber de antemão.
+//
+// Revisado em 05/08/2026 (pedido do Paulo: a faixa animada sem número
+// "não dava ideia de quanto falta") - em vez de uma animação
+// indeterminada, simula uma porcentagem que sobe rápido no início e vai
+// desacelerando (curva ease-out) até um TETO de 96% - nunca chega
+// sozinha a 100%, só quando esconderBarraProgresso_ roda de verdade
+// (resposta real do backend chegou). É uma simulação, não o progresso
+// real da conversão (a API do Apps Script não expõe isso) - mas dá uma
+// ideia honesta de "ainda rodando, chegando perto do fim" em vez de uma
+// animação sem significado nenhum.
+let timerBarraSimulada_ = null;
+
+function pararBarraSimulada_() {
+  if (timerBarraSimulada_) {
+    clearInterval(timerBarraSimulada_);
+    timerBarraSimulada_ = null;
+  }
+}
+function definirBarraProgresso_(pct) {
+  el.barraProgresso.style.width = pct + '%';
+  el.barraProgressoTexto.textContent = Math.round(pct) + '%';
+}
 function mostrarBarraProgresso_() {
-  el.barraProgressoWrap.style.display = 'block';
-  el.barraProgresso.classList.remove('indeterminada');
-  el.barraProgresso.style.width = '0%';
+  el.barraProgressoWrap.style.display = 'flex';
+  pararBarraSimulada_();
+  definirBarraProgresso_(0);
 }
 function atualizarBarraProgressoDeterminada_(fracao) {
-  el.barraProgresso.classList.remove('indeterminada');
-  el.barraProgresso.style.width = Math.round(Math.min(fracao, 1) * 100) + '%';
+  pararBarraSimulada_();
+  definirBarraProgresso_(Math.round(Math.min(fracao, 1) * 100));
 }
 function marcarBarraProgressoIndeterminada_() {
-  el.barraProgresso.classList.add('indeterminada');
+  pararBarraSimulada_();
+  const TETO = 96;
+  let pct = parseFloat(el.barraProgresso.style.width) || 50;
+  timerBarraSimulada_ = setInterval(() => {
+    pct += Math.max(0.3, (TETO - pct) * 0.06);
+    if (pct >= TETO) {
+      pct = TETO;
+      pararBarraSimulada_();
+    }
+    definirBarraProgresso_(pct);
+  }, 200);
 }
 function esconderBarraProgresso_() {
+  pararBarraSimulada_();
   el.barraProgressoWrap.style.display = 'none';
 }
 
