@@ -789,7 +789,13 @@ const SpeechRecognitionCtor_ = window.SpeechRecognition || window.webkitSpeechRe
 // de novo, descartando os botões antigos).
 let pararDitadoAtivo_ = null;
 
-function configurarDitadoPorVoz_(botao, textarea) {
+// Erros que significam "sem acesso nenhum ao microfone" (permissão
+// negada, hardware indisponível) - só esses justificam parar de vez e
+// avisar a pessoa. Qualquer outro (no-speech, network, aborted...) é
+// passageiro; quem decide se reinicia é o 'end' logo abaixo.
+const ERROS_FATAIS_DITADO_VOZ_ = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
+
+function configurarDitadoPorVoz_(botao, textarea, elAviso) {
   if (!SpeechRecognitionCtor_) { botao.style.display = 'none'; return; }
 
   const recognition = new SpeechRecognitionCtor_();
@@ -800,18 +806,25 @@ function configurarDitadoPorVoz_(botao, textarea) {
   let gravando = false;
   let textoBase = '';
 
-  function parar_() {
+  function mostrarAviso_(texto) {
+    if (!elAviso) return;
+    elAviso.textContent = texto;
+  }
+
+  function parar_(mensagemErro) {
     if (!gravando) return;
     gravando = false;
     botao.classList.remove('gravando');
     botao.setAttribute('aria-label', 'Ditar por voz');
     if (pararDitadoAtivo_ === parar_) pararDitadoAtivo_ = null;
     try { recognition.stop(); } catch (err) { /* já parado, ignora */ }
+    if (mensagemErro) mostrarAviso_(mensagemErro);
   }
 
   botao.addEventListener('click', () => {
     if (gravando) { parar_(); return; }
     if (pararDitadoAtivo_) pararDitadoAtivo_(); // só 1 microfone ativo por vez
+    mostrarAviso_('');
     textoBase = textarea.value;
     gravando = true;
     pararDitadoAtivo_ = parar_;
@@ -820,7 +833,7 @@ function configurarDitadoPorVoz_(botao, textarea) {
     try {
       recognition.start();
     } catch (err) {
-      parar_();
+      parar_('Não consegui iniciar o microfone - tente de novo.');
     }
   });
 
@@ -841,12 +854,38 @@ function configurarDitadoPorVoz_(botao, textarea) {
   });
 
   recognition.addEventListener('error', (e) => {
-    console.warn('Ditado por voz falhou:', e.error);
-    parar_();
+    if (ERROS_FATAIS_DITADO_VOZ_.has(e.error)) {
+      console.warn('Ditado por voz sem acesso ao microfone:', e.error);
+      parar_('Sem acesso ao microfone - verifique a permissão nas configurações do app/navegador.');
+      return;
+    }
+    // Passageiro (ex: 'no-speech', 'network', 'aborted') - não derruba a
+    // gravação por causa disso; o 'end' que vem em seguida decide se
+    // reinicia sozinho (ver comentário abaixo).
+    console.warn('Ditado por voz: erro passageiro (' + e.error + '), tentando continuar.');
   });
-  // 'continuous' pode encerrar sozinho depois de uma pausa longa, mesmo
-  // sem erro - reflete no botão pra não ficar "gravando" fantasma.
-  recognition.addEventListener('end', () => { if (gravando) parar_(); });
+
+  // No Android (Chrome), 'continuous:true' não é respeitado de verdade -
+  // o reconhecimento encerra sozinho (evento 'end') depois de poucos
+  // segundos de silêncio, MESMO no meio de uma frase (bug conhecido,
+  // reportado pelo Paulo: "começa e para em 2-3 segundos" pra vários
+  // usuários Android; no iPhone/computador não acontece). Antes disso
+  // era tratado como se a pessoa tivesse apertado "parar" - agora, se
+  // `gravando` continua true (ninguém pediu pra parar), reinicia sozinho
+  // depois de uma pausa curta (evita a "InvalidStateError" de chamar
+  // start() de novo rápido demais em cima do fim anterior) - do ponto de
+  // vista de quem está ditando, a escuta nunca parou.
+  recognition.addEventListener('end', () => {
+    if (!gravando) return;
+    setTimeout(() => {
+      if (!gravando) return; // a pessoa pode ter apertado "parar" durante a pausa
+      try {
+        recognition.start();
+      } catch (err) {
+        parar_('O ditado foi interrompido - toque no microfone para continuar.');
+      }
+    }, 250);
+  });
 }
 
 function renderizarListaAtividades(cfg) {
@@ -880,10 +919,11 @@ function renderizarListaAtividades(cfg) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/><path d="M8 22h8"/></svg>
         </button>
       </div>
+      <p class="aviso-ditado-voz"></p>
       <div class="linhas-estimadas"></div>`;
     container.appendChild(linha);
 
-    configurarDitadoPorVoz_(linha.querySelector('.btn-ditado-voz'), linha.querySelector('.input-discriminacao'));
+    configurarDitadoPorVoz_(linha.querySelector('.btn-ditado-voz'), linha.querySelector('.input-discriminacao'), linha.querySelector('.aviso-ditado-voz'));
 
     const elEstimativa = linha.querySelector('.linhas-estimadas');
     function atualizarEstimativa() {

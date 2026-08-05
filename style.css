@@ -367,6 +367,13 @@ textarea { resize: vertical; overflow: hidden; }
   cursor: pointer;
   padding: 0 4px;
 }
+.aviso-ditado-voz {
+  font-size: 11px;
+  color: var(--erro);
+  font-weight: bold;
+  margin: 2px 0 0;
+}
+.aviso-ditado-voz:empty { display: none; }
 .linha-atividade .linhas-estimadas {
   font-size: 11px;
   color: var(--texto-suave);
