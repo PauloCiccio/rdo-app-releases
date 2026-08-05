@@ -1131,3 +1131,41 @@ img.iframe-visualizador-pdf {
 @media (min-width: 1000px) {
   #cartao-perfil { max-width: 1080px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Autocomplete personalizado (05/08/2026, substitui <datalist> nativo -
+   ver configurarAutocompletePersonalizado_ em app.js). No iPhone, a
+   sugestão do <datalist> é desenhada pelo próprio iOS, não pelo nosso
+   CSS, e não convivia bem com o teclado virtual nem com a barra fixa
+   debaixo da tela - a lista "não subia", ficava encavalada em cima do
+   teclado. position:fixed com posição calculada em JS (ver
+   posicionarAutocomplete_) tira essa lista da renderização nativa por
+   completo - sempre no nosso controle, igual em iOS/Android/desktop.
+   --------------------------------------------------------------------------- */
+.autocomplete-lista {
+  position: fixed;
+  z-index: 45;
+  display: none;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-md);
+  box-shadow: var(--sombra-flutuante);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.autocomplete-lista li {
+  padding: 11px 12px;
+  border-radius: var(--raio-sm);
+  font-size: 15px;
+  line-height: 1.3;
+  color: var(--texto);
+  cursor: pointer;
+}
+.autocomplete-lista li.ativo,
+.autocomplete-lista li:active {
+  background: var(--vinho-claro);
+  color: var(--vinho);
+}

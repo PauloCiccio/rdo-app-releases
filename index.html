@@ -142,11 +142,9 @@
         <label for="filtro-perfil-os">OS</label>
         <input type="text" id="filtro-perfil-os" placeholder="Número da OS">
         <label for="filtro-perfil-contratante">Contratante</label>
-        <input type="text" id="filtro-perfil-contratante" list="lista-contratantes-perfil" placeholder="Digite ou escolha">
-        <datalist id="lista-contratantes-perfil"></datalist>
+        <input type="text" id="filtro-perfil-contratante" placeholder="Digite ou escolha">
         <label for="filtro-perfil-obra">Obra</label>
-        <input type="text" id="filtro-perfil-obra" list="lista-obras-perfil" placeholder="Digite ou escolha">
-        <datalist id="lista-obras-perfil"></datalist>
+        <input type="text" id="filtro-perfil-obra" placeholder="Digite ou escolha">
         <div class="linha-2col">
           <div>
             <label for="filtro-perfil-data-ini">Execução de</label>
@@ -248,16 +246,13 @@
       </div>
 
       <label for="campo-contratante">Contratante</label>
-      <input type="text" id="campo-contratante" list="dl-contratante" placeholder="Selecione da lista ou digite" required autocomplete="off">
-      <datalist id="dl-contratante"></datalist>
+      <input type="text" id="campo-contratante" placeholder="Selecione da lista ou digite" required autocomplete="off">
 
       <label for="campo-obra">Obra</label>
-      <input type="text" id="campo-obra" list="dl-obra" placeholder="Selecione da lista ou digite" required autocomplete="off">
-      <datalist id="dl-obra"></datalist>
+      <input type="text" id="campo-obra" placeholder="Selecione da lista ou digite" required autocomplete="off">
 
       <label for="campo-servico">Serviço</label>
-      <input type="text" id="campo-servico" list="dl-servico" placeholder="Selecione da lista ou digite (opcional)" autocomplete="off">
-      <datalist id="dl-servico"></datalist>
+      <input type="text" id="campo-servico" placeholder="Selecione da lista ou digite (opcional)" autocomplete="off">
 
       <label for="campo-objeto">Objeto do Contrato</label>
       <input type="text" id="campo-objeto" placeholder="Preenchido automático, pode editar">
@@ -336,7 +331,6 @@
         <h3>Efetivo (MOD)</h3>
         <p class="orcamento-info">Espaço usado: <span id="orcamento-efetivo">0 / 12</span> linhas</p>
         <div id="lista-efetivo" class="lista-quant"></div>
-        <datalist id="dl-mod"></datalist>
         <button type="button" id="btn-add-efetivo" class="botao-secundario">+ Adicionar M.O.D.</button>
       </div>
 
@@ -344,7 +338,6 @@
         <h3>Equipamentos e Veículos</h3>
         <p class="orcamento-info">Espaço usado: <span id="orcamento-equipamentos">0 / 24</span> linhas</p>
         <div id="lista-equipamentos" class="lista-quant"></div>
-        <datalist id="dl-equipamentos"></datalist>
         <button type="button" id="btn-add-equipamentos" class="botao-secundario">+ Adicionar equipamento/veículo</button>
       </div>
     </div>

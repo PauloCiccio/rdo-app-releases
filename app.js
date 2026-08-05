@@ -263,11 +263,6 @@ const el = {
   contratante: document.getElementById('campo-contratante'),
   obra: document.getElementById('campo-obra'),
   servico: document.getElementById('campo-servico'),
-  dlContratante: document.getElementById('dl-contratante'),
-  dlObra: document.getElementById('dl-obra'),
-  dlServico: document.getElementById('dl-servico'),
-  dlEquipamentos: document.getElementById('dl-equipamentos'),
-  dlMod: document.getElementById('dl-mod'),
   objeto: document.getElementById('campo-objeto'),
   trecho: document.getElementById('campo-trecho'),
   btnToggleFrente: document.getElementById('btn-toggle-frente'),
@@ -386,9 +381,7 @@ const el = {
   painelFiltrosPerfil: document.getElementById('painel-filtros-perfil'),
   filtroPerfilOs: document.getElementById('filtro-perfil-os'),
   filtroPerfilContratante: document.getElementById('filtro-perfil-contratante'),
-  listaContratantesPerfil: document.getElementById('lista-contratantes-perfil'),
   filtroPerfilObra: document.getElementById('filtro-perfil-obra'),
-  listaObrasPerfil: document.getElementById('lista-obras-perfil'),
   filtroPerfilDataIni: document.getElementById('filtro-perfil-data-ini'),
   filtroPerfilDataFim: document.getElementById('filtro-perfil-data-fim'),
   btnLimparFiltrosPerfil: document.getElementById('btn-limpar-filtros-perfil'),
@@ -400,6 +393,169 @@ const el = {
   btnSalvarFiltroObras: document.getElementById('btn-salvar-filtro-obras'),
   statusFiltroObras: document.getElementById('status-filtro-obras')
 };
+
+// ---------------------------------------------------------------------------
+// Autocomplete personalizado (05/08/2026) - substitui o <datalist> nativo
+// usado até então em Contratante/Obra/Serviço/M.O.D./Equipamentos/filtros
+// do Perfil. No iPhone, a lista de sugestão do <datalist> é desenhada
+// pelo próprio iOS (não pelo nosso CSS) e não convive bem com o teclado
+// virtual nem com a barra fixa debaixo da tela - "a lista não sobe, fica
+// encavalada em cima do teclado" (relato do Paulo). Uma lista <ul> SÓ
+// (singleton, anexada em document.body, position:fixed) reaproveitada por
+// todo campo com sugestão resolve isso: fica 100% no nosso controle de
+// posição/z-index, nunca preso à renderização nativa - e evita vazar um
+// <ul> órfão toda vez que uma linha de Efetivo/Equipamentos é recriada
+// (container.innerHTML = '' a cada +Adicionar/remover), já que só um
+// campo pode estar focado por vez mesmo.
+//
+// REGISTRO_LISTAS_CUSTOM_ guarda as opções de cada lista por um ID de
+// string (ex: 'dl-obra') em vez de um <datalist> do DOM - preencherDatalist
+// só grava nesse registro; se a lista atualizada é a que está aberta na
+// hora (ex: Equipamentos chega do backend com o campo já focado),
+// re-renderiza na hora.
+const REGISTRO_LISTAS_CUSTOM_ = {};
+function preencherDatalist(listaId, opcoes) {
+  REGISTRO_LISTAS_CUSTOM_[listaId] = opcoes;
+  if (inputAutocompleteAtivo_ && inputAutocompleteAtivo_.dataset.listaId === listaId) {
+    renderizarOpcoesAutocomplete_(opcoes);
+  }
+}
+
+const listaAutocomplete_ = document.createElement('ul');
+listaAutocomplete_.className = 'autocomplete-lista';
+listaAutocomplete_.setAttribute('role', 'listbox');
+document.body.appendChild(listaAutocomplete_);
+
+let inputAutocompleteAtivo_ = null;
+let indiceAtivoAutocomplete_ = -1;
+
+function fecharAutocomplete_() {
+  listaAutocomplete_.style.display = 'none';
+  listaAutocomplete_.innerHTML = '';
+  if (inputAutocompleteAtivo_) inputAutocompleteAtivo_.setAttribute('aria-expanded', 'false');
+  inputAutocompleteAtivo_ = null;
+  indiceAtivoAutocomplete_ = -1;
+}
+
+// Decide abrir a lista pra baixo ou pra cima do campo conforme o espaço
+// disponível na VIEWPORT VISUAL (window.visualViewport), não a viewport
+// de layout (window.innerHeight) - no iPhone, com o teclado aberto, a
+// visual já vem reduzida pela altura do teclado; a de layout não. É essa
+// diferença que garante a lista abrindo num espaço de verdade visível em
+// vez de atrás/em cima do teclado.
+function posicionarAutocomplete_() {
+  if (!inputAutocompleteAtivo_) return;
+  const alturaVisivel = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const r = inputAutocompleteAtivo_.getBoundingClientRect();
+  const espacoAbaixo = alturaVisivel - r.bottom;
+  const espacoAcima = r.top;
+  const paraCima = espacoAbaixo < 160 && espacoAcima > espacoAbaixo;
+  const alturaMax = Math.max(120, (paraCima ? espacoAcima : espacoAbaixo) - 12);
+  listaAutocomplete_.style.left = r.left + 'px';
+  listaAutocomplete_.style.width = r.width + 'px';
+  listaAutocomplete_.style.maxHeight = alturaMax + 'px';
+  if (paraCima) {
+    listaAutocomplete_.style.top = '';
+    listaAutocomplete_.style.bottom = (alturaVisivel - r.top + 4) + 'px';
+  } else {
+    listaAutocomplete_.style.bottom = '';
+    listaAutocomplete_.style.top = (r.bottom + 4) + 'px';
+  }
+}
+
+function renderizarOpcoesAutocomplete_(opcoes) {
+  if (!inputAutocompleteAtivo_ || !opcoes.length) { fecharAutocomplete_(); return; }
+  listaAutocomplete_.innerHTML = opcoes.map(o => `<li role="option">${o}</li>`).join('');
+  listaAutocomplete_.style.display = 'block';
+  inputAutocompleteAtivo_.setAttribute('aria-expanded', 'true');
+  indiceAtivoAutocomplete_ = -1;
+  posicionarAutocomplete_();
+}
+
+function atualizarItemAtivoAutocomplete_(itens) {
+  itens.forEach((li, i) => li.classList.toggle('ativo', i === indiceAtivoAutocomplete_));
+  if (indiceAtivoAutocomplete_ >= 0) itens[indiceAtivoAutocomplete_].scrollIntoView({ block: 'nearest' });
+}
+
+function escolherAutocomplete_(valor) {
+  const input = inputAutocompleteAtivo_;
+  fecharAutocomplete_();
+  if (!input) return;
+  input.value = valor;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  input.focus();
+}
+
+// mousedown/touchstart com preventDefault na LISTA (não no campo) - impede
+// o blur do campo de disparar antes do toque na opção terminar de
+// registrar (a ordem padrão do navegador é mousedown -> blur -> click, o
+// que fecharia a lista antes dela conseguir capturar a escolha). Precisa
+// dos dois eventos porque touchstart não vira mousedown de verdade no
+// Safari/iOS a tempo de evitar o blur só com um dos dois.
+listaAutocomplete_.addEventListener('mousedown', e => e.preventDefault());
+listaAutocomplete_.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+listaAutocomplete_.addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (li) escolherAutocomplete_(li.textContent);
+});
+
+// Reposiciona ao vivo com o teclado abrindo/fechando/mudando de altura
+// (troca de campo com teclados diferentes, ex: texto -> numérico) e com
+// qualquer scroll da página enquanto a lista está aberta.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', posicionarAutocomplete_);
+  window.visualViewport.addEventListener('scroll', posicionarAutocomplete_);
+}
+window.addEventListener('scroll', posicionarAutocomplete_, true);
+
+function configurarAutocompletePersonalizado_(input, listaId) {
+  input.dataset.listaId = listaId;
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-expanded', 'false');
+  input.setAttribute('aria-autocomplete', 'list');
+
+  // Foco mostra a lista INTEIRA, mesmo com o campo já preenchido (pedido
+  // original do Paulo, 10/07: linhas fixas do M.O.D. tipo "Engenheiro"
+  // também precisam mostrar a lista completa ao tocar, não só as que
+  // "batem" com o texto atual) - digitar depois é que filtra.
+  input.addEventListener('focus', () => {
+    inputAutocompleteAtivo_ = input;
+    renderizarOpcoesAutocomplete_(REGISTRO_LISTAS_CUSTOM_[listaId] || []);
+  });
+  input.addEventListener('input', () => {
+    if (inputAutocompleteAtivo_ !== input) return;
+    const termo = input.value.trim().toLowerCase();
+    const todas = REGISTRO_LISTAS_CUSTOM_[listaId] || [];
+    renderizarOpcoesAutocomplete_(termo ? todas.filter(o => o.toLowerCase().includes(termo)) : todas);
+  });
+  input.addEventListener('blur', () => {
+    setTimeout(() => { if (inputAutocompleteAtivo_ === input) fecharAutocomplete_(); }, 150);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (inputAutocompleteAtivo_ !== input) return;
+    const itens = [...listaAutocomplete_.querySelectorAll('li')];
+    if (!itens.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      indiceAtivoAutocomplete_ = Math.min(indiceAtivoAutocomplete_ + 1, itens.length - 1);
+      atualizarItemAtivoAutocomplete_(itens);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      indiceAtivoAutocomplete_ = Math.max(indiceAtivoAutocomplete_ - 1, 0);
+      atualizarItemAtivoAutocomplete_(itens);
+    } else if (e.key === 'Enter') {
+      if (indiceAtivoAutocomplete_ >= 0) { e.preventDefault(); escolherAutocomplete_(itens[indiceAtivoAutocomplete_].textContent); }
+    } else if (e.key === 'Escape') {
+      fecharAutocomplete_();
+    }
+  });
+}
+
+configurarAutocompletePersonalizado_(el.contratante, 'dl-contratante');
+configurarAutocompletePersonalizado_(el.obra, 'dl-obra');
+configurarAutocompletePersonalizado_(el.servico, 'dl-servico');
 
 // ---------------------------------------------------------------------------
 // Banner de "sem conexão" (12/07, modo offline) - visível em qualquer tela
@@ -431,7 +587,6 @@ function atualizarOrcamentoQuant_(itens, capacidade, elOrcamento, btnAdd) {
 function renderizarListaQuantCrescente(cfg) {
   const { itens, container, elOrcamento, btnAdd, capacidade, datalistId, placeholderDescricao } = cfg;
   container.innerHTML = '';
-  const listAttr = datalistId ? `list="${datalistId}"` : '';
   const placeholderAttr = placeholderDescricao ? ` placeholder="${placeholderDescricao}"` : '';
 
   itens.forEach((item, i) => {
@@ -440,7 +595,7 @@ function renderizarListaQuantCrescente(cfg) {
     linha.innerHTML = `
       <div class="campo-descricao">
         <label>Descrição</label>
-        <input type="text" class="input-descricao" ${listAttr}${placeholderAttr} autocomplete="off" value="${item.descricao || ''}">
+        <input type="text" class="input-descricao"${placeholderAttr} autocomplete="off" value="${item.descricao || ''}">
       </div>
       <div class="campo-quant">
         <label>Quant</label>
@@ -451,18 +606,14 @@ function renderizarListaQuantCrescente(cfg) {
 
     const inputDescricao = linha.querySelector('.input-descricao');
     inputDescricao.addEventListener('input', e => {
-      if (e.target.value === 'Digitar') {
-        e.target.value = ''; // ver preencherDatalist
-        suprimirListaAteDesfocar_(e.target);
-      }
       item.descricao = e.target.value;
       salvarUltimaIdentificacao_();
     });
-    // ver configurarListaSempreCompleta_ - sem isso, linhas já preenchidas
-    // (ex: "Engenheiro" nas 6 funções padrão do M.O.D.) não mostram a
-    // lista completa de sugestões ao tocar, só as que "batem" com o texto
-    // atual.
-    configurarListaSempreCompleta_(inputDescricao);
+    // ver configurarAutocompletePersonalizado_ - o foco já mostra a lista
+    // INTEIRA mesmo com o campo preenchido (linhas fixas do M.O.D. tipo
+    // "Engenheiro" também precisam disso), sem precisar de nenhum truque
+    // aqui.
+    if (datalistId) configurarAutocompletePersonalizado_(inputDescricao, datalistId);
 
     linha.querySelector('.input-quant').addEventListener('input', e => {
       item.quant = e.target.value;
@@ -746,7 +897,7 @@ el.btnAddContratante.addEventListener('click', () => {
   renderizarListaAtividades(cfgAtivContratante);
 });
 
-preencherDatalist(el.dlMod, FUNCOES_MOD);
+preencherDatalist('dl-mod', FUNCOES_MOD);
 
 const cfgEfetivo = {
   itens: state.efetivo,
@@ -1011,7 +1162,7 @@ async function restaurarEstadoEmAndamento_() {
 
   if (state.contratante) {
     const obras = [...new Set(obrasDisponiveis.filter(o => o.cliente === state.contratante).map(o => o.obra))].sort();
-    preencherDatalist(el.dlObra, obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
+    preencherDatalist('dl-obra', obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
   }
   if (state.contratante && state.obra) {
     atualizarServicosESugestoes();
@@ -1057,8 +1208,8 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   el.btnToggleFrente.classList.remove('marcado');
   el.os.value = '';
   el.emailContratante.value = '';
-  preencherDatalist(el.dlObra, []);
-  preencherDatalist(el.dlServico, []);
+  preencherDatalist('dl-obra', []);
+  preencherDatalist('dl-servico', []);
 
   // Efetivo/Equipamentos voltam ao mesmo estado de um app recém-aberto
   // (6 funções padrão pré-preenchidas / 1 linha em branco de equipamento)
@@ -1303,75 +1454,6 @@ function mostrarAba_(aba) {
 // constava na lista ainda.
 // ---------------------------------------------------------------------------
 
-// Primeiro item de toda lista suspensa é "Digitar" (pedido do Paulo) - ao
-// tocar/selecionar essa opção, o campo limpa sozinho (ver
-// configurarDigitarSentinela_) em vez de preencher com o texto literal
-// "Digitar", deixando o teclado aberto pra digitação livre sem a lista
-// atrapalhando a visão.
-function preencherDatalist(datalist, opcoes) {
-  const todas = ['Digitar', ...opcoes];
-  datalist.innerHTML = todas.map(o => `<option value="${o}">`).join('');
-}
-
-// Ao selecionar "Digitar" da lista suspensa, o campo limpa sozinho (linha
-// abaixo) - mas só isso não bastava (pedido do Paulo, 10/07 tarde): o
-// datalist nativo do Android/Chrome não fecha o popup que já estava aberto
-// só porque o JS zerou o value, e a lista (agora "filtrando" por um valor
-// vazio, ou seja, mostrando TUDO de novo) reaparece bem na hora que o
-// usuário ia digitar livre - o contrário do que o botão "Digitar" deveria
-// fazer. A correção é remover o atributo `list` por completo enquanto o
-// campo estiver com foco (impede qualquer popup de aparecer, nem
-// filtrado) e devolver o atributo no blur, pra sugestão voltar a funcionar
-// da próxima vez que o campo for tocado.
-function suprimirListaAteDesfocar_(input) {
-  const listId = input.getAttribute('list');
-  if (!listId) return;
-  input.removeAttribute('list');
-  input.addEventListener('blur', () => input.setAttribute('list', listId), { once: true });
-}
-
-function configurarDigitarSentinela_(input) {
-  input.addEventListener('input', () => {
-    if (input.value === 'Digitar') {
-      input.value = '';
-      suprimirListaAteDesfocar_(input);
-    }
-  });
-}
-
-// A lista suspensa só sugere opções que "batem" com o texto JÁ digitado no
-// campo (filtro nativo do datalist) - então um campo que chega PRÉ-
-// PREENCHIDO (ex: linhas fixas do M.O.D. tipo "Engenheiro", ou
-// Contratante/Obra/Serviço lembrados da última vez - ver
-// preencherUltimaIdentificacao_) não mostra a lista completa ao tocar,
-// só opções que contenham aquele texto (quase sempre nenhuma). Pedido do
-// Paulo (10/07 tarde): "a lista suspensa precisa estar em todas as linhas
-// do M.O.D, não só nas vazias". Fix: ao focar um campo com valor
-// preenchido, esvazia ele temporariamente (sem disparar o listener de
-// 'input', então o dado guardado no state não muda) pra o datalist voltar
-// a mostrar TUDO; se o usuário sair do campo sem escolher/digitar nada
-// novo, devolve o valor original no blur.
-function configurarListaSempreCompleta_(input) {
-  let valorAntesDoFoco = null;
-  input.addEventListener('focus', () => {
-    if (input.value && input.value !== 'Digitar') {
-      valorAntesDoFoco = input.value;
-      input.value = '';
-    }
-  });
-  input.addEventListener('blur', () => {
-    if (valorAntesDoFoco !== null && input.value === '') {
-      input.value = valorAntesDoFoco;
-    }
-    valorAntesDoFoco = null;
-  });
-}
-
-[el.contratante, el.obra, el.servico].forEach(input => {
-  configurarDigitarSentinela_(input);
-  configurarListaSempreCompleta_(input);
-});
-
 async function carregarObras() {
   try {
     obrasDisponiveis = await RdoApi.getObras();
@@ -1384,7 +1466,7 @@ async function carregarObras() {
   // o preenchimento manual, já que os campos aceitam texto livre.
   obrasDisponiveis = obrasDisponiveis.filter(o => o.cliente && o.obra);
   const clientes = [...new Set(obrasDisponiveis.map(o => o.cliente))].sort();
-  preencherDatalist(el.dlContratante, clientes);
+  preencherDatalist('dl-contratante', clientes);
 }
 
 // Pré-preenche Contratante/Obra/Serviço/Objeto/Local com o que ficou salvo
@@ -1406,7 +1488,7 @@ async function preencherUltimaIdentificacao_() {
   el.contratante.value = ultima.contratante;
   state.contratante = ultima.contratante;
   const obras = [...new Set(obrasDisponiveis.filter(o => o.cliente === state.contratante).map(o => o.obra))].sort();
-  preencherDatalist(el.dlObra, obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
+  preencherDatalist('dl-obra', obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
 
   if (!ultima.obra) return;
   el.obra.value = ultima.obra;
@@ -1458,7 +1540,7 @@ async function carregarEquipamentosVeiculos() {
   } catch (err) {
     console.warn('Falha ao carregar lista de veículos:', err);
   }
-  preencherDatalist(el.dlEquipamentos, [...equipamentos, ...veiculos]);
+  preencherDatalist('dl-equipamentos', [...equipamentos, ...veiculos]);
 }
 
 el.contratante.addEventListener('input', () => {
@@ -1466,7 +1548,7 @@ el.contratante.addEventListener('input', () => {
   numeroReservado = null;
   el.previewNumero.textContent = '-';
   const obras = [...new Set(obrasDisponiveis.filter(o => o.cliente === state.contratante).map(o => o.obra))].sort();
-  preencherDatalist(el.dlObra, obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
+  preencherDatalist('dl-obra', obras.length ? obras : [...new Set(obrasDisponiveis.map(o => o.obra))].sort());
   salvarUltimaIdentificacao_();
 });
 
@@ -1493,7 +1575,7 @@ el.servico.addEventListener('input', () => {
 function atualizarServicosESugestoes() {
   const linhas = obrasDisponiveis.filter(o => o.cliente === state.contratante && o.obra === state.obra);
   const servicos = [...new Set(linhas.map(l => l.servico))].filter(Boolean);
-  preencherDatalist(el.dlServico, servicos);
+  preencherDatalist('dl-servico', servicos);
 
   if (linhas.length === 1) {
     aplicarServico(linhas[0]);
@@ -2023,9 +2105,11 @@ function desenharGraficoSvg_(dias, valores) {
 function popularDatalistsFiltroPerfil_(itens) {
   const contratantes = [...new Set(itens.map(item => item.cliente).filter(Boolean))].sort();
   const obras = [...new Set(itens.map(item => item.obra).filter(Boolean))].sort();
-  el.listaContratantesPerfil.innerHTML = contratantes.map(c => `<option value="${c}">`).join('');
-  el.listaObrasPerfil.innerHTML = obras.map(o => `<option value="${o}">`).join('');
+  preencherDatalist('lista-contratantes-perfil', contratantes);
+  preencherDatalist('lista-obras-perfil', obras);
 }
+configurarAutocompletePersonalizado_(el.filtroPerfilContratante, 'lista-contratantes-perfil');
+configurarAutocompletePersonalizado_(el.filtroPerfilObra, 'lista-obras-perfil');
 
 // OS/Contratante/Obra: substring, sem diferenciar maiúsculas/minúsculas.
 // Período: string 'yyyy-mm-dd' já é comparável diretamente.
