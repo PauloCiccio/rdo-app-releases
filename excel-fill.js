@@ -533,8 +533,8 @@ const RdoExcel = (function () {
       // (pedido do Paulo: "alinhe no meio da linha").
       cell.alignment = Object.assign({}, cell.alignment, { vertical: 'middle', horizontal: 'center' });
     };
-    celCentralizada(CELULAS.numero, String(numero));
-    celCentralizada(CELULAS.rev, '0');
+    celCentralizada(CELULAS.numero, numeroComRevisao_(numero, state));
+    celCentralizada(CELULAS.rev, formatarRevisao_(state));
     // Página X/Y dinâmico (17/07/2026) - até então sempre '1/1' fixo
     // ("RDO sempre cabe em 1 página"), agora reflete a paginação real.
     celCentralizada(CELULAS.pagina, `${numPagina}/${totalPaginas}`);
@@ -574,8 +574,26 @@ const RdoExcel = (function () {
   // sufixo "-2"/"-3" se houver mais de 1 no mesmo dia, ver
   // montarNumeroRdo_ no Code.gs) - não precisa mais de padStart, era só
   // pro contador sequencial antigo (ex: "1" -> "001").
+  //
+  // Revisão (05/08/2026, pedido do Paulo) - toda vez que um RDO já
+  // ENVIADO é reaberto pra revisão (ver abrirRdoParaRevisao_ em app.js,
+  // "Reabrir para revisão" no Perfil) e reenviado, a revisão sobe: Rev.
+  // 0 (nunca revisado) -> 01 -> 02... `state.revisao` (número simples,
+  // incrementado só nesse fluxo, nunca na revisão interna pré-1º envio -
+  // essa continua sendo a emissão original, Rev. 0) é a fonte única,
+  // usada tanto no cabeçalho quanto no nome do arquivo, pra nunca
+  // dessincronizar os dois.
+  function formatarRevisao_(state) {
+    const r = Number(state.revisao) || 0;
+    return r > 0 ? String(r).padStart(2, '0') : '0';
+  }
+  function numeroComRevisao_(numero, state) {
+    const r = Number(state.revisao) || 0;
+    return r > 0 ? `${numero}_R${String(r).padStart(2, '0')}` : String(numero);
+  }
+
   function montarNomeArquivo_(numero, state) {
-    return `RDO_${numero}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
+    return `RDO_${numeroComRevisao_(numero, state)}_${state.obra}_${state.data}.xlsx`.replace(/[\\/:*?"<>|]/g, '-');
   }
 
   // Gera N páginas (17/07/2026, substitui gerarWorkbook - ver histórico
@@ -642,6 +660,8 @@ const RdoExcel = (function () {
     particionarAtividades_,
     estimarLinhasAtividade,
     abreviarDescricaoEquipamento_,
+    formatarRevisao_,
+    numeroComRevisao_,
     CAPACIDADE_CONTRATADA,
     CAPACIDADE_CONTRATANTE,
     MAX_PAGINAS,

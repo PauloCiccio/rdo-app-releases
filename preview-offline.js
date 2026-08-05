@@ -288,9 +288,14 @@ const RdoPreviewOffline = (function () {
     // Modelo novo de 13/07/2026: rótulo (linha 3) e valor (linha 4) agora
     // são células separadas - antes ficavam juntos na linha 3. Todas as 3
     // são bold=true no modelo de verdade (conferido via openpyxl).
-    const numeroTexto = (numero != null) ? String(numero) : '(provisório)';
+    // Revisão (05/08/2026) - mesma fonte que o gerador oficial
+    // (RdoExcel.numeroComRevisao_/formatarRevisao_, ver excel-fill.js),
+    // pra prévia offline nunca mostrar Rev. errada quando o RDO é uma
+    // reabertura (state.revisao > 0).
+    const numeroTexto = (numero != null) ? (temRdoExcel ? RdoExcel.numeroComRevisao_(numero, state) : String(numero)) : '(provisório)';
+    const revTexto = temRdoExcel ? RdoExcel.formatarRevisao_(state) : '0';
     escreverTexto_(doc, numeroTexto, 'L', 4, 9, 0, { negrito: true, centralizarAteColuna: 'R', centralizarVerticalmente: true });
-    escreverTexto_(doc, '0', 'R', 4, 9, 0, { negrito: true, centralizarAteColuna: 'U', centralizarVerticalmente: true });
+    escreverTexto_(doc, revTexto, 'R', 4, 9, 0, { negrito: true, centralizarAteColuna: 'U', centralizarVerticalmente: true });
     escreverTexto_(doc, `1/${totalPaginas}`, 'U', 4, 9, 0, { negrito: true, centralizarAteColuna: 'FIM', centralizarVerticalmente: true });
 
     // Contratante/Obra/Objeto/Local/OS: rótulo (linha de cima) e valor
@@ -362,7 +367,7 @@ const RdoPreviewOffline = (function () {
     }
 
     const base64 = doc.output('datauristring').split(',')[1];
-    const numeroTextoArquivo = numero != null ? String(numero) : 'provisorio';
+    const numeroTextoArquivo = numero != null ? (temRdoExcel ? RdoExcel.numeroComRevisao_(numero, state) : String(numero)) : 'provisorio';
     const fileName = `RDO_${numeroTextoArquivo}_${state.obra || 'obra'}_${state.data || ''}_offline.pdf`.replace(/[\\/:*?"<>|]/g, '-');
     return { base64, fileName, totalPaginas };
   }

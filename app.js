@@ -209,7 +209,13 @@ const state = {
   // agora, ver [[project_rdo_app]]) - sempre true pra quem manda de verdade
   // (administrador/admin_master); elaborador nem chega a usar este campo
   // (RDO dele sempre vai pra aprovação interna primeiro).
-  aprovacaoContratante: true
+  aprovacaoContratante: true,
+  // Revisão (05/08/2026) - 0 = emissão original, nunca reaberta depois de
+  // enviada. Só sobe quando um RDO JÁ ENVIADO é reaberto pra revisão (ver
+  // abrirRdoParaRevisao_) - a revisão interna pré-1º envio NÃO conta (essa
+  // ainda é a emissão original). Usado no cabeçalho ("Rev.:") e no nome do
+  // arquivo gerado (RdoExcel.formatarRevisao_/numeroComRevisao_).
+  revisao: 0
 };
 
 let obrasDisponiveis = [];
@@ -1076,6 +1082,7 @@ el.btnLimparIdentificacao.addEventListener('click', () => {
   state.assinaturaAprovadorFuncao = '';
   state.assinaturaAprovadorDataHora = '';
   state.assinaturaContratadaDataHora = '';
+  state.revisao = 0;
 
   state.aprovacaoContratante = true;
   atualizarBalaoSemAprovacao_();
@@ -1504,7 +1511,7 @@ async function atualizarPreviewNumero() {
   try {
     const resp = await RdoApi.reservarNumero(state.contratante, state.obra, state.data, state.os);
     numeroReservado = resp.numero;
-    el.previewNumero.textContent = String(numeroReservado);
+    el.previewNumero.textContent = RdoExcel.numeroComRevisao_(numeroReservado, state);
   } catch (err) {
     el.previewNumero.textContent = '?';
   }
@@ -2284,6 +2291,7 @@ function preencherFormularioComState_(s) {
   state.assinaturaContratadaNome = s.assinaturaContratadaNome || '';
   state.assinaturaContratadaFuncao = s.assinaturaContratadaFuncao || '';
   state.assinaturaContratadaDataHora = s.assinaturaContratadaDataHora || '';
+  state.revisao = Number(s.revisao) || 0;
 
   state.efetivo.length = 0;
   (s.efetivo || []).forEach(item => state.efetivo.push(item));
@@ -2368,6 +2376,10 @@ async function abrirRdoParaRevisao_(origem, identificador) {
     const resp = await RdoApi.liberarRdoParaRevisao(sessao.token, origem, identificador);
     if (!resp.ok) { alert(resp.erro || 'Não consegui reabrir esse RDO.'); return; }
     restaurarRdoNoFormulario_(resp.stateJSON, resp.nomeElaborador, sessao);
+    // Reabertura de um RDO JÁ ENVIADO sobe a revisão (05/08/2026, pedido do
+    // Paulo) - Rev. 0 -> 01, 01 -> 02... só nesse fluxo (reabertura de um
+    // documento já emitido), nunca na revisão interna pré-1º envio.
+    state.revisao = (Number(state.revisao) || 0) + 1;
     reaberturaAtual_ = { origem, identificador, loginElaborador: resp.loginElaborador, nomeElaborador: resp.nomeElaborador };
   } catch (err) {
     console.error(err);
@@ -2666,7 +2678,7 @@ function resumirTempoResumo_(tempo) {
 // discriminação, e só a discriminação quando não há horário preenchido.
 function montarResumoTextoRdo_(s, numero) {
   const linhas = [];
-  linhas.push(`📋 *RESUMO DO RDO nº ${numero}*`);
+  linhas.push(`📋 *RESUMO DO RDO nº ${RdoExcel.numeroComRevisao_(numero, s)}*`);
   if (s.os) linhas.push(`🔖 *OS:* ${s.os}`);
   linhas.push(`📅 *Data:* ${formatarDataResumoBR_(s.data)}`);
   linhas.push(`🏢 *Contratante:* ${s.contratante || ''}`);
@@ -2889,6 +2901,10 @@ async function resetarParaProximoRdo_() {
   state.assinaturaAprovadorFuncao = '';
   state.assinaturaAprovadorDataHora = '';
   state.assinaturaContratadaDataHora = '';
+  // Revisão é específica do documento que acabou de ser enviado - o
+  // próximo RDO começa do zero (Rev. 0), mesmo que este tenha sido uma
+  // reabertura (ver abrirRdoParaRevisao_).
+  state.revisao = 0;
 
   // Balão "Gerar RDO sem assinatura da Contratante" (15/07/2026) - volta
   // pro padrão (COM aprovação da Contratante) a cada RDO novo, nunca
