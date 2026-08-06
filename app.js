@@ -806,6 +806,33 @@ function configurarDitadoPorVoz_(botao, textarea, elAviso) {
   let gravando = false;
   let textoBase = '';
 
+  // No Android, quando o reconhecimento reinicia sozinho (ver listener de
+  // 'end' abaixo), o buffer de áudio costuma "arrastar" a cauda da última
+  // palavra da sessão anterior pra dentro da sessão nova, que a reconhece
+  // de novo como resultado final - a pessoa via a mesma palavra repetida
+  // 2-3 vezes (reportado pelo Paulo). Corta a sobreposição antes de anexar.
+  function normalizarComparacaoDitado_(texto) {
+    return texto
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[.,!?;:]/g, '')
+      .trim();
+  }
+
+  function removerSobreposicaoDitado_(base, novo) {
+    const palavrasBase = base.trim().split(/\s+/).filter(Boolean);
+    const palavrasNovo = novo.trim().split(/\s+/).filter(Boolean);
+    const maxSobreposicao = Math.min(5, palavrasBase.length, palavrasNovo.length);
+    for (let n = maxSobreposicao; n > 0; n--) {
+      const caudaBase = palavrasBase.slice(-n).map(normalizarComparacaoDitado_).join(' ');
+      const inicioNovo = palavrasNovo.slice(0, n).map(normalizarComparacaoDitado_).join(' ');
+      if (caudaBase && caudaBase === inicioNovo) {
+        return palavrasNovo.slice(n).join(' ');
+      }
+    }
+    return novo;
+  }
+
   function mostrarAviso_(texto) {
     if (!elAviso) return;
     elAviso.textContent = texto;
@@ -845,7 +872,7 @@ function configurarDitadoPorVoz_(botao, textarea, elAviso) {
       if (e.results[i].isFinal) final += trecho;
       else interino += trecho;
     }
-    if (final) textoBase = (textoBase + ' ' + final).trim();
+    if (final) textoBase = (textoBase + ' ' + removerSobreposicaoDitado_(textoBase, final)).trim();
     textarea.value = (textoBase + ' ' + interino).trim();
     // Dispara o mesmo evento 'input' de sempre - reaproveita a checagem
     // de limite de páginas, auto-grow e estimativa de linhas que o
