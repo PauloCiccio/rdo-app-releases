@@ -3348,9 +3348,10 @@ function resumirTempoResumo_(tempo) {
 // pra "Discriminação das atividades" (nome da coluna no RDO de verdade,
 // ver corrigirCabecalhoHorario_ em excel-fill.js) com horário ANTES da
 // discriminação, e só a discriminação quando não há horário preenchido.
-function montarResumoTextoRdo_(s, numero) {
+function montarResumoTextoRdo_(s, numero, notaStatus) {
   const linhas = [];
   linhas.push(`📋 *RESUMO DO RDO nº ${RdoExcel.numeroComRevisao_(numero, s)}*`);
+  if (notaStatus) linhas.push(`⏳ *Status:* ${notaStatus}`);
   if (s.os) linhas.push(`🔖 *OS:* ${s.os}`);
   linhas.push(`📅 *Data:* ${formatarDataResumoBR_(s.data)}`);
   linhas.push(`🏢 *Contratante:* ${s.contratante || ''}`);
@@ -4302,8 +4303,26 @@ el.btnConfirmarEnvio.addEventListener('click', async () => {
       });
       if (!resp.ok) throw new Error(resp.erro || 'Não consegui salvar.');
       el.statusConfirmacao.className = 'status sucesso';
+
+      // "Copiar Resumo" também vale pro elaborador (14/07/2026, achado real
+      // do Paulo: só o caminho de envio direto - admin/admin_master -
+      // montava o resumo e mostrava o botão; quem salva pra revisão interna
+      // ficava sem essa opção). Nota de status embutida no PRÓPRIO texto
+      // copiado (não só na tela) - esse texto costuma ser colado no
+      // WhatsApp e sair do app, então precisa deixar claro por conta
+      // própria que o RDO ainda não foi pro Contratante.
+      const resumoTextoInterno = montarResumoTextoRdo_(state, numeroReservado, 'Aguardando aprovação de um responsável (revisão interna) - ainda não foi enviado à Contratante.');
+      el.btnCopiarResumo.style.display = 'block';
+      el.btnCopiarResumo.onclick = async () => {
+        const ok = await copiarTexto_(resumoTextoInterno);
+        const textoOriginalBotao = el.btnCopiarResumo.textContent;
+        el.btnCopiarResumo.textContent = ok ? '✓ Copiado! Já pode colar no WhatsApp.' : 'Erro ao copiar - tente de novo';
+        if (!ok) RdoApi.logErro('copiar_resumo_rdo', 'copiarTexto_ retornou false');
+        setTimeout(() => { el.btnCopiarResumo.textContent = textoOriginalBotao; }, 2500);
+      };
+
       await resetarParaProximoRdo_();
-      prepararFechamentoPreviewPosEnvio_('RDO salvo! Um administrador vai revisar e enviar pro Contratante.');
+      prepararFechamentoPreviewPosEnvio_('RDO salvo! Aguardando aprovação de um responsável (um administrador vai revisar e enviar pro Contratante).');
       return;
     }
 
