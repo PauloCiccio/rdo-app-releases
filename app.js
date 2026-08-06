@@ -249,6 +249,7 @@ function autoGrow(textarea) {
 // ela abre, pra não ficar com a caixa "cortada" até a pessoa digitar de novo.
 document.querySelectorAll('.secao-formulario').forEach(detalhes => {
   detalhes.addEventListener('toggle', () => {
+    atualizarStepper_();
     if (!detalhes.open) return;
     detalhes.querySelectorAll('textarea').forEach(autoGrow);
   });
@@ -272,6 +273,13 @@ const el = {
   data: document.getElementById('campo-data'),
   btnLimparIdentificacao: document.getElementById('btn-limpar-identificacao'),
   previewNumero: document.getElementById('preview-numero'),
+  resumoObra: document.getElementById('resumo-obra'),
+  resumoContratante: document.getElementById('resumo-contratante'),
+  resumoData: document.getElementById('resumo-data'),
+  resumoResponsavel: document.getElementById('resumo-responsavel'),
+  resumoNumero: document.getElementById('resumo-numero'),
+  resumoSalvoEm: document.getElementById('resumo-salvo-em'),
+  stepperRdo: document.getElementById('stepper-rdo'),
   observacoes: document.getElementById('campo-observacoes'),
   listaEfetivo: document.getElementById('lista-efetivo'),
   orcamentoEfetivo: document.getElementById('orcamento-efetivo'),
@@ -393,6 +401,33 @@ const el = {
   btnSalvarFiltroObras: document.getElementById('btn-salvar-filtro-obras'),
   statusFiltroObras: document.getElementById('status-filtro-obras')
 };
+
+// ---------------------------------------------------------------------------
+// Cartão-resumo + Stepper do formulário de RDO (06/08/2026, polimento
+// visual) - refletem dados que já existem no `state`/na sessão e no
+// acordeão real de seções, nunca inventam informação nova. Chamadas pelo
+// mesmo listener delegado que já aciona o autosave (mais abaixo) e pelo
+// listener de 'toggle' de cada <details> (abertura por clique OU
+// programática, ex: restaurarEstadoEmAndamento_ abre tudo de uma vez).
+// ---------------------------------------------------------------------------
+function atualizarResumoRdo_() {
+  el.resumoObra.textContent = state.obra || '-';
+  el.resumoContratante.textContent = state.contratante || '-';
+  el.resumoData.textContent = state.data ? formatarDataResumoBR_(state.data) : '-';
+  const sessao = carregarSessaoUsuario_();
+  el.resumoResponsavel.textContent = (sessao && sessao.nome) || '-';
+  el.resumoNumero.textContent = el.previewNumero.textContent !== '-' ? el.previewNumero.textContent : '-';
+}
+
+function atualizarStepper_() {
+  if (!el.stepperRdo) return;
+  const secoes = [...document.querySelectorAll('.secao-formulario')];
+  const indiceAberta = secoes.findIndex(s => s.open);
+  el.stepperRdo.querySelectorAll('.passo-stepper').forEach((passo, i) => {
+    passo.classList.toggle('atual', i === indiceAberta);
+    passo.classList.toggle('concluido', indiceAberta !== -1 && i < indiceAberta);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Autocomplete personalizado (05/08/2026) - substitui o <datalist> nativo
@@ -1235,6 +1270,12 @@ let debounceEstadoEmAndamentoTimer_ = null;
 function salvarEstadoEmAndamento_() {
   try {
     localStorage.setItem(CHAVE_ESTADO_EM_ANDAMENTO, JSON.stringify({ state }));
+    if (el.resumoSalvoEm) {
+      const agora = new Date();
+      const hh = String(agora.getHours()).padStart(2, '0');
+      const mm = String(agora.getMinutes()).padStart(2, '0');
+      el.resumoSalvoEm.textContent = 'Salvo automaticamente às ' + hh + ':' + mm;
+    }
   } catch (err) {
     console.warn('Falha ao salvar estado em andamento:', err);
   }
@@ -1263,6 +1304,7 @@ function carregarEstadoEmAndamento_() {
   el.formRdo.addEventListener(evento, (e) => {
     if (e.target.closest('summary')) return; // abrir/fechar seção não edita nada
     agendarSalvarEstadoEmAndamento_();
+    atualizarResumoRdo_();
     // Fecha a prévia pós-envio (ver prepararFechamentoPreviewPosEnvio_) assim
     // que a pessoa começa a mexer no formulário (passos 1 a 5) já resetado
     // pro próximo RDO - MAS NÃO por cliques dentro do próprio card de
@@ -1291,6 +1333,23 @@ document.querySelectorAll('.secao-formulario > summary').forEach(summary => {
         });
       }
     }, 0);
+  });
+});
+
+// Cada passo do stepper só "clica" no <summary> real da seção correspondente
+// (reaproveita 100% o fechar-os-outros de cima, sem duplicar lógica) - se a
+// seção já estiver aberta, só rola até ela em vez de fechar (evitar toggle
+// acidental pra fechado ao tocar no passo atual de novo).
+document.querySelectorAll('.passo-stepper').forEach(passo => {
+  passo.addEventListener('click', () => {
+    const secao = document.getElementById(passo.dataset.alvo);
+    if (!secao) return;
+    if (secao.open) {
+      secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    secao.querySelector('summary').click();
+    secao.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
 
@@ -1637,6 +1696,7 @@ function mostrarAba_(aba) {
   el.abaRdo.classList.toggle('ativo', ehRdo);
   el.abaPerfil.classList.toggle('ativo', !ehRdo);
   if (!ehRdo) carregarPerfil_();
+  else { atualizarResumoRdo_(); atualizarStepper_(); }
 }
 
 // ---------------------------------------------------------------------------
@@ -1825,6 +1885,7 @@ function aplicarServico(linha) {
 async function atualizarPreviewNumero() {
   if (!state.contratante || !state.obra || !state.data || !state.os) {
     el.previewNumero.textContent = '-';
+    atualizarResumoRdo_();
     return;
   }
   try {
@@ -1834,6 +1895,7 @@ async function atualizarPreviewNumero() {
   } catch (err) {
     el.previewNumero.textContent = '?';
   }
+  atualizarResumoRdo_();
 }
 
 // ---------------------------------------------------------------------------

@@ -38,9 +38,17 @@
   --raio-sm: 6px;
   --raio-md: 8px;
   --raio-lg: 12px;
+  /* Cantos maiores (06/08, polimento visual) - só nos cartões de nível
+     superior (.cartao, .secao-formulario, resumo, stepper), não em
+     inputs/botões pequenos, pra não virar "tudo pílula". */
+  --raio-xl: 18px;
 
   --sombra-cartao: 0 1px 3px rgba(35,20,18,.09), 0 1px 2px rgba(35,20,18,.05);
   --sombra-flutuante: 0 8px 30px rgba(35,20,18,.28);
+  /* Sombra mais suave/espalhada (06/08) - substitui --sombra-cartao só nos
+     cartões de nível superior, mantendo a original nos blocos internos
+     menores (ex: linha-quant) pra não achatar a hierarquia visual. */
+  --sombra-suave: 0 4px 20px rgba(35,20,18,.10), 0 1px 3px rgba(35,20,18,.06);
 }
 
 * { box-sizing: border-box; }
@@ -88,8 +96,8 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 .cartao {
   background: #fff;
   border: 1px solid var(--borda);
-  border-radius: var(--raio-lg);
-  box-shadow: var(--sombra-cartao);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-suave);
   padding: 14px;
   margin-bottom: 14px;
 }
@@ -103,6 +111,122 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
   align-items: center;
   gap: 8px;
 }
+
+/* ---------------------------------------------------------------------------
+   Cartão-resumo do RDO + Stepper (06/08, polimento visual) - ficam entre o
+   topo e o acordeão de seções. Refletem dados que já existem no `state`
+   (contratante/obra/data/nº) e no acordeão real (nunca inventam uma tela
+   nova) - ver atualizarResumoRdo_/atualizarStepper_ em app.js.
+   --------------------------------------------------------------------------- */
+.cartao-resumo-rdo { padding: 16px; }
+.resumo-rdo-grade {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 16px;
+}
+.resumo-rdo-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.resumo-rdo-rotulo {
+  font-size: 11px;
+  color: var(--texto-suave);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.resumo-rdo-valor {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--texto);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resumo-rdo-rodape {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--borda);
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+.resumo-rdo-rodape svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--sucesso); }
+
+.stepper-rdo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-suave);
+  padding: 16px 10px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+}
+.passo-stepper {
+  flex: 1;
+  min-width: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  position: relative;
+}
+/* Linha conectando as bolhas - desenhada com pseudo-elemento em cada passo
+   (exceto o primeiro), atrás da bolha (z-index), pra não precisar medir
+   posição via JS. */
+.passo-stepper:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--borda);
+  z-index: 0;
+}
+.passo-stepper.concluido:not(:first-child)::before { background: var(--sucesso); }
+.passo-stepper-bolha {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--neutro-claro);
+  border: 2px solid var(--borda);
+  color: var(--texto-suave);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.passo-stepper-check { display: none; width: 16px; height: 16px; }
+.passo-stepper-rotulo {
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: var(--texto-suave);
+  text-align: center;
+}
+.passo-stepper.atual .passo-stepper-bolha {
+  background: var(--vinho);
+  border-color: var(--vinho);
+  color: #fff;
+}
+.passo-stepper.atual .passo-stepper-rotulo { color: var(--vinho); font-weight: 700; }
+.passo-stepper.concluido .passo-stepper-bolha {
+  background: var(--sucesso);
+  border-color: var(--sucesso);
+  color: #fff;
+}
+.passo-stepper.concluido .passo-stepper-numero { display: none; }
+.passo-stepper.concluido .passo-stepper-check { display: block; }
+.passo-stepper.concluido .passo-stepper-rotulo { color: var(--sucesso); }
 .cartao h2 .icone-secao {
   width: 18px;
   height: 18px;
@@ -212,6 +336,10 @@ textarea { resize: vertical; overflow: hidden; }
   gap: 10px;
   align-items: flex-end;
   margin-bottom: 8px;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-md);
+  padding: 8px 10px;
 }
 .linha-quant .campo-descricao { flex: 3; }
 .linha-quant .campo-quant { flex: 1; }
@@ -847,8 +975,8 @@ textarea { resize: vertical; overflow: hidden; }
 .secao-formulario {
   background: #fff;
   border: 1px solid var(--borda);
-  border-radius: var(--raio-lg);
-  box-shadow: var(--sombra-cartao);
+  border-radius: var(--raio-xl);
+  box-shadow: var(--sombra-suave);
   margin-bottom: 14px;
   overflow: hidden;
 }
